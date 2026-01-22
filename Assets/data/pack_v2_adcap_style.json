@@ -1,0 +1,250 @@
+{
+  "gameId": "pack.v2.adcap-style",
+  "version": 2,
+  "numberFormat": { "type": "mantissaExponent", "precision": 16 },
+
+  "resources": [
+    { "id": "cash", "displayName": "Cash", "kind": "softCurrency", "format": { "style": "currency", "symbol": "$" } },
+    { "id": "angels", "displayName": "Angel Investors", "kind": "metaCurrency", "format": { "style": "suffix", "symbol": "👼" } }
+  ],
+
+  "phases": [{ "id": "phase.1", "displayName": "Main Run" }],
+
+  "zones": [
+    {
+      "id": "zone.main",
+      "displayName": "Main",
+      "startingPhaseId": "phase.1",
+      "localResources": ["cash"],
+      "tags": ["primary"]
+    }
+  ],
+
+  "computedVars": [],
+
+  "nodes": [
+    {
+      "id": "nodeType.business.lemonade",
+      "type": "producer",
+      "displayName": "Lemonade Stand",
+      "tags": ["business"],
+      "zoneId": "zone.main",
+      "outputs": [{ "resource": "cash", "mode": "cycle", "basePayout": "4" }],
+      "cycle": { "baseDurationSeconds": 1.0 },
+      "leveling": {
+        "levelResource": "cash",
+        "baseLevel": 0,
+        "maxLevel": null,
+        "priceCurve": { "type": "exponential", "baseCost": "4", "growth": "1.07" },
+        "outputScaling": [{ "target": "outputs[cash].basePayout", "perLevel": { "type": "multiply", "value": "1.05" } }]
+      },
+      "automation": { "policy": "manualCollect", "autoCollect": false, "autoRestart": false },
+      "requirements": []
+    },
+    {
+      "id": "nodeType.business.newspaper",
+      "type": "producer",
+      "displayName": "Newspaper Delivery",
+      "tags": ["business"],
+      "zoneId": "zone.main",
+      "outputs": [{ "resource": "cash", "mode": "cycle", "basePayout": "60" }],
+      "cycle": { "baseDurationSeconds": 3.0 },
+      "leveling": {
+        "levelResource": "cash",
+        "baseLevel": 0,
+        "maxLevel": null,
+        "priceCurve": { "type": "exponential", "baseCost": "60", "growth": "1.08" },
+        "outputScaling": [{ "target": "outputs[cash].basePayout", "perLevel": { "type": "multiply", "value": "1.06" } }]
+      },
+      "automation": { "policy": "manualCollect", "autoCollect": false, "autoRestart": false },
+      "requirements": [{ "type": "unlock", "args": { "id": "unlock.newspaper" } }]
+    },
+    {
+      "id": "nodeType.business.carwash",
+      "type": "producer",
+      "displayName": "Car Wash",
+      "tags": ["business"],
+      "zoneId": "zone.main",
+      "outputs": [{ "resource": "cash", "mode": "cycle", "basePayout": "720" }],
+      "cycle": { "baseDurationSeconds": 6.0 },
+      "leveling": {
+        "levelResource": "cash",
+        "baseLevel": 0,
+        "maxLevel": null,
+        "priceCurve": { "type": "exponential", "baseCost": "720", "growth": "1.09" },
+        "outputScaling": [{ "target": "outputs[cash].basePayout", "perLevel": { "type": "multiply", "value": "1.07" } }]
+      },
+      "automation": { "policy": "manualCollect", "autoCollect": false, "autoRestart": false },
+      "requirements": [{ "type": "unlock", "args": { "id": "unlock.carwash" } }]
+    }
+  ],
+
+  "nodeInstances": [
+    { "id": "inst.lemonade", "nodeId": "nodeType.business.lemonade", "zoneId": "zone.main", "initialState": { "level": 0, "enabled": true } },
+    { "id": "inst.newspaper", "nodeId": "nodeType.business.newspaper", "zoneId": "zone.main", "initialState": { "level": 0, "enabled": false } },
+    { "id": "inst.carwash", "nodeId": "nodeType.business.carwash", "zoneId": "zone.main", "initialState": { "level": 0, "enabled": false } }
+  ],
+
+  "links": [],
+
+  "modifiers": [
+    {
+      "id": "mod.global.cash2x",
+      "source": "upgrade.global.cash2x",
+      "zoneId": "zone.main",
+      "scope": { "kind": "global", "zoneId": "zone.main" },
+      "op": "multiply",
+      "target": "resourceGain.cash",
+      "value": "2"
+    },
+
+    {
+      "id": "mod.manager.lemonade",
+      "source": "upgrade.manager.lemonade",
+      "zoneId": "zone.main",
+      "scope": { "kind": "node", "zoneId": "zone.main", "nodeId": "nodeType.business.lemonade" },
+      "op": "set",
+      "target": "automation.policy",
+      "value": "autoRepeat"
+    },
+    {
+      "id": "mod.manager.newspaper",
+      "source": "upgrade.manager.newspaper",
+      "zoneId": "zone.main",
+      "scope": { "kind": "node", "zoneId": "zone.main", "nodeId": "nodeType.business.newspaper" },
+      "op": "set",
+      "target": "automation.policy",
+      "value": "autoRepeat"
+    },
+    {
+      "id": "mod.manager.carwash",
+      "source": "upgrade.manager.carwash",
+      "zoneId": "zone.main",
+      "scope": { "kind": "node", "zoneId": "zone.main", "nodeId": "nodeType.business.carwash" },
+      "op": "set",
+      "target": "automation.policy",
+      "value": "autoRepeat"
+    },
+
+    {
+      "id": "mod.ms.lemonade.25",
+      "source": "milestone.ms.lemonade.25",
+      "zoneId": "zone.main",
+      "scope": { "kind": "node", "zoneId": "zone.main", "nodeId": "nodeType.business.lemonade" },
+      "op": "multiply",
+      "target": "nodeOutput.cash",
+      "value": "2"
+    },
+    {
+      "id": "mod.ms.newspaper.25",
+      "source": "milestone.ms.newspaper.25",
+      "zoneId": "zone.main",
+      "scope": { "kind": "node", "zoneId": "zone.main", "nodeId": "nodeType.business.newspaper" },
+      "op": "multiply",
+      "target": "nodeOutput.cash",
+      "value": "2"
+    },
+
+    {
+      "id": "mod.prestige.angels.mult",
+      "source": "prestige",
+      "zoneId": "zone.main",
+      "scope": { "kind": "global", "zoneId": "zone.main" },
+      "op": "multiply",
+      "target": "resourceGain.cash",
+      "valueFromState": "meta.angelEarningsMultiplier"
+    }
+  ],
+
+  "upgrades": [
+    {
+      "id": "upgrade.global.cash2x",
+      "displayName": "Double All Profits",
+      "category": "upgrade",
+      "zoneId": "zone.main",
+      "cost": [{ "resource": "cash", "amount": "500" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.global.cash2x" }],
+      "requirements": [],
+      "tags": ["global"]
+    },
+
+    {
+      "id": "upgrade.manager.lemonade",
+      "displayName": "Hire Lemonade Manager",
+      "category": "upgrade",
+      "zoneId": "zone.main",
+      "cost": [{ "resource": "cash", "amount": "100" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.manager.lemonade" }],
+      "requirements": [{ "type": "nodeLevelAtLeast", "args": { "nodeId": "inst.lemonade", "level": 10 } }],
+      "tags": ["manager"]
+    },
+    {
+      "id": "upgrade.manager.newspaper",
+      "displayName": "Hire Newspaper Manager",
+      "category": "upgrade",
+      "zoneId": "zone.main",
+      "cost": [{ "resource": "cash", "amount": "2500" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.manager.newspaper" }],
+      "requirements": [{ "type": "nodeLevelAtLeast", "args": { "nodeId": "inst.newspaper", "level": 10 } }],
+      "tags": ["manager"]
+    },
+    {
+      "id": "upgrade.manager.carwash",
+      "displayName": "Hire Car Wash Manager",
+      "category": "upgrade",
+      "zoneId": "zone.main",
+      "cost": [{ "resource": "cash", "amount": "30000" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.manager.carwash" }],
+      "requirements": [{ "type": "nodeLevelAtLeast", "args": { "nodeId": "inst.carwash", "level": 10 } }],
+      "tags": ["manager"]
+    }
+  ],
+
+  "milestones": [
+    { "id": "milestone.ms.lemonade.25", "nodeId": "nodeType.business.lemonade", "zoneId": "zone.main", "atLevel": 25, "grantEffects": [{ "modifierId": "mod.ms.lemonade.25" }] },
+    { "id": "milestone.ms.newspaper.25", "nodeId": "nodeType.business.newspaper", "zoneId": "zone.main", "atLevel": 25, "grantEffects": [{ "modifierId": "mod.ms.newspaper.25" }] }
+  ],
+
+  "projects": [],
+
+  "unlockGraph": [
+    {
+      "id": "unlock.newspaper",
+      "zoneId": "zone.main",
+      "unlocks": [{ "kind": "nodeInstance", "id": "inst.newspaper" }],
+      "requirements": [{ "type": "resourceAtLeast", "args": { "resource": "cash", "amount": "200" } }]
+    },
+    {
+      "id": "unlock.carwash",
+      "zoneId": "zone.main",
+      "unlocks": [{ "kind": "nodeInstance", "id": "inst.carwash" }],
+      "requirements": [{ "type": "resourceAtLeast", "args": { "resource": "cash", "amount": "5000" } }]
+    }
+  ],
+
+  "buffs": [],
+
+  "prestige": {
+    "enabled": true,
+    "zoneId": "zone.main",
+    "prestigeResource": "angels",
+    "formula": { "type": "sqrt", "basedOn": "lifetimeEarnings.cash", "multiplier": "0.001", "offset": "0" },
+    "resetScopes": { "resetNodes": true, "resetSoftCurrencies": true, "keepHardCurrencies": true, "keepUnlocks": [], "keepUpgrades": [], "keepProjects": [] },
+    "metaUpgrades": [
+      {
+        "id": "meta.angels.multiplier",
+        "displayName": "Angel Multiplier (computed)",
+        "computed": { "type": "linear", "basedOn": "resource.angels", "multiplier": "0.02", "offset": "1.0" },
+        "writesToState": "meta.angelEarningsMultiplier"
+      }
+    ]
+  }
+}

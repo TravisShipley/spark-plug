@@ -1,0 +1,237 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class ModalManager : MonoBehaviour
+{
+    [Header("Scene References")]
+    [SerializeField] private Transform modalContainer;
+    [SerializeField] private Button backdropButton;   // full-screen button behind modal(s)
+    [SerializeField] private CanvasGroup backdropGroup;
+    [SerializeField] private Canvas backdropCanvas;
+
+    [Header("Behavior")]
+    [SerializeField] private bool closeOnEscape = true;
+    [SerializeField] private bool closeOnBackdropClick = true;
+
+    [Header("Stacking")]
+    [SerializeField] private int baseModalSortingOrder = 100;
+    [SerializeField] private int sortingStep = 10;
+
+    [Header("Modal Registry")]
+    [SerializeField] private List<ModalEntry> modalPrefabs = new();
+
+    private readonly Stack<ModalView> stack = new();
+    private Dictionary<string, ModalView> modalById;
+
+    [Serializable]
+    private class ModalEntry
+    {
+        public string Id;
+        public ModalView Prefab;
+    }
+
+    private void Awake()
+    {
+        if (modalContainer == null) modalContainer = transform;
+
+        if (backdropButton != null)
+            backdropButton.onClick.AddListener(OnBackdropClicked);
+
+        if (backdropCanvas == null && backdropGroup != null)
+            backdropCanvas = backdropGroup.GetComponent<Canvas>();
+
+        modalById = new Dictionary<string, ModalView>(StringComparer.Ordinal);
+
+        foreach (var entry in modalPrefabs)
+        {
+            if (entry == null || entry.Prefab == null)
+                continue;
+
+            var id = (entry.Id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogWarning($"ModalManager: ModalEntry with empty Id on prefab '{entry.Prefab.name}' was ignored.", this);
+                continue;
+            }
+
+            if (modalById.ContainsKey(id))
+            {
+                Debug.LogWarning($"ModalManager: Duplicate modal Id '{id}' found. Keeping the first, ignoring '{entry.Prefab.name}'.", this);
+                continue;
+            }
+
+            modalById.Add(id, entry.Prefab);
+        }
+
+        RefreshStack();
+    }
+
+    private void Update()
+    {
+        if (!closeOnEscape) return;
+
+        // Esc on desktop; Android back often maps to Escape too.
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            if (stack.Count == 0) return;
+
+            var top = stack.Peek();
+            if (top != null && top.Dismissible && top.CloseOnEscape)
+                CloseTop();
+        }
+    }
+
+    // Inspector-facing method
+    public void ShowById(string id)
+    {
+        Show(id);
+    }
+    
+    public T Show<T>(T modalPrefab, object payload = null) where T : ModalView
+    {
+        if (modalPrefab == null)
+            throw new ArgumentNullException(nameof(modalPrefab));
+
+        var instance = Instantiate(modalPrefab, modalContainer);
+        instance.gameObject.SetActive(true);
+
+        instance.Manager = this;
+
+        instance.OnBeforeShow(payload);
+        stack.Push(instance);
+
+        RefreshStack();
+        instance.OnShown();
+
+        return (T)instance;
+    }
+
+    public ModalView Show(string id, object payload = null)
+    {
+        if (modalById == null)
+            throw new InvalidOperationException("ModalManager has not been initialized.");
+
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException("Modal id is null or empty.", nameof(id));
+
+        id = id.Trim();
+
+        if (!modalById.TryGetValue(id, out var prefab) || prefab == null)
+            throw new KeyNotFoundException($"ModalManager: No modal registered with id '{id}'.");
+
+        return Show(prefab, payload);
+    }
+
+    public bool TryCloseTop()
+    {
+        if (stack.Count == 0)
+            return false;
+
+        var top = stack.Peek();
+        if (top != null && !top.Dismissible)
+            return false;
+
+        CloseTop();
+        return true;
+    }
+
+    public void CloseTop()
+    {
+        if (stack.Count == 0)
+            return;
+
+        var top = stack.Pop();
+        if (top != null)
+        {
+            top.OnBeforeClose();
+            Destroy(top.gameObject);
+        }
+
+        RefreshStack();
+    }
+
+    public void CloseAll()
+    {
+        while (stack.Count > 0)
+        {
+            var top = stack.Pop();
+            if (top != null)
+            {
+                top.OnBeforeClose();
+                Destroy(top.gameObject);
+            }
+        }
+
+        RefreshStack();
+    }
+
+    private void OnBackdropClicked()
+    {
+        if (!closeOnBackdropClick) return;
+        if (stack.Count == 0) return;
+
+        var top = stack.Peek();
+        if (top != null && top.Dismissible && top.CloseOnBackdrop)
+            CloseTop();
+    }
+
+    private void RefreshStack()
+    {
+        bool any = stack.Count > 0;
+
+        // Keep backdrop just below the top-most modal.
+        if (backdropCanvas != null)
+        {
+            backdropCanvas.overrideSorting = true;
+
+            if (stack.Count == 0)
+            {
+                backdropCanvas.sortingOrder = baseModalSortingOrder - 1;
+            }
+            else
+            {
+                // Top modal uses baseModalSortingOrder + (stack.Count - 1) * sortingStep
+                int topSortingOrder = baseModalSortingOrder + (stack.Count - 1) * sortingStep;
+                backdropCanvas.sortingOrder = topSortingOrder - 1;
+            }
+        }
+
+        if (backdropButton != null)
+            backdropButton.gameObject.SetActive(any);
+
+        if (backdropGroup != null)
+        {
+            backdropGroup.alpha = any ? 1f : 0f;
+            backdropGroup.blocksRaycasts = any;
+            backdropGroup.interactable = any;
+        }
+
+        // Ensure only the top modal is interactable and assign sorting orders.
+        // Stack enumerates from top -> bottom.
+        int i = 0;
+        foreach (var modal in stack)
+        {
+            if (modal == null) { i++; continue; }
+
+            bool isTop = (i == 0);
+
+            // Sorting: bottom = base, then +step per layer.
+            int sortingOrder = baseModalSortingOrder + (stack.Count - 1 - i) * sortingStep;
+
+            var canvas = modal.Canvas;
+            if (canvas != null && canvas.overrideSorting)
+                canvas.sortingOrder = sortingOrder;
+
+            var cg = modal.CanvasGroup;
+            if (cg != null)
+            {
+                cg.blocksRaycasts = isTop;
+                cg.interactable = isTop;
+            }
+
+            i++;
+        }
+    }
+}

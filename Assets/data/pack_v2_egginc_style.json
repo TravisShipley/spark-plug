@@ -1,0 +1,200 @@
+{
+  "gameId": "pack.v2.egginc-style",
+  "version": 2,
+  "numberFormat": { "type": "mantissaExponent", "precision": 16 },
+
+  "resources": [
+    { "id": "cash", "displayName": "Cash", "kind": "softCurrency", "format": { "style": "currency", "symbol": "$" } },
+    { "id": "eggs", "displayName": "Eggs", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "soul", "displayName": "Soul Eggs", "kind": "metaCurrency", "format": { "style": "suffix", "symbol": "🥚" } },
+    { "id": "golden", "displayName": "Golden Eggs", "kind": "hardCurrency", "format": { "style": "suffix", "symbol": "✨" } }
+  ],
+
+  "phases": [{ "id": "phase.1", "displayName": "Farm" }],
+
+  "zones": [
+    { "id": "zone.farm", "displayName": "Farm", "startingPhaseId": "phase.1", "localResources": ["cash", "eggs"], "tags": ["run"] }
+  ],
+
+  "computedVars": [
+    {
+      "id": "var.eggSellPrice",
+      "displayName": "Egg Sell Price",
+      "zoneId": "zone.farm",
+      "base": "1",
+      "min": "0",
+      "max": null,
+      "rounding": "none",
+      "expression": { "type": "constant", "args": ["1"] },
+      "dependsOn": []
+    }
+  ],
+
+  "nodes": [
+    {
+      "id": "nodeType.hatchery",
+      "type": "producer",
+      "displayName": "Hatchery",
+      "tags": ["production"],
+      "zoneId": "zone.farm",
+      "outputs": [{ "resource": "eggs", "mode": "rate", "basePerSecond": "1" }],
+      "leveling": {
+        "levelResource": "cash",
+        "baseLevel": 1,
+        "priceCurve": { "type": "exponential", "baseCost": "25", "growth": "1.12" },
+        "outputScaling": [{ "target": "outputs[eggs].basePerSecond", "perLevel": { "type": "multiply", "value": "1.10" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.shipping",
+      "type": "bottleneck",
+      "displayName": "Shipping",
+      "tags": ["bottleneck"],
+      "zoneId": "zone.farm",
+      "caps": [{ "resource": "eggs", "mode": "throughputPerSecond", "baseCapPerSecond": "5" }],
+      "leveling": {
+        "levelResource": "cash",
+        "baseLevel": 1,
+        "priceCurve": { "type": "exponential", "baseCost": "60", "growth": "1.14" },
+        "capScaling": [{ "target": "caps[eggs].baseCapPerSecond", "perLevel": { "type": "multiply", "value": "1.25" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.market",
+      "type": "converter",
+      "displayName": "Market",
+      "tags": ["sell"],
+      "zoneId": "zone.farm",
+      "inputs": [{ "resource": "eggs", "amountPerCycle": "1" }],
+      "outputs": [{ "resource": "cash", "amountPerCycleFromVar": "var.eggSellPrice" }],
+      "cycle": { "baseDurationSeconds": 0.2 },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    }
+  ],
+
+  "nodeInstances": [
+    { "id": "inst.hatchery", "nodeId": "nodeType.hatchery", "zoneId": "zone.farm", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.shipping", "nodeId": "nodeType.shipping", "zoneId": "zone.farm", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.market", "nodeId": "nodeType.market", "zoneId": "zone.farm", "initialState": { "level": 1, "enabled": true } }
+  ],
+
+  "links": [
+    {
+      "id": "link.eggsToMarket",
+      "zoneId": "zone.farm",
+      "from": "inst.hatchery",
+      "to": "inst.market",
+      "resource": "eggs",
+      "mode": "push",
+      "priority": 0,
+      "lossFactor": "1.0",
+      "enabledRequirements": []
+    }
+  ],
+
+  "modifiers": [
+    {
+      "id": "mod.research.hatchery2x",
+      "source": "upgrade.research.hatchery2x",
+      "zoneId": "zone.farm",
+      "scope": { "kind": "node", "zoneId": "zone.farm", "nodeId": "nodeType.hatchery" },
+      "op": "multiply",
+      "target": "nodeOutput.eggs",
+      "value": "2"
+    },
+    {
+      "id": "mod.research.shipping2x",
+      "source": "upgrade.research.shipping2x",
+      "zoneId": "zone.farm",
+      "scope": { "kind": "node", "zoneId": "zone.farm", "nodeId": "nodeType.shipping" },
+      "op": "multiply",
+      "target": "nodeCap.eggs.throughputPerSecond",
+      "value": "2"
+    },
+    {
+      "id": "mod.prestige.soul.mult",
+      "source": "prestige",
+      "zoneId": "zone.farm",
+      "scope": { "kind": "global", "zoneId": "zone.farm" },
+      "op": "multiply",
+      "target": "resourceGain.cash",
+      "valueFromState": "meta.soulEarningsMultiplier"
+    }
+  ],
+
+  "upgrades": [
+    {
+      "id": "upgrade.research.hatchery2x",
+      "displayName": "Research: Better Feed (2x eggs)",
+      "category": "research",
+      "zoneId": "zone.farm",
+      "cost": [{ "resource": "golden", "amount": "25" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.research.hatchery2x" }],
+      "requirements": [],
+      "tags": ["research"]
+    },
+    {
+      "id": "upgrade.research.shipping2x",
+      "displayName": "Research: Better Trucks (2x shipping)",
+      "category": "research",
+      "zoneId": "zone.farm",
+      "cost": [{ "resource": "golden", "amount": "25" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.research.shipping2x" }],
+      "requirements": [{ "type": "nodeLevelAtLeast", "args": { "nodeId": "inst.shipping", "level": 5 } }],
+      "tags": ["research"]
+    }
+  ],
+
+  "milestones": [],
+  "projects": [],
+
+  "unlockGraph": [],
+
+  "buffs": [
+    {
+      "id": "buff.10min.10x",
+      "displayName": "10x Earnings (10m)",
+      "zoneId": "zone.farm",
+      "durationSeconds": 600,
+      "stacking": "refresh",
+      "effects": [
+        {
+          "id": "mod.buff.earn10x",
+          "source": "buff.10min.10x",
+          "zoneId": "zone.farm",
+          "scope": { "kind": "global", "zoneId": "zone.farm" },
+          "op": "multiply",
+          "target": "resourceGain.cash",
+          "value": "10"
+        }
+      ]
+    }
+  ],
+
+  "prestige": {
+    "enabled": true,
+    "zoneId": "zone.farm",
+    "prestigeResource": "soul",
+    "formula": { "type": "log10", "basedOn": "lifetimeEarnings.cash", "multiplier": "10", "offset": "0" },
+    "resetScopes": { "resetNodes": true, "resetSoftCurrencies": true, "keepHardCurrencies": true, "keepUnlocks": [], "keepUpgrades": ["upgrade.research.hatchery2x", "upgrade.research.shipping2x"], "keepProjects": [] },
+    "metaUpgrades": [
+      {
+        "id": "meta.soul.multiplier",
+        "displayName": "Soul Multiplier (computed)",
+        "computed": { "type": "linear", "basedOn": "resource.soul", "multiplier": "0.01", "offset": "1.0" },
+        "writesToState": "meta.soulEarningsMultiplier"
+      }
+    ]
+  }
+}

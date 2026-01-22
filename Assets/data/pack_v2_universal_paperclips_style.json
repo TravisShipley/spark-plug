@@ -1,0 +1,186 @@
+{
+  "gameId": "pack.v2.universal-paperclips-style",
+  "version": 2,
+  "numberFormat": { "type": "mantissaExponent", "precision": 16 },
+
+  "resources": [
+    { "id": "funds", "displayName": "Funds", "kind": "softCurrency", "format": { "style": "currency", "symbol": "$" } },
+    { "id": "wire", "displayName": "Wire", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "clips", "displayName": "Paperclips", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "ops", "displayName": "Ops", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "trust", "displayName": "Trust", "kind": "inventory", "format": { "style": "suffix" } }
+  ],
+
+  "phases": [
+    { "id": "phase.1", "displayName": "Clips" },
+    { "id": "phase.2", "displayName": "Automation" }
+  ],
+
+  "zones": [
+    { "id": "zone.office", "displayName": "Office", "startingPhaseId": "phase.1", "localResources": ["funds", "wire", "clips", "ops", "trust"], "tags": ["paper"] }
+  ],
+
+  "computedVars": [
+    {
+      "id": "var.clipPrice",
+      "displayName": "Clip Price",
+      "zoneId": "zone.office",
+      "base": "0.25",
+      "min": "0.01",
+      "max": "2",
+      "rounding": "none",
+      "expression": { "type": "constant", "args": ["0.25"] },
+      "dependsOn": []
+    },
+    {
+      "id": "var.wireCost",
+      "displayName": "Wire Cost",
+      "zoneId": "zone.office",
+      "base": "15",
+      "min": "1",
+      "max": null,
+      "rounding": "none",
+      "expression": { "type": "constant", "args": ["15"] },
+      "dependsOn": []
+    }
+  ],
+
+  "nodes": [
+    {
+      "id": "nodeType.makeClips",
+      "type": "converter",
+      "displayName": "Make Paperclips",
+      "tags": ["production"],
+      "zoneId": "zone.office",
+      "inputs": [{ "resource": "wire", "amountPerCycle": "1" }],
+      "outputs": [{ "resource": "clips", "amountPerCycle": "1" }],
+      "cycle": { "baseDurationSeconds": 0.5 },
+      "leveling": {
+        "levelResource": "funds",
+        "baseLevel": 1,
+        "priceCurve": { "type": "exponential", "baseCost": "5", "growth": "1.18" },
+        "outputScaling": [{ "target": "cycle.baseDurationSeconds", "perLevel": { "type": "multiply", "value": "0.97" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.sellClips",
+      "type": "converter",
+      "displayName": "Sell Paperclips",
+      "tags": ["sell"],
+      "zoneId": "zone.office",
+      "inputs": [{ "resource": "clips", "amountPerCycle": "1" }],
+      "outputs": [{ "resource": "funds", "amountPerCycleFromVar": "var.clipPrice" }],
+      "cycle": { "baseDurationSeconds": 0.2 },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.buyWire",
+      "type": "converter",
+      "displayName": "Buy Wire",
+      "tags": ["market"],
+      "zoneId": "zone.office",
+      "inputs": [{ "resource": "funds", "amountPerCycleFromVar": "var.wireCost" }],
+      "outputs": [{ "resource": "wire", "amountPerCycle": "10" }],
+      "cycle": { "baseDurationSeconds": 1.0 },
+      "automation": { "policy": "manualStart", "autoCollect": true, "autoRestart": false },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.computeOps",
+      "type": "producer",
+      "displayName": "Compute (Ops)",
+      "tags": ["compute"],
+      "zoneId": "zone.office",
+      "outputs": [{ "resource": "ops", "mode": "rate", "basePerSecond": "0.1" }],
+      "leveling": {
+        "levelResource": "funds",
+        "baseLevel": 0,
+        "priceCurve": { "type": "exponential", "baseCost": "100", "growth": "1.25" },
+        "outputScaling": [{ "target": "outputs[ops].basePerSecond", "perLevel": { "type": "multiply", "value": "1.35" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": [{ "type": "phaseAtLeast", "args": { "phaseId": "phase.2" } }]
+    }
+  ],
+
+  "nodeInstances": [
+    { "id": "inst.makeClips", "nodeId": "nodeType.makeClips", "zoneId": "zone.office", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.sellClips", "nodeId": "nodeType.sellClips", "zoneId": "zone.office", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.buyWire", "nodeId": "nodeType.buyWire", "zoneId": "zone.office", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.computeOps", "nodeId": "nodeType.computeOps", "zoneId": "zone.office", "initialState": { "level": 0, "enabled": false } }
+  ],
+
+  "links": [
+    { "id": "link.wireToClips", "zoneId": "zone.office", "from": "inst.buyWire", "to": "inst.makeClips", "resource": "wire", "mode": "push", "priority": 0, "lossFactor": "1.0", "enabledRequirements": [] },
+    { "id": "link.clipsToSell", "zoneId": "zone.office", "from": "inst.makeClips", "to": "inst.sellClips", "resource": "clips", "mode": "push", "priority": 0, "lossFactor": "1.0", "enabledRequirements": [] }
+  ],
+
+  "modifiers": [
+    {
+      "id": "mod.price.raise",
+      "source": "project.raisePrice",
+      "zoneId": "zone.office",
+      "scope": { "kind": "global", "zoneId": "zone.office" },
+      "op": "multiply",
+      "target": "var.var.clipPrice",
+      "value": "1.15"
+    },
+    {
+      "id": "mod.unlock.phase2",
+      "source": "project.unlockAutomation",
+      "zoneId": "zone.office",
+      "scope": { "kind": "global", "zoneId": "zone.office" },
+      "op": "set",
+      "target": "state.phaseId",
+      "value": "phase.2"
+    }
+  ],
+
+  "upgrades": [],
+
+  "milestones": [],
+
+  "projects": [
+    {
+      "id": "project.raisePrice",
+      "displayName": "Marketing Campaign (raise clip price)",
+      "zoneId": "zone.office",
+      "timeSeconds": 10,
+      "cost": [{ "resource": "ops", "amount": "25" }],
+      "effects": [{ "modifierId": "mod.price.raise" }],
+      "requirements": [],
+      "exclusiveGroup": null,
+      "tags": ["project"]
+    },
+    {
+      "id": "project.unlockAutomation",
+      "displayName": "Automation Breakthrough",
+      "zoneId": "zone.office",
+      "timeSeconds": 20,
+      "cost": [{ "resource": "ops", "amount": "50" }],
+      "effects": [{ "modifierId": "mod.unlock.phase2" }],
+      "requirements": [{ "type": "resourceAtLeast", "args": { "resource": "clips", "amount": "500" } }],
+      "exclusiveGroup": "phaseUnlock",
+      "tags": ["phase"]
+    }
+  ],
+
+  "unlockGraph": [
+    {
+      "id": "unlock.computeOps",
+      "zoneId": "zone.office",
+      "unlocks": [{ "kind": "nodeInstance", "id": "inst.computeOps" }],
+      "requirements": [{ "type": "phaseAtLeast", "args": { "phaseId": "phase.2" } }]
+    }
+  ],
+
+  "buffs": [],
+
+  "prestige": { "enabled": false, "zoneId": "zone.office" }
+}

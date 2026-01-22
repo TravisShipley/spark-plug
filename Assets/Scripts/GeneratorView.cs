@@ -186,7 +186,7 @@ public class GeneratorView : MonoBehaviour
             .CombineLatest(
                 vm.OutputPerCycle.DistinctUntilChanged(),
                 vm.CycleDurationSeconds.DistinctUntilChanged(),
-                (output, duration) => $"${output:0.00} / {duration:0.00}s"
+                (output, duration) => $"{Format.Currency(output)} / {duration:0.00}s"
             )
             .Subscribe(text => outputText.text = text)
             .AddTo(disposables);

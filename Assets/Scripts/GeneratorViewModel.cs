@@ -1,10 +1,8 @@
 using UniRx;
 using System;
-using UnityEngine;
 
 public class GeneratorViewModel : IDisposable
 {
-    private readonly GeneratorModel model;
     private readonly GeneratorDefinition definition;
     private readonly GeneratorService generatorService;
     
@@ -21,13 +19,16 @@ public class GeneratorViewModel : IDisposable
 
     public GeneratorViewModel(GeneratorModel model, GeneratorDefinition definition, GeneratorService generatorService)
     {
-        this.model = model;
         this.definition = definition;
         this.generatorService = generatorService;
 
         OutputPerCycle =
-            generatorService.Level
-                .Select(l => definition.BaseOutputPerCycle * l)
+            Observable
+                .CombineLatest(
+                    generatorService.Level.DistinctUntilChanged(),
+                    generatorService.OutputMultiplier.DistinctUntilChanged(),
+                    (level, mult) => definition.BaseOutputPerCycle * level * mult
+                )
                 .ToReadOnlyReactiveProperty()
                 .AddTo(disposables);
 

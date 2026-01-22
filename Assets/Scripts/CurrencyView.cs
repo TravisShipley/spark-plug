@@ -30,7 +30,7 @@ public class CurrencyView : MonoBehaviour
             : walletViewModel.GoldBalance;
 
         // Subscribe and update label (ReactiveProperty emits current value on subscribe)
-        source.Subscribe(count => value.text = $"${count:0.00}")
+        source.Subscribe(count => value.text = $"{Format.Currency(count)}")
             .AddTo(this);
     }
 }

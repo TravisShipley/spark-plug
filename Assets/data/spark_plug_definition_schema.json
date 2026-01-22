@@ -1,0 +1,297 @@
+{
+  "gameId": "string",
+  "version": 2,
+
+  "numberFormat": {
+    "type": "mantissaExponent|decimalString",
+    "precision": 16
+  },
+
+  "resources": [
+    {
+      "id": "string",
+      "displayName": "string",
+      "kind": "softCurrency|hardCurrency|metaCurrency|inventory",
+      "format": { "style": "currency|suffix|plain", "symbol": "string?" },
+      "stackLimit": null
+    }
+  ],
+
+  "phases": [
+    { "id": "phase.1", "displayName": "string", "description": "string?" }
+  ],
+
+  "zones": [
+    {
+      "id": "zone.main",
+      "displayName": "string",
+      "description": "string?",
+      "startingPhaseId": "phase.1",
+      "localResources": ["resourceId"],
+      "tags": ["string"]
+    }
+  ],
+
+  "computedVars": [
+    {
+      "id": "var.clipPrice",
+      "displayName": "string?",
+      "zoneId": "zone.main",
+      "base": "numberString",
+      "min": null,
+      "max": null,
+      "rounding": "none|floor|truncate|bankers",
+      "expression": {
+        "type": "constant|add|mul|pow|log10|min|max|clamp|if",
+        "args": []
+      },
+      "dependsOn": [
+        "resource.cash",
+        "state.run.someKey",
+        "var.otherVar"
+      ]
+    }
+  ],
+
+  "nodes": [
+    {
+      "id": "nodeTypeId",
+      "type": "producer|converter|bottleneck|sink",
+      "displayName": "string",
+      "tags": ["string"],
+
+      "zoneId": "zone.main",
+
+      "inputs": [
+        { "resource": "resourceId", "amountPerCycle": "numberString" }
+      ],
+      "outputs": [
+        {
+          "resource": "resourceId",
+          "mode": "rate|cycle",
+          "basePerSecond": "numberString?",
+          "basePayout": "numberString?",
+          "amountPerCycle": "numberString?",
+          "amountPerCycleFromVar": "varId?",
+          "amountPerCycleFromState": "state.path?"
+        }
+      ],
+
+      "cycle": { "baseDurationSeconds": 1.0 },
+
+      "caps": [
+        {
+          "resource": "resourceId",
+          "mode": "capacity|throughputPerSecond",
+          "baseCap": "numberString?",
+          "baseCapPerSecond": "numberString?"
+        }
+      ],
+
+      "leveling": {
+        "levelResource": "resourceId",
+        "baseLevel": 0,
+        "maxLevel": null,
+
+        "priceCurve": {
+          "type": "exponential|linear|piecewise|table",
+          "baseCost": "numberString",
+          "growth": "numberString?",
+          "increment": "numberString?",
+          "table": [
+            { "level": 1, "cost": "numberString" }
+          ],
+          "segments": [
+            {
+              "fromLevel": 1,
+              "toLevel": 50,
+              "curve": { "type": "exponential", "baseCost": "10", "growth": "1.12" }
+            }
+          ]
+        },
+
+        "outputScaling": [
+          {
+            "target": "outputs[resourceId].basePerSecond|outputs[resourceId].basePayout|outputs[resourceId].amountPerCycle",
+            "perLevel": { "type": "add|multiply", "value": "numberString" }
+          }
+        ],
+
+        "capScaling": [
+          {
+            "target": "caps[resourceId].baseCap|caps[resourceId].baseCapPerSecond",
+            "perLevel": { "type": "add|multiply", "value": "numberString" }
+          }
+        ]
+      },
+
+      "automation": {
+        "policy": "alwaysOn|manualCollect|autoRepeat|manualStart",
+        "autoCollect": true,
+        "autoRestart": true
+      },
+
+      "requirements": [
+        { "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked", "args": {} }
+      ]
+    }
+  ],
+
+  "nodeInstances": [
+    {
+      "id": "instanceId",
+      "nodeId": "nodeTypeId",
+      "zoneId": "zone.main",
+      "displayNameOverride": "string?",
+      "tags": ["string"],
+      "initialState": { "level": 0, "enabled": true }
+    }
+  ],
+
+  "links": [
+    {
+      "id": "linkId",
+      "zoneId": "zone.main",
+      "from": "instanceId|nodeTypeId",
+      "to": "instanceId|nodeTypeId",
+      "resource": "resourceId",
+      "mode": "push|pull",
+      "priority": 0,
+      "lossFactor": "1.0",
+      "capPerSecondFrom": "state.path?|varId?",
+      "enabledRequirements": []
+    }
+  ],
+
+  "modifiers": [
+    {
+      "id": "modifierId",
+      "source": "upgradeId|milestoneId|buffId|projectId|prestige|system",
+      "zoneId": "zone.main",
+      "scope": {
+        "kind": "global|zone|node|nodeTag|resource",
+        "zoneId": "zone.main?",
+        "nodeId": "nodeTypeId?",
+        "nodeTag": "string?",
+        "resource": "resourceId?"
+      },
+      "op": "add|multiply|set|capMin|capMax",
+      "target": "resourceGain.cash|nodeOutput.eggs|nodeCap.eggs.throughputPerSecond|state.run.key|var.clipPrice|automation.policy",
+      "value": "numberString?",
+      "valueFromState": "state.path?",
+      "valueFromVar": "varId?",
+      "conditions": [
+        { "type": "phaseAtLeast|zone|nodeEnabled|hasUpgrade|randomChance", "args": {} }
+      ]
+    }
+  ],
+
+  "upgrades": [
+    {
+      "id": "upgradeId",
+      "displayName": "string",
+      "category": "upgrade|research|card",
+      "zoneId": "zone.main",
+
+      "cost": [{ "resource": "resourceId", "amount": "numberString" }],
+
+      "repeatable": false,
+      "maxRank": 1,
+      "rankCostScaling": {
+        "type": "exponential|linear|table",
+        "baseCostMultiplier": "1",
+        "growth": "1.15"
+      },
+
+      "effects": [{ "modifierId": "modifierId" }],
+
+      "requirements": [],
+      "tags": ["string"]
+    }
+  ],
+
+  "milestones": [
+    {
+      "id": "milestoneId",
+      "nodeId": "nodeTypeId",
+      "zoneId": "zone.main",
+      "atLevel": 25,
+      "grantEffects": [{ "modifierId": "modifierId" }]
+    }
+  ],
+
+  "projects": [
+    {
+      "id": "projectId",
+      "displayName": "string",
+      "zoneId": "zone.main",
+      "timeSeconds": 0,
+      "cost": [{ "resource": "resourceId", "amount": "numberString" }],
+      "effects": [{ "modifierId": "modifierId" }],
+      "requirements": [],
+      "exclusiveGroup": "string?",
+      "tags": ["string"]
+    }
+  ],
+
+  "unlockGraph": [
+    {
+      "id": "unlockId",
+      "zoneId": "zone.main",
+      "unlocks": [
+        { "kind": "node|nodeInstance|upgrade|project|zone|phase|modifier", "id": "string" }
+      ],
+      "requirements": []
+    }
+  ],
+
+  "buffs": [
+    {
+      "id": "buffId",
+      "displayName": "string",
+      "zoneId": "zone.main",
+      "durationSeconds": 600,
+      "stacking": "refresh|extend|ignore|stack",
+      "effects": [
+        {
+          "id": "buffModifierId",
+          "source": "buffId",
+          "zoneId": "zone.main",
+          "scope": { "kind": "global" },
+          "op": "multiply",
+          "target": "resourceGain.cash",
+          "value": "2"
+        }
+      ]
+    }
+  ],
+
+  "prestige": {
+    "enabled": false,
+    "zoneId": "zone.main",
+    "prestigeResource": "resourceId",
+    "formula": {
+      "type": "sqrt|log10|linear|customExpr",
+      "basedOn": "lifetimeEarnings.cash|state.path|resource.id",
+      "multiplier": "numberString",
+      "offset": "numberString",
+      "exprVarId": "varId?"
+    },
+    "resetScopes": {
+      "resetNodes": true,
+      "resetSoftCurrencies": true,
+      "keepHardCurrencies": true,
+      "keepUnlocks": [],
+      "keepUpgrades": [],
+      "keepProjects": []
+    },
+    "metaUpgrades": [
+      {
+        "id": "metaUpgradeId",
+        "displayName": "string",
+        "computed": { "type": "linear", "basedOn": "resource.prestige", "multiplier": "0.01", "offset": "1" },
+        "writesToState": "state.path"
+      }
+    ]
+  }
+}

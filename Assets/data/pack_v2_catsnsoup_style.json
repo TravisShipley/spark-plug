@@ -1,0 +1,200 @@
+{
+  "gameId": "pack.v2.catsnsoup-style",
+  "version": 2,
+  "numberFormat": { "type": "mantissaExponent", "precision": 16 },
+
+  "resources": [
+    { "id": "gold", "displayName": "Gold", "kind": "softCurrency", "format": { "style": "currency", "symbol": "🪙" } },
+    { "id": "recipe", "displayName": "Recipe Points", "kind": "softCurrency", "format": { "style": "suffix", "symbol": "📜" } },
+    { "id": "carrot", "displayName": "Carrot", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "cabbage", "displayName": "Cabbage", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "soup", "displayName": "Soup", "kind": "inventory", "format": { "style": "suffix" } }
+  ],
+
+  "phases": [{ "id": "phase.1", "displayName": "Forest" }],
+
+  "zones": [
+    { "id": "zone.forest", "displayName": "Forest", "startingPhaseId": "phase.1", "localResources": ["gold", "recipe", "carrot", "cabbage", "soup"], "tags": ["cozy"] }
+  ],
+
+  "computedVars": [
+    {
+      "id": "var.soupSellPrice",
+      "displayName": "Soup Sell Price",
+      "zoneId": "zone.forest",
+      "base": "25",
+      "min": "0",
+      "max": null,
+      "rounding": "none",
+      "expression": { "type": "constant", "args": ["25"] },
+      "dependsOn": []
+    }
+  ],
+
+  "nodes": [
+    {
+      "id": "nodeType.station.carrot",
+      "type": "producer",
+      "displayName": "Carrot Station",
+      "tags": ["ingredient"],
+      "zoneId": "zone.forest",
+      "outputs": [{ "resource": "carrot", "mode": "cycle", "basePayout": "1" }],
+      "cycle": { "baseDurationSeconds": 2.5 },
+      "leveling": {
+        "levelResource": "gold",
+        "baseLevel": 1,
+        "priceCurve": { "type": "exponential", "baseCost": "30", "growth": "1.10" },
+        "outputScaling": [{ "target": "outputs[carrot].basePayout", "perLevel": { "type": "multiply", "value": "1.05" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+    {
+      "id": "nodeType.station.cabbage",
+      "type": "producer",
+      "displayName": "Cabbage Station",
+      "tags": ["ingredient"],
+      "zoneId": "zone.forest",
+      "outputs": [{ "resource": "cabbage", "mode": "cycle", "basePayout": "1" }],
+      "cycle": { "baseDurationSeconds": 3.0 },
+      "leveling": {
+        "levelResource": "gold",
+        "baseLevel": 0,
+        "priceCurve": { "type": "exponential", "baseCost": "120", "growth": "1.12" },
+        "outputScaling": [{ "target": "outputs[cabbage].basePayout", "perLevel": { "type": "multiply", "value": "1.05" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": [{ "type": "unlock", "args": { "id": "unlock.cabbageStation" } }]
+    },
+    {
+      "id": "nodeType.cook.soupPot",
+      "type": "converter",
+      "displayName": "Soup Pot",
+      "tags": ["cook"],
+      "zoneId": "zone.forest",
+      "inputs": [
+        { "resource": "carrot", "amountPerCycle": "2" },
+        { "resource": "cabbage", "amountPerCycle": "1" }
+      ],
+      "outputs": [{ "resource": "soup", "amountPerCycle": "1" }],
+      "cycle": { "baseDurationSeconds": 6.0 },
+      "leveling": {
+        "levelResource": "gold",
+        "baseLevel": 1,
+        "priceCurve": { "type": "exponential", "baseCost": "200", "growth": "1.13" },
+        "outputScaling": [{ "target": "outputs[soup].amountPerCycle", "perLevel": { "type": "multiply", "value": "1.03" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": [{ "type": "unlock", "args": { "id": "unlock.soupPot" } }]
+    },
+    {
+      "id": "nodeType.sell.soup",
+      "type": "converter",
+      "displayName": "Sell Soup",
+      "tags": ["sell"],
+      "zoneId": "zone.forest",
+      "inputs": [{ "resource": "soup", "amountPerCycle": "1" }],
+      "outputs": [
+        { "resource": "gold", "amountPerCycleFromVar": "var.soupSellPrice" },
+        { "resource": "recipe", "amountPerCycle": "1" }
+      ],
+      "cycle": { "baseDurationSeconds": 0.4 },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    }
+  ],
+
+  "nodeInstances": [
+    { "id": "inst.carrot", "nodeId": "nodeType.station.carrot", "zoneId": "zone.forest", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.cabbage", "nodeId": "nodeType.station.cabbage", "zoneId": "zone.forest", "initialState": { "level": 0, "enabled": false } },
+    { "id": "inst.soupPot", "nodeId": "nodeType.cook.soupPot", "zoneId": "zone.forest", "initialState": { "level": 1, "enabled": false } },
+    { "id": "inst.sellSoup", "nodeId": "nodeType.sell.soup", "zoneId": "zone.forest", "initialState": { "level": 1, "enabled": true } }
+  ],
+
+  "links": [
+    { "id": "link.carrotToSoup", "zoneId": "zone.forest", "from": "inst.carrot", "to": "inst.soupPot", "resource": "carrot", "mode": "push", "priority": 0, "lossFactor": "1.0", "enabledRequirements": [] },
+    { "id": "link.cabbageToSoup", "zoneId": "zone.forest", "from": "inst.cabbage", "to": "inst.soupPot", "resource": "cabbage", "mode": "push", "priority": 0, "lossFactor": "1.0", "enabledRequirements": [] },
+    { "id": "link.soupToSell", "zoneId": "zone.forest", "from": "inst.soupPot", "to": "inst.sellSoup", "resource": "soup", "mode": "push", "priority": 0, "lossFactor": "1.0", "enabledRequirements": [] }
+  ],
+
+  "modifiers": [
+    {
+      "id": "mod.upg.recipeBoost",
+      "source": "upgrade.recipe.book",
+      "zoneId": "zone.forest",
+      "scope": { "kind": "global", "zoneId": "zone.forest" },
+      "op": "multiply",
+      "target": "resourceGain.recipe",
+      "value": "2"
+    },
+    {
+      "id": "mod.upg.soupValue",
+      "source": "upgrade.soup.value",
+      "zoneId": "zone.forest",
+      "scope": { "kind": "global", "zoneId": "zone.forest" },
+      "op": "multiply",
+      "target": "var.var.soupSellPrice",
+      "value": "1.5"
+    }
+  ],
+
+  "upgrades": [
+    {
+      "id": "upgrade.recipe.book",
+      "displayName": "Recipe Book (2x recipe points)",
+      "category": "upgrade",
+      "zoneId": "zone.forest",
+      "cost": [{ "resource": "gold", "amount": "800" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.upg.recipeBoost" }],
+      "requirements": [{ "type": "resourceAtLeast", "args": { "resource": "gold", "amount": "300" } }],
+      "tags": ["meta"]
+    },
+    {
+      "id": "upgrade.soup.value",
+      "displayName": "Better Broth (1.5x soup value)",
+      "category": "upgrade",
+      "zoneId": "zone.forest",
+      "cost": [{ "resource": "recipe", "amount": "50" }],
+      "repeatable": false,
+      "maxRank": 1,
+      "effects": [{ "modifierId": "mod.upg.soupValue" }],
+      "requirements": [{ "type": "unlock", "args": { "id": "unlock.soupPot" } }],
+      "tags": ["value"]
+    }
+  ],
+
+  "milestones": [],
+  "projects": [],
+
+  "unlockGraph": [
+    {
+      "id": "unlock.cabbageStation",
+      "zoneId": "zone.forest",
+      "unlocks": [{ "kind": "nodeInstance", "id": "inst.cabbage" }],
+      "requirements": [{ "type": "resourceAtLeast", "args": { "resource": "gold", "amount": "100" } }]
+    },
+    {
+      "id": "unlock.soupPot",
+      "zoneId": "zone.forest",
+      "unlocks": [{ "kind": "nodeInstance", "id": "inst.soupPot" }],
+      "requirements": [{ "type": "resourceAtLeast", "args": { "resource": "gold", "amount": "180" } }]
+    }
+  ],
+
+  "buffs": [
+    {
+      "id": "buff.jarFairy",
+      "displayName": "Jar Fairy (5x gold for 30s)",
+      "zoneId": "zone.forest",
+      "durationSeconds": 30,
+      "stacking": "refresh",
+      "effects": [
+        { "id": "mod.buff.gold5x", "source": "buff.jarFairy", "zoneId": "zone.forest", "scope": { "kind": "global", "zoneId": "zone.forest" }, "op": "multiply", "target": "resourceGain.gold", "value": "5" }
+      ]
+    }
+  ],
+
+  "prestige": { "enabled": false, "zoneId": "zone.forest" }
+}

@@ -1,0 +1,113 @@
+{
+  "gameId": "pack.v2.adcomm-style",
+  "version": 2,
+  "numberFormat": { "type": "mantissaExponent", "precision": 16 },
+
+  "resources": [
+    { "id": "coin", "displayName": "Coins", "kind": "softCurrency", "format": { "style": "currency", "symbol": "₡" } },
+    { "id": "potato", "displayName": "Potatoes", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "farmer", "displayName": "Farmers", "kind": "inventory", "format": { "style": "suffix" } },
+    { "id": "card", "displayName": "Cards", "kind": "inventory", "format": { "style": "suffix" } }
+  ],
+
+  "phases": [{ "id": "phase.1", "displayName": "Motherland" }],
+
+  "zones": [
+    { "id": "zone.motherland", "displayName": "Motherland", "startingPhaseId": "phase.1", "localResources": ["coin", "potato", "farmer", "card"], "tags": ["chain"] }
+  ],
+
+  "computedVars": [
+    { "id": "var.potatoSellPrice", "displayName": "Potato Sell Price", "zoneId": "zone.motherland", "base": "1", "min": "0", "max": null, "rounding": "none", "expression": { "type": "constant", "args": ["1"] }, "dependsOn": [] }
+  ],
+
+  "nodes": [
+    {
+      "id": "nodeType.industry.potatoField",
+      "type": "producer",
+      "displayName": "Potato Fields",
+      "tags": ["industry", "potato"],
+      "zoneId": "zone.motherland",
+      "outputs": [{ "resource": "potato", "mode": "rate", "basePerSecond": "0.5" }],
+      "leveling": {
+        "levelResource": "coin",
+        "baseLevel": 1,
+        "priceCurve": { "type": "exponential", "baseCost": "10", "growth": "1.12" },
+        "outputScaling": [{ "target": "outputs[potato].basePerSecond", "perLevel": { "type": "multiply", "value": "1.10" } }]
+      },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.industry.farmerRecruitment",
+      "type": "converter",
+      "displayName": "Recruit Farmers",
+      "tags": ["industry", "recruit"],
+      "zoneId": "zone.motherland",
+      "inputs": [{ "resource": "potato", "amountPerCycle": "10" }],
+      "outputs": [{ "resource": "farmer", "amountPerCycle": "1" }],
+      "cycle": { "baseDurationSeconds": 2.0 },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    },
+
+    {
+      "id": "nodeType.sellPotatoes",
+      "type": "converter",
+      "displayName": "Sell Potatoes",
+      "tags": ["sell"],
+      "zoneId": "zone.motherland",
+      "inputs": [{ "resource": "potato", "amountPerCycle": "1" }],
+      "outputs": [{ "resource": "coin", "amountPerCycleFromVar": "var.potatoSellPrice" }],
+      "cycle": { "baseDurationSeconds": 0.3 },
+      "automation": { "policy": "alwaysOn", "autoCollect": true, "autoRestart": true },
+      "requirements": []
+    }
+  ],
+
+  "nodeInstances": [
+    { "id": "inst.potatoField", "nodeId": "nodeType.industry.potatoField", "zoneId": "zone.motherland", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.recruitFarmers", "nodeId": "nodeType.industry.farmerRecruitment", "zoneId": "zone.motherland", "initialState": { "level": 1, "enabled": true } },
+    { "id": "inst.sellPotatoes", "nodeId": "nodeType.sellPotatoes", "zoneId": "zone.motherland", "initialState": { "level": 1, "enabled": true } }
+  ],
+
+  "links": [
+    { "id": "link.potatoToRecruit", "zoneId": "zone.motherland", "from": "inst.potatoField", "to": "inst.recruitFarmers", "resource": "potato", "mode": "push", "priority": 0, "lossFactor": "1.0", "enabledRequirements": [] },
+    { "id": "link.potatoToSell", "zoneId": "zone.motherland", "from": "inst.potatoField", "to": "inst.sellPotatoes", "resource": "potato", "mode": "push", "priority": 1, "lossFactor": "1.0", "enabledRequirements": [] }
+  ],
+
+  "modifiers": [
+    {
+      "id": "mod.card.potatoField.rank",
+      "source": "upgrade.card.potatoField",
+      "zoneId": "zone.motherland",
+      "scope": { "kind": "node", "zoneId": "zone.motherland", "nodeId": "nodeType.industry.potatoField" },
+      "op": "multiply",
+      "target": "nodeOutput.potato",
+      "valueFromState": "cards.potatoField.multiplier"
+    }
+  ],
+
+  "upgrades": [
+    {
+      "id": "upgrade.card.potatoField",
+      "displayName": "Potato Scientist Card",
+      "category": "card",
+      "zoneId": "zone.motherland",
+      "cost": [{ "resource": "card", "amount": "1" }],
+      "repeatable": true,
+      "maxRank": 10,
+      "rankCostScaling": { "type": "exponential", "baseCostMultiplier": "1", "growth": "1.35" },
+      "effects": [{ "modifierId": "mod.card.potatoField.rank" }],
+      "requirements": [],
+      "tags": ["card", "potato"]
+    }
+  ],
+
+  "milestones": [],
+  "projects": [],
+  "unlockGraph": [],
+  "buffs": [],
+
+  "prestige": { "enabled": false, "zoneId": "zone.motherland" }
+}
