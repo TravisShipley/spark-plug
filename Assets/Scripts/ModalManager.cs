@@ -3,8 +3,20 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class ModalManager : MonoBehaviour
+
+public sealed class ModalManager : MonoBehaviour, IUpgradesContext
 {
+    // Inspector helper for modal registry
+    [Serializable]
+    private sealed class ModalEntry
+    {
+        public string Id;
+        public ModalView Prefab;
+    }
+    
+    [Header("Services")]
+    [SerializeField] private UiServiceRegistry uiServices;
+
     [Header("Scene References")]
     [SerializeField] private Transform modalContainer;
     [SerializeField] private Button backdropButton;   // full-screen button behind modal(s)
@@ -25,22 +37,34 @@ public class ModalManager : MonoBehaviour
     private readonly Stack<ModalView> stack = new();
     private Dictionary<string, ModalView> modalById;
 
-    [Serializable]
-    private class ModalEntry
+    public WalletService Wallet => uiServices != null ? uiServices.Wallet : null;
+
+    public bool TryGetGenerator(string generatorId, out GeneratorService gen)
     {
-        public string Id;
-        public ModalView Prefab;
+        gen = null;
+        return uiServices != null && uiServices.TryGetGenerator(generatorId, out gen);
     }
 
     private void Awake()
     {
         if (modalContainer == null) modalContainer = transform;
 
+        if (uiServices == null)
+        {
+            Debug.LogError("ModalManager: UiServiceRegistry is not assigned. Assign it in the inspector so modals can resolve IUpgradesContext.", this);
+        }
+
         if (backdropButton != null)
             backdropButton.onClick.AddListener(OnBackdropClicked);
 
-        if (backdropCanvas == null && backdropGroup != null)
-            backdropCanvas = backdropGroup.GetComponent<Canvas>();
+        if (backdropCanvas == null)
+        {
+            if (backdropGroup != null)
+                backdropCanvas = backdropGroup.GetComponentInParent<Canvas>(true);
+
+            if (backdropCanvas == null && backdropButton != null)
+                backdropCanvas = backdropButton.GetComponentInParent<Canvas>(true);
+        }
 
         modalById = new Dictionary<string, ModalView>(StringComparer.Ordinal);
 
@@ -83,9 +107,25 @@ public class ModalManager : MonoBehaviour
         }
     }
 
+    private void EnsureWalletInitializedIfNeeded()
+    {
+        // Awake order is not guaranteed; only validate when a modal is actually being shown.
+        if (uiServices == null)
+            return;
+
+        if (uiServices.Wallet != null)
+            return;
+
+        Debug.LogError(
+            "ModalManager: UiServiceRegistry.Wallet is null. Ensure UiServiceRegistry.Initialize(walletService) is called during bootstrap.",
+            this
+        );
+    }
+
     // Inspector-facing method
     public void ShowById(string id)
     {
+        EnsureWalletInitializedIfNeeded();
         Show(id);
     }
     
@@ -93,6 +133,8 @@ public class ModalManager : MonoBehaviour
     {
         if (modalPrefab == null)
             throw new ArgumentNullException(nameof(modalPrefab));
+
+        EnsureWalletInitializedIfNeeded();
 
         var instance = Instantiate(modalPrefab, modalContainer);
         instance.gameObject.SetActive(true);

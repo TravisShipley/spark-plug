@@ -206,7 +206,6 @@ public class GeneratorView : MonoBehaviour
         if (viewModel == null || !viewModel.IsOwned.Value || progressFill == null)
             return;
 
-        Debug.Log("update");
         float duration = (float)viewModel.CycleDurationSeconds.Value;
         duration = Mathf.Max(0.0001f, duration);
 

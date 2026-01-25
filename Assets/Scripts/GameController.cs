@@ -13,6 +13,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject generatorUIRootPrefab;
 
     [SerializeField] private Transform generatorUIContainer;
+    [SerializeField] private UiServiceRegistry uiService;
 
     private WalletService walletService;
     // private AutomationService automationService;
@@ -71,6 +72,16 @@ public class GameController : MonoBehaviour
         walletService = new WalletService();
         walletViewModel = new PlayerWalletViewModel(walletService);
 
+        // UI service registry is required for UI-driven systems (eg: modals resolving services)
+        if (uiService == null)
+        {
+            Debug.LogError("GameController: UiServiceRegistry is not assigned in the inspector.", this);
+            enabled = false;
+            return;
+        }
+
+        uiService.Initialize(walletService);
+        
         tickService = new TickService(TimeSpan.FromMilliseconds(100));
 
         // create the automation service as pass in the wallet service
@@ -147,6 +158,9 @@ public class GameController : MonoBehaviour
             generatorViewModels.Add(generatorViewModel);
 
             generatorView.Bind(generatorViewModel, service, walletViewModel);
+
+            // Register each generator and service with the UiServiceRegistry
+            uiService.RegisterGenerator(model.Id, service);
 
             // Persist generator state whenever it changes
             Observable

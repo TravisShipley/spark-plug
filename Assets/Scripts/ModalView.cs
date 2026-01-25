@@ -1,7 +1,9 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(Canvas))]
 [RequireComponent(typeof(CanvasGroup))]
+[RequireComponent(typeof(GraphicRaycaster))]
 public class ModalView : MonoBehaviour
 {
     [SerializeField] private bool dismissible = true;
@@ -10,6 +12,7 @@ public class ModalView : MonoBehaviour
 
     [SerializeField] private Canvas canvas;
     [SerializeField] private CanvasGroup canvasGroup;
+    [SerializeField] private GraphicRaycaster graphicRaycaster;
 
     public bool Dismissible => dismissible;
     public bool CloseOnBackdrop => closeOnBackdrop;
@@ -24,32 +27,46 @@ public class ModalView : MonoBehaviour
         EnsureModalSetup();
     }
 
-    #if UNITY_EDITOR
-    private void OnValidate()
-    {
-        EnsureModalSetup();
-    }
-    #endif
-
     public void RequestClose()
     {
         if (!Dismissible)
             return;
 
-        if (Manager != null)
+        if (Manager == null)
         {
-            Manager.CloseTop();
+            Debug.LogError("ModalView: Manager is not set; cannot close modal. Ensure this modal was shown via ModalManager.", this);
+            return;
         }
-        else
-        {
-            // Fallback: allow the modal to self-destruct if no manager is present.
-            Destroy(gameObject);
-        }
+
+        Manager.CloseTop();
     }
 
     public void ShowById(string id)
     {
+        if (Manager == null)
+        {
+            Debug.LogError("ModalView: Manager is not set; cannot ShowById.", this);
+            return;
+        }
         Manager.ShowById(id);
+    }
+
+    protected IUpgradesContext UpgradesContext
+    {
+        get
+        {
+            if (Manager == null)
+            {
+                Debug.LogError("ModalView: Manager is not set; cannot resolve UpgradesContext.", this);
+                return null;
+            }
+
+            if (Manager is IUpgradesContext ctx)
+                return ctx;
+
+            Debug.LogError("ModalView: ModalManager does not provide IUpgradesContext. Wire a UiServiceRegistry into ModalManager (or have ModalManager implement IUpgradesContext) so modals don't need scene lookups.", this);
+            return null;
+        }
     }
 
     private void EnsureModalSetup()
@@ -62,6 +79,9 @@ public class ModalView : MonoBehaviour
 
         if (canvasGroup == null)
             canvasGroup = GetComponent<CanvasGroup>();
+
+        if (graphicRaycaster == null)
+            graphicRaycaster = GetComponent<GraphicRaycaster>();
     }
 
     public virtual void OnBeforeShow(object payload) { }

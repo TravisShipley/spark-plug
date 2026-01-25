@@ -119,6 +119,51 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &5399437
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5399438}
+  - component: {fileID: 5399439}
+  m_Layer: 0
+  m_Name: UiServiceRegistry
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5399438
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5399437}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 720326204}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5399439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5399437}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec566ee6fd6724880a68ed8f1732aea1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UiServiceRegistry
+  dontDestroyOnLoad: 0
 --- !u!1 &27763114
 GameObject:
   m_ObjectHideFlags: 0
@@ -360,6 +405,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1263566858}
+  - {fileID: 5399438}
   - {fileID: 1120071345}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -534,9 +580,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ec604445ea7b4aabb58a564a8c48dec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModalManager
+  uiServices: {fileID: 5399439}
   modalContainer: {fileID: 194516104}
   backdropButton: {fileID: 6065628833239432592}
   backdropGroup: {fileID: 6065628833239432591}
+  backdropCanvas: {fileID: 6065628833239432595}
   closeOnEscape: 1
   closeOnBackdropClick: 1
   baseModalSortingOrder: 100
@@ -547,6 +595,9 @@ MonoBehaviour:
       type: 3}
   - Id: WINDOW
     Prefab: {fileID: 7732882825203242694, guid: c167771c26ca24969b45ef2480482963,
+      type: 3}
+  - Id: UPGRADES
+    Prefab: {fileID: 8129661465548805835, guid: 23bdf05a3551340f294d46f8de4ca521,
       type: 3}
 --- !u!1 &1263566856
 GameObject:
@@ -581,6 +632,7 @@ MonoBehaviour:
   generatorUIRootPrefab: {fileID: 5203841696497185053, guid: c2d5911ca7967430d9f70489f4f407a3,
     type: 3}
   generatorUIContainer: {fileID: 1596328118}
+  uiService: {fileID: 5399439}
 --- !u!224 &1263566858
 RectTransform:
   m_ObjectHideFlags: 0
@@ -623,7 +675,7 @@ PrefabInstance:
     - target: {fileID: 2150937678114895606, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_Name
-      value: WindowButton
+      value: UpgradesButton
       objectReference: {fileID: 0}
     - target: {fileID: 2505672749294639810, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
@@ -788,7 +840,7 @@ PrefabInstance:
     - target: {fileID: 7120079071500152858, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_StringArgument
-      value: WINDOW
+      value: UPGRADES
       objectReference: {fileID: 0}
     - target: {fileID: 7120079071500152858, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
@@ -2806,6 +2858,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+--- !u!223 &6065628833239432595 stripped
+Canvas:
+  m_CorrespondingSourceObject: {fileID: 7584166579324823389, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

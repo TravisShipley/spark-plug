@@ -12,6 +12,13 @@ public class GeneratorService : IDisposable
     private readonly CompositeDisposable disposables = new();
     private readonly ReactiveProperty<double> cycleProgress = new(0);
     public IReadOnlyReactiveProperty<double> CycleProgress => cycleProgress;
+
+    private readonly ReactiveProperty<double> outputMultiplier = new(1.0);
+    public IReadOnlyReactiveProperty<double> OutputMultiplier => outputMultiplier;
+
+    private readonly ReactiveProperty<double> speedMultiplier = new(1.0);
+    public IReadOnlyReactiveProperty<double> SpeedMultiplier => speedMultiplier;
+
     public double AutomationCost => definition.AutomationCost;
     public double NextLevelCost => CalculateNextLevelCost();
 
@@ -27,6 +34,8 @@ public class GeneratorService : IDisposable
     public IReadOnlyReactiveProperty<bool> IsOwned => isOwned;
     public IReadOnlyReactiveProperty<bool> IsRunning => isRunning;
     public IReadOnlyReactiveProperty<bool> IsAutomated => isAutomated;
+
+    public string DisplayName => definition.DisplayName;
     
     public GeneratorService(GeneratorModel model, GeneratorDefinition definition, WalletService wallet, TickService tickService)
     {
@@ -69,7 +78,10 @@ public class GeneratorService : IDisposable
         }
 
         var dt = tickService.Interval.TotalSeconds;
-        var interval = Math.Max(0.0001, definition.BaseCycleDurationSeconds);
+        var interval = Math.Max(
+            0.0001,
+            definition.BaseCycleDurationSeconds / speedMultiplier.Value
+        );
 
         model.CycleElapsedSeconds += dt;
 
@@ -104,7 +116,30 @@ public class GeneratorService : IDisposable
 
     private double CalculateOutput()
     {
-        return definition.BaseOutputPerCycle * model.Level;
+        // Use reactive level + multiplier as the authoritative values.
+        return definition.BaseOutputPerCycle * level.Value * outputMultiplier.Value;
+    }
+
+    public void MultiplyOutput(double factor)
+    {
+        if (double.IsNaN(factor) || double.IsInfinity(factor))
+            return;
+
+        if (factor <= 0)
+            return;
+
+        outputMultiplier.Value *= factor;
+    }
+
+    public void MultiplySpeed(double factor)
+    {
+        if (double.IsNaN(factor) || double.IsInfinity(factor))
+            return;
+
+        if (factor <= 0)
+            return;
+
+        speedMultiplier.Value *= factor;
     }
 
     private double CalculateNextLevelCost()
@@ -170,6 +205,20 @@ public class GeneratorService : IDisposable
         isRunning.Value = true;
     }
 
+    public void ApplyUpgrade(UpgradeDefinition upgrade)
+    {
+        switch (upgrade.EffectType)
+        {
+            case UpgradeEffectType.OutputMultiplier:
+                MultiplyOutput(upgrade.Value);
+                break;
+
+            case UpgradeEffectType.SpeedMultiplier:
+                MultiplySpeed(upgrade.Value);
+                break;
+        }
+    }
+
     public void Dispose()
     {
         cycleCompleted.OnCompleted();
@@ -179,6 +228,8 @@ public class GeneratorService : IDisposable
         isOwned.Dispose();
         isAutomated.Dispose();
         isRunning.Dispose();
+        outputMultiplier.Dispose();
+        speedMultiplier.Dispose();
 
         disposables.Dispose();
     }
