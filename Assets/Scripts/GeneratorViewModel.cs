@@ -8,13 +8,12 @@ public class GeneratorViewModel : IDisposable
     
     private readonly CompositeDisposable disposables = new();
 
-    public string Name => definition.DisplayName;
+    public string DisplayName => definition.DisplayName;
     public IReadOnlyReactiveProperty<int> Level => generatorService.Level;
     public IReadOnlyReactiveProperty<bool> IsOwned => generatorService.IsOwned;
     public IReadOnlyReactiveProperty<bool> IsAutomated => generatorService.IsAutomated;
 
     public IReadOnlyReactiveProperty<double> OutputPerCycle { get; }
-    public IReadOnlyReactiveProperty<double> CycleDurationSeconds { get; }
     public IObservable<Unit> CycleCompleted => generatorService.CycleCompleted;
 
     public GeneratorViewModel(GeneratorModel model, GeneratorDefinition definition, GeneratorService generatorService)
@@ -29,11 +28,6 @@ public class GeneratorViewModel : IDisposable
                     generatorService.OutputMultiplier.DistinctUntilChanged(),
                     (level, mult) => definition.BaseOutputPerCycle * level * mult
                 )
-                .ToReadOnlyReactiveProperty()
-                .AddTo(disposables);
-
-        CycleDurationSeconds =
-            Observable.Return(definition.BaseCycleDurationSeconds)
                 .ToReadOnlyReactiveProperty()
                 .AddTo(disposables);
     }

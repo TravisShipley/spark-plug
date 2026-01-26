@@ -15,7 +15,7 @@ MonoBehaviour:
   Id: gen02
   DisplayName: Oranges
   BaseOutputPerCycle: 15
-  BaseCycleDurationSeconds: 5
+  BaseCycleDurationSeconds: 8
   BaseLevelCost: 20
   AutomationCost: 40
   LevelCostGrowth: 1.15

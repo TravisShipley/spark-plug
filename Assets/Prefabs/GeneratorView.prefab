@@ -523,6 +523,7 @@ GameObject:
   - component: {fileID: 4492073440729659432}
   - component: {fileID: 8684813835421480680}
   - component: {fileID: 2388808666517025494}
+  - component: {fileID: 8718312379256126178}
   m_Layer: 5
   m_Name: GeneratorView
   m_TagString: Untagged
@@ -591,7 +592,7 @@ MonoBehaviour:
     m_Right: 40
     m_Top: 40
     m_Bottom: 40
-  m_ChildAlignment: 0
+  m_ChildAlignment: 4
   m_Spacing: 40
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 0
@@ -638,6 +639,26 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &8718312379256126178
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5203841696497185053}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
+  m_IgnoreLayout: 0
+  m_MinWidth: -1
+  m_MinHeight: -1
+  m_PreferredWidth: -1
+  m_PreferredHeight: -1
+  m_FlexibleWidth: 1
+  m_FlexibleHeight: -1
+  m_LayoutPriority: 1
 --- !u!1 &5209811905808201011
 GameObject:
   m_ObjectHideFlags: 0
@@ -821,6 +842,7 @@ GameObject:
   - component: {fileID: 684060460636426913}
   - component: {fileID: 6514178257791676125}
   - component: {fileID: 6345856968438859827}
+  - component: {fileID: 5633322690540036007}
   m_Layer: 5
   m_Name: Name
   m_TagString: Untagged
@@ -947,6 +969,26 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &5633322690540036007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8214091548033947466}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
+  m_IgnoreLayout: 0
+  m_MinWidth: -1
+  m_MinHeight: -1
+  m_PreferredWidth: -1
+  m_PreferredHeight: -1
+  m_FlexibleWidth: 1
+  m_FlexibleHeight: -1
+  m_LayoutPriority: 1
 --- !u!1001 &827638802808968018
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1069,6 +1111,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5301691096496548597, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      propertyPath: m_FlexibleWidth
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5301691096496548597, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      propertyPath: m_PreferredWidth
+      value: -1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

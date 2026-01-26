@@ -15,7 +15,7 @@ MonoBehaviour:
   Id: gen03
   DisplayName: Bananas
   BaseOutputPerCycle: 60
-  BaseCycleDurationSeconds: 15
+  BaseCycleDurationSeconds: 16
   BaseLevelCost: 50
   AutomationCost: 100
   LevelCostGrowth: 1.15

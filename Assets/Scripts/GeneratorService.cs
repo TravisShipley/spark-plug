@@ -9,6 +9,8 @@ public class GeneratorService : IDisposable
     private readonly WalletService wallet;
     private readonly TickService tickService;
     
+    private double lastIntervalSeconds;
+
     private readonly CompositeDisposable disposables = new();
     private readonly ReactiveProperty<double> cycleProgress = new(0);
     public IReadOnlyReactiveProperty<double> CycleProgress => cycleProgress;
@@ -18,6 +20,9 @@ public class GeneratorService : IDisposable
 
     private readonly ReactiveProperty<double> speedMultiplier = new(1.0);
     public IReadOnlyReactiveProperty<double> SpeedMultiplier => speedMultiplier;
+
+    private readonly ReactiveProperty<double> cycleDurationSeconds = new(0);
+    public IReadOnlyReactiveProperty<double> CycleDurationSeconds => cycleDurationSeconds;
 
     public double AutomationCost => definition.AutomationCost;
     public double NextLevelCost => CalculateNextLevelCost();
@@ -36,6 +41,14 @@ public class GeneratorService : IDisposable
     public IReadOnlyReactiveProperty<bool> IsAutomated => isAutomated;
 
     public string DisplayName => definition.DisplayName;
+
+    private double ComputeCycleDurationSeconds(double speed)
+    {
+        if (double.IsNaN(speed) || double.IsInfinity(speed) || speed <= 0)
+            speed = 1.0;
+
+        return Math.Max(0.0001, definition.BaseCycleDurationSeconds / speed);
+    }
     
     public GeneratorService(GeneratorModel model, GeneratorDefinition definition, WalletService wallet, TickService tickService)
     {
@@ -52,8 +65,39 @@ public class GeneratorService : IDisposable
         this.wallet = wallet;
         this.tickService = tickService;
 
+        cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
+        lastIntervalSeconds = cycleDurationSeconds.Value;
+
         tickService.OnTick
             .Subscribe(_ => OnTick())
+            .AddTo(disposables);
+
+        // Preserve elapsed percentage when speed changes mid-cycle so progress does not jump.
+        speedMultiplier
+            .DistinctUntilChanged()
+            .Skip(1)
+            .Subscribe(newSpeed =>
+            {
+                // Only adjust if we are actively running a cycle.
+                bool shouldRun = isAutomated.Value || isRunning.Value;
+                if (!isOwned.Value || !shouldRun)
+                {
+                    cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
+                    lastIntervalSeconds = cycleDurationSeconds.Value;
+                    return;
+                }
+
+                double oldInterval = Math.Max(0.0001, lastIntervalSeconds);
+                double percent = Math.Clamp(model.CycleElapsedSeconds / oldInterval, 0.0, 1.0);
+
+                cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
+                double newInterval = cycleDurationSeconds.Value;
+
+                model.CycleElapsedSeconds = percent * newInterval;
+                lastIntervalSeconds = newInterval;
+
+                cycleProgress.Value = model.CycleElapsedSeconds / newInterval;
+            })
             .AddTo(disposables);
     }
 
@@ -78,10 +122,9 @@ public class GeneratorService : IDisposable
         }
 
         var dt = tickService.Interval.TotalSeconds;
-        var interval = Math.Max(
-            0.0001,
-            definition.BaseCycleDurationSeconds / speedMultiplier.Value
-        );
+        // Authoritative effective duration (Option A: base / speedMultiplier)
+        var interval = cycleDurationSeconds.Value;
+        lastIntervalSeconds = interval;
 
         model.CycleElapsedSeconds += dt;
 
@@ -140,6 +183,9 @@ public class GeneratorService : IDisposable
             return;
 
         speedMultiplier.Value *= factor;
+
+        // Keep duration in sync immediately (subscription will also run)
+        cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
     }
 
     private double CalculateNextLevelCost()
@@ -215,6 +261,10 @@ public class GeneratorService : IDisposable
 
             case UpgradeEffectType.SpeedMultiplier:
                 MultiplySpeed(upgrade.Value);
+
+                // Debug: log the new effective cycle duration (Option A: duration = base / speedMultiplier)
+                double newSeconds = Math.Max(0.0001, definition.BaseCycleDurationSeconds / speedMultiplier.Value);
+                Debug.Log($"[GeneratorService] {definition.Id} speed x{upgrade.Value:0.##} → {newSeconds:0.###}s/cycle (mult={speedMultiplier.Value:0.###})");
                 break;
         }
     }
@@ -230,6 +280,7 @@ public class GeneratorService : IDisposable
         isRunning.Dispose();
         outputMultiplier.Dispose();
         speedMultiplier.Dispose();
+        cycleDurationSeconds.Dispose();
 
         disposables.Dispose();
     }

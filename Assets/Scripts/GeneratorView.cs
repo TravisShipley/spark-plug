@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UniRx;
-// using System.Diagnostics;
 
 public class GeneratorView : MonoBehaviour
 {
@@ -23,8 +22,11 @@ public class GeneratorView : MonoBehaviour
 
     private CompositeDisposable disposables = new();
     private GeneratorViewModel viewModel;
+    private GeneratorService generatorService;
 
     private float cycleStartTime;
+    private float lastCycleDuration;
+    private bool waitingForCollect;
 
     public void Bind(GeneratorViewModel vm, GeneratorService generatorService, PlayerWalletViewModel walletViewModel)
     {
@@ -32,7 +34,11 @@ public class GeneratorView : MonoBehaviour
         disposables.Dispose();
         disposables = new CompositeDisposable();
 
+        this.generatorService = generatorService;
         Initialize(vm);
+
+        lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+        waitingForCollect = false;
 
         var nextLevelCost =
                 vm.Level
@@ -49,16 +55,42 @@ public class GeneratorView : MonoBehaviour
                 .DistinctUntilChanged();
 
         var isOwned = vm.IsOwned.DistinctUntilChanged();
-        
+
         // Start the progress bar running
         generatorService.IsRunning
             .DistinctUntilChanged()
             .Where(running => running)
             .Subscribe(_ =>
             {
-                    cycleStartTime = Time.time;   // start visual cycle now
-                    if (progressFill != null)
-                        progressFill.fillAmount = 0f;
+                waitingForCollect = false;
+
+                cycleStartTime = Time.time;
+                lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+
+                if (progressFill != null)
+                    progressFill.fillAmount = 0f;
+            })
+            .AddTo(disposables);
+
+        // Handle mid-cycle speed changes by preserving elapsed percentage
+        generatorService.CycleDurationSeconds
+            .DistinctUntilChanged()
+            .Subscribe(newDuration =>
+            {
+                // If we're not actively running a cycle, just update the cached duration.
+                if (generatorService == null || !generatorService.IsRunning.Value)
+                {
+                    lastCycleDuration = (float)newDuration;
+                    return;
+                }
+
+                // Preserve elapsed percentage based on simulation progress to avoid drift.
+                float percent = 0f;
+                if (generatorService.CycleProgress != null)
+                    percent = Mathf.Clamp01((float)generatorService.CycleProgress.Value);
+
+                lastCycleDuration = Mathf.Max(0.0001f, (float)newDuration);
+                cycleStartTime = Time.time - percent * lastCycleDuration;
             })
             .AddTo(disposables);
 
@@ -71,15 +103,16 @@ public class GeneratorView : MonoBehaviour
                 labelText: label,
                 interactable: canAffordLevel,
                 visible: isOwned.Select(x => !x),
-                onClick: () => {
+                onClick: () =>
+                {
                     if (generatorService.TryBuyLevel())
                     {
                         generatorService.StartRun();
                     }
                 }
             );
-            
         }
+
         if (levelUpButtonView != null)
         {
             var label =
@@ -91,7 +124,6 @@ public class GeneratorView : MonoBehaviour
                 visible: isOwned,
                 onClick: () => generatorService.TryBuyLevel()
             );
-
         }
 
         if (collectButtonView != null)
@@ -109,7 +141,7 @@ public class GeneratorView : MonoBehaviour
                 Observable.CombineLatest(
                         vm.IsOwned.DistinctUntilChanged(),
                         vm.IsAutomated.DistinctUntilChanged(),
-                        (isOwned, isAutomated) => isOwned && !isAutomated
+                        (owned, automated) => owned && !automated
                     )
                     .DistinctUntilChanged();
 
@@ -146,7 +178,7 @@ public class GeneratorView : MonoBehaviour
                 Observable.CombineLatest(
                         vm.IsOwned.DistinctUntilChanged(),
                         vm.IsAutomated.DistinctUntilChanged(),
-                        (isOwned, isAutomated) => isOwned && !isAutomated
+                        (owned, automated) => owned && !automated
                     )
                     .DistinctUntilChanged();
 
@@ -158,13 +190,27 @@ public class GeneratorView : MonoBehaviour
             );
         }
 
-        // Visual sync: reset the progress bar instantly when a cycle completes.
+        // Visual sync on cycle completion:
+        // - Manual mode: snap to full and wait for Collect
+        // - Automated mode: immediately restart from 0
         generatorService.CycleCompleted
             .Subscribe(_ =>
             {
-                cycleStartTime = Time.time;
-                if (progressFill != null)
-                    progressFill.fillAmount = 0f;
+                if (viewModel != null && viewModel.IsAutomated.Value)
+                {
+                    waitingForCollect = false;
+                    cycleStartTime = Time.time;
+                    lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+
+                    if (progressFill != null)
+                        progressFill.fillAmount = 0f;
+                }
+                else
+                {
+                    waitingForCollect = true;
+                    if (progressFill != null)
+                        progressFill.fillAmount = 1f;
+                }
             })
             .AddTo(disposables);
     }
@@ -173,19 +219,22 @@ public class GeneratorView : MonoBehaviour
     {
         viewModel = vm;
 
-        nameText.text = vm.Name;
+        nameText.text = vm.DisplayName;
 
         vm.Level
-            .Subscribe(level =>
-                levelText.text = $"Lv {level}"
-            )
+            .Subscribe(level => levelText.text = $"Lv {level}")
             .AddTo(disposables);
 
         // Output: react to BOTH output and duration changes
+        var durationStream =
+            this.generatorService != null
+                ? this.generatorService.CycleDurationSeconds.DistinctUntilChanged()
+                : Observable.Return(0.0);
+
         Observable
             .CombineLatest(
                 vm.OutputPerCycle.DistinctUntilChanged(),
-                vm.CycleDurationSeconds.DistinctUntilChanged(),
+                durationStream,
                 (output, duration) => $"{Format.Currency(output)} / {duration:0.00}s"
             )
             .Subscribe(text => outputText.text = text)
@@ -193,10 +242,10 @@ public class GeneratorView : MonoBehaviour
 
         vm.IsOwned
             .DistinctUntilChanged()
-            .Subscribe(isOwned =>
+            .Subscribe(owned =>
             {
                 if (ownedContainer != null)
-                    ownedContainer.SetActive(isOwned);
+                    ownedContainer.SetActive(owned);
             })
             .AddTo(disposables);
     }
@@ -206,9 +255,15 @@ public class GeneratorView : MonoBehaviour
         if (viewModel == null || !viewModel.IsOwned.Value || progressFill == null)
             return;
 
-        float duration = (float)viewModel.CycleDurationSeconds.Value;
-        duration = Mathf.Max(0.0001f, duration);
+        // Manual mode: once completed, hold at full until Collect.
+        if (waitingForCollect)
+            return;
 
+        // Only animate while the generator is running.
+        if (generatorService == null || !generatorService.IsRunning.Value)
+            return;
+
+        float duration = Mathf.Max(0.0001f, lastCycleDuration);
         float t = (Time.time - cycleStartTime) / duration;
         progressFill.fillAmount = Mathf.Clamp01(t);
     }
