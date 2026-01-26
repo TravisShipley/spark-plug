@@ -7,7 +7,7 @@ public class GameData
     public double CashAmount;
     public double GoldAmount;
 
-    public double rateOfIncome = 1f;
+    public double globalIncomeMultiplier = 1.0;
 
     [Serializable]
     public class GeneratorStateData
@@ -18,5 +18,16 @@ public class GameData
         public int Level;
     }
 
+    [Serializable]
+    public class UpgradeStateData
+    {
+        // Stable upgrade identifier (matches UpgradeDefinition.Id)
+        public string Id;
+
+        // Number of times purchased. For one-time upgrades, this will be 0 or 1.
+        public int PurchasedCount;
+    }
+
     public List<GeneratorStateData> Generators = new();
+    public List<UpgradeStateData> Upgrades = new();
 }

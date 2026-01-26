@@ -14,9 +14,7 @@ public sealed class UpgradesModalView : ModalView
     [Header("Data")]
     [SerializeField] private UpgradeDatabase upgradeDatabase;
 
-    // Local state (v1): one-time upgrades tracked in-memory.
-    // Next step is to persist this to GameData.
-    private readonly Dictionary<string, ReactiveProperty<bool>> purchasedById = new Dictionary<string, ReactiveProperty<bool>>(StringComparer.Ordinal);
+    private UpgradeService upgradeService;
 
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
@@ -37,16 +35,38 @@ public sealed class UpgradesModalView : ModalView
             return;
         }
 
-        var ctx = UpgradesContext;
-        if (ctx == null)
+        if (Manager == null)
         {
-            Debug.LogError("UpgradesModalView: No IUpgradesContext is available (check ModalManager/UiServiceRegistry wiring).", this);
+            Debug.LogError("UpgradesModalView: Manager is not set; this modal must be shown via ModalManager.", this);
             return;
         }
 
-        if (ctx.Wallet == null)
+        // Generator lookup is provided by the ModalManager (delegates to UiServiceRegistry).
+        if (Manager is not IGeneratorResolver generatorResolver)
         {
-            Debug.LogError("UpgradesModalView: UpgradesContext has a null WalletService (did you call Initialize?).", this);
+            Debug.LogError("UpgradesModalView: ModalManager must implement IGeneratorResolver.", this);
+            return;
+        }
+
+        // UpgradeService should be exposed by ModalManager via a public property `UpgradeService`.
+        upgradeService = null;
+        var prop = Manager.GetType().GetProperty("UpgradeService");
+        if (prop != null)
+            upgradeService = prop.GetValue(Manager) as UpgradeService;
+
+        if (upgradeService == null)
+        {
+            Debug.LogError(
+                "UpgradesModalView: UpgradeService could not be resolved from ModalManager. " +
+                "Expose a public property `public UpgradeService UpgradeService { get; }` on ModalManager and assign it during bootstrap.",
+                this
+            );
+            return;
+        }
+
+        if (upgradeService.Wallet == null)
+        {
+            Debug.LogError("UpgradesModalView: UpgradeService.Wallet is null (did bootstrap initialize it?).", this);
             return;
         }
 
@@ -61,7 +81,7 @@ public sealed class UpgradesModalView : ModalView
             if (string.IsNullOrEmpty(genId))
                 continue;
 
-            if (!ctx.TryGetGenerator(genId, out var generator) || generator == null)
+            if (!generatorResolver.TryGetGenerator(genId, out var generator) || generator == null)
             {
                 Debug.LogWarning($"UpgradesModalView: No generator found for GeneratorId '{genId}' (upgrade '{upgrade.Id}').", this);
                 continue;
@@ -70,45 +90,19 @@ public sealed class UpgradesModalView : ModalView
             var entry = Instantiate(entryPrefab, listContainer);
             entry.name = $"Upgrade_{upgrade.Id}";
 
+            var purchasedCount =
+                upgradeService
+                    .PurchasedCount(upgrade.Id)
+                    .DistinctUntilChanged()
+                    .ToReadOnlyReactiveProperty()
+                    .AddTo(disposables);
+
             entry.Bind(
                 upgrade,
                 generator,
-                ctx.Wallet,
-                IsPurchased(upgrade.Id),
-                () => MarkPurchased(upgrade.Id)
+                upgradeService,
+                purchasedCount
             );
-        }
-    }
-
-    private IReadOnlyReactiveProperty<bool> IsPurchased(string id)
-    {
-        id = (id ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(id))
-            return new ReactiveProperty<bool>(false);
-
-        if (!purchasedById.TryGetValue(id, out var rp) || rp == null)
-        {
-            rp = new ReactiveProperty<bool>(false);
-            purchasedById[id] = rp;
-        }
-
-        return rp;
-    }
-
-    private void MarkPurchased(string id)
-    {
-        id = (id ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(id))
-            return;
-
-        if (!purchasedById.TryGetValue(id, out var rp) || rp == null)
-        {
-            rp = new ReactiveProperty<bool>(true);
-            purchasedById[id] = rp;
-        }
-        else
-        {
-            rp.Value = true;
         }
     }
 
@@ -127,10 +121,5 @@ public sealed class UpgradesModalView : ModalView
     private void OnDestroy()
     {
         disposables.Dispose();
-
-        foreach (var kv in purchasedById)
-            kv.Value?.Dispose();
-
-        purchasedById.Clear();
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 
-public sealed class ModalManager : MonoBehaviour, IUpgradesContext
+public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
 {
     // Inspector helper for modal registry
     [Serializable]
@@ -37,7 +37,12 @@ public sealed class ModalManager : MonoBehaviour, IUpgradesContext
     private readonly Stack<ModalView> stack = new();
     private Dictionary<string, ModalView> modalById;
 
-    public WalletService Wallet => uiServices != null ? uiServices.Wallet : null;
+    public UpgradeService UpgradeService { get; private set; }
+
+    public void Initialize(UpgradeService upgradeService)
+    {
+        UpgradeService = upgradeService;
+    }
 
     public bool TryGetGenerator(string generatorId, out GeneratorService gen)
     {
@@ -51,7 +56,7 @@ public sealed class ModalManager : MonoBehaviour, IUpgradesContext
 
         if (uiServices == null)
         {
-            Debug.LogError("ModalManager: UiServiceRegistry is not assigned. Assign it in the inspector so modals can resolve IUpgradesContext.", this);
+            Debug.LogError("ModalManager: UiServiceRegistry is not assigned. Assign it in the inspector so modals can resolve generators.", this);
         }
 
         if (backdropButton != null)
@@ -107,17 +112,17 @@ public sealed class ModalManager : MonoBehaviour, IUpgradesContext
         }
     }
 
-    private void EnsureWalletInitializedIfNeeded()
+    private void EnsureUpgradeServiceInitializedIfNeeded()
     {
         // Awake order is not guaranteed; only validate when a modal is actually being shown.
-        if (uiServices == null)
+        if (UpgradeService == null)
             return;
 
-        if (uiServices.Wallet != null)
+        if (UpgradeService.Wallet != null)
             return;
 
         Debug.LogError(
-            "ModalManager: UiServiceRegistry.Wallet is null. Ensure UiServiceRegistry.Initialize(walletService) is called during bootstrap.",
+            "ModalManager: UpgradeService.Wallet is null. Ensure UpgradeService is constructed with a WalletService during bootstrap.",
             this
         );
     }
@@ -125,7 +130,7 @@ public sealed class ModalManager : MonoBehaviour, IUpgradesContext
     // Inspector-facing method
     public void ShowById(string id)
     {
-        EnsureWalletInitializedIfNeeded();
+        EnsureUpgradeServiceInitializedIfNeeded();
         Show(id);
     }
     
@@ -134,7 +139,7 @@ public sealed class ModalManager : MonoBehaviour, IUpgradesContext
         if (modalPrefab == null)
             throw new ArgumentNullException(nameof(modalPrefab));
 
-        EnsureWalletInitializedIfNeeded();
+        EnsureUpgradeServiceInitializedIfNeeded();
 
         var instance = Instantiate(modalPrefab, modalContainer);
         instance.gameObject.SetActive(true);

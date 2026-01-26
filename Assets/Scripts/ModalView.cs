@@ -51,24 +51,6 @@ public class ModalView : MonoBehaviour
         Manager.ShowById(id);
     }
 
-    protected IUpgradesContext UpgradesContext
-    {
-        get
-        {
-            if (Manager == null)
-            {
-                Debug.LogError("ModalView: Manager is not set; cannot resolve UpgradesContext.", this);
-                return null;
-            }
-
-            if (Manager is IUpgradesContext ctx)
-                return ctx;
-
-            Debug.LogError("ModalView: ModalManager does not provide IUpgradesContext. Wire a UiServiceRegistry into ModalManager (or have ModalManager implement IUpgradesContext) so modals don't need scene lookups.", this);
-            return null;
-        }
-    }
-
     private void EnsureModalSetup()
     {
         if (canvas == null)

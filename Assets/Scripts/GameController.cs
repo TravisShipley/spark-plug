@@ -15,7 +15,14 @@ public class GameController : MonoBehaviour
     [SerializeField] private Transform generatorUIContainer;
     [SerializeField] private UiServiceRegistry uiService;
 
+    [Header("Upgrades")]
+    [SerializeField] private UpgradeDatabase upgradeDatabase;
+
+    [Header("Modals")]
+    [SerializeField] private ModalManager modalManager;
+
     private WalletService walletService;
+    private UpgradeService upgradeService;
     // private AutomationService automationService;
     private TickService tickService;
     private PlayerWalletViewModel walletViewModel;
@@ -81,14 +88,40 @@ public class GameController : MonoBehaviour
         }
 
         uiService.Initialize(walletService);
-        
+
+        if (upgradeDatabase == null)
+        {
+            Debug.LogError("GameController: UpgradeDatabase is not assigned in the inspector.", this);
+            enabled = false;
+            return;
+        }
+
+        if (uiService is not IGeneratorResolver generatorResolver)
+        {
+            Debug.LogError("GameController: UiServiceRegistry must implement IGeneratorResolver for UpgradeService.", this);
+            enabled = false;
+            return;
+        }
+
+        upgradeService = new UpgradeService(upgradeDatabase, walletService, generatorResolver);
+
+        if (modalManager == null)
+        {
+            Debug.LogError("GameController: ModalManager is not assigned in the inspector.", this);
+            enabled = false;
+            return;
+        }
+
+        modalManager.Initialize(upgradeService);
+
         tickService = new TickService(TimeSpan.FromMilliseconds(100));
 
         // create the automation service as pass in the wallet service
         // automationService = new AutomationService(walletService, tickService);
 
         // Load saved data once for generator initialization (WalletService already loads currency).
-        var saved = SaveSystem.LoadGame();
+        var data = SaveSystem.LoadGame();
+        upgradeService.LoadFrom(data);
 
         // Inject the ViewModel into all relevant components
         foreach (var currencyView in FindObjectsByType<CurrencyView>(FindObjectsSortMode.None))
@@ -118,9 +151,9 @@ public class GameController : MonoBehaviour
             bool isAutomated = false;
             int level = 0;
 
-            if (saved != null && saved.Generators != null)
+            if (data != null && data.Generators != null)
             {
-                var savedGen = saved.Generators.Find(g => g != null && g.Id == id);
+                var savedGen = data.Generators.Find(g => g != null && g.Id == id);
                 if (savedGen != null)
                 {
                     isOwned = savedGen.IsOwned;
@@ -186,10 +219,16 @@ public class GameController : MonoBehaviour
                     entry.IsAutomated = state.automated;
                     entry.Level = state.lvl;
 
+                    // Persist upgrade purchases alongside generator state
+                    upgradeService?.SaveInto(data);
+
                     SaveSystem.SaveGame(data);
                 })
                 .AddTo(disposables);
         }
+
+        // Apply any saved upgrades
+        upgradeService.ApplyAllPurchased();
     }
 
     private void OnEnable()
@@ -225,6 +264,7 @@ public class GameController : MonoBehaviour
         walletViewModel?.Dispose();
 
         // Dispose core state last
+        upgradeService?.Dispose();
         walletService?.Dispose();
     }
 }

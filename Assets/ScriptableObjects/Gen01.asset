@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Id: gen01
   DisplayName: Apples
-  BaseOutputPerCycle: 0.9
+  BaseOutputPerCycle: 1
   BaseCycleDurationSeconds: 2
   BaseLevelCost: 0
   AutomationCost: 5

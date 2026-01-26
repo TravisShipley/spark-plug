@@ -9,15 +9,15 @@ public sealed class UpgradeEntryView : MonoBehaviour
     [SerializeField] private TextMeshProUGUI costText;
     [SerializeField] private TextMeshProUGUI infoText;
     [SerializeField] private ReactiveButtonView buyButton;
+    [SerializeField] private GameObject checkmark;
 
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
     public void Bind(
         UpgradeDefinition upgrade,
         GeneratorService generator,
-        WalletService wallet,
-        IReadOnlyReactiveProperty<bool> isPurchased,
-        Action markPurchased)
+        UpgradeService upgradeService,
+        IReadOnlyReactiveProperty<int> purchasedCount)
     {
         disposables.Clear();
 
@@ -33,9 +33,9 @@ public sealed class UpgradeEntryView : MonoBehaviour
             return;
         }
 
-        if (wallet == null)
+        if (upgradeService == null)
         {
-            Debug.LogError("UpgradeEntryView: wallet is null.", this);
+            Debug.LogError("UpgradeEntryView: upgradeService is null.", this);
             return;
         }
 
@@ -44,6 +44,14 @@ public sealed class UpgradeEntryView : MonoBehaviour
             Debug.LogError("UpgradeEntryView: buyButton is not assigned.", this);
             return;
         }
+
+        var isPurchased =
+            purchasedCount
+                .Select(c => c > 0)
+                .DistinctUntilChanged();
+
+        if (checkmark != null)
+            checkmark.SetActive(purchasedCount.Value > 0);
 
         if (nameText != null)
             nameText.text = upgrade.DisplayName;
@@ -74,42 +82,35 @@ public sealed class UpgradeEntryView : MonoBehaviour
             costText.text = Format.Currency(cost);
 
         var canAfford =
-            wallet.CashBalance
+            upgradeService.Wallet.CashBalance
                 .DistinctUntilChanged()
                 .Select(cash => cash >= cost)
-                .DistinctUntilChanged();
-
-        var visible =
-            isPurchased
-                .DistinctUntilChanged()
-                .Select(purchased => !purchased)
                 .DistinctUntilChanged();
 
         var interactable =
             Observable.CombineLatest(
                     canAfford,
-                    isPurchased.DistinctUntilChanged(),
+                    isPurchased,
                     (afford, purchased) => afford && !purchased
                 )
                 .DistinctUntilChanged();
 
+        isPurchased
+            .Subscribe(purchased =>
+            {
+                if (checkmark != null)
+                    checkmark.SetActive(purchased);
+
+                if (buyButton != null)
+                    buyButton.gameObject.SetActive(!purchased);
+            })
+            .AddTo(disposables);
+
         buyButton.Bind(
             labelText: Observable.Return($"Buy\n{Format.Currency(cost)}"),
             interactable: interactable,
-            visible: visible,
-            onClick: () =>
-            {
-                if (isPurchased.Value) return;
-                if (wallet.CashBalance.Value < cost) return;
-
-                wallet.IncrementBalance(CurrencyType.Cash, -cost);
-                generator.ApplyUpgrade(upgrade);
-
-                markPurchased?.Invoke();
-
-                // Optional: Hide immediately even if the reactive state update is delayed.
-                gameObject.SetActive(false);
-            }
+            visible: Observable.Return(true),
+            onClick: () => upgradeService.TryPurchase(upgrade.Id)
         );
     }
 

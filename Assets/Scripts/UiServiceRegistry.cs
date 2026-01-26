@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public sealed class UiServiceRegistry : MonoBehaviour, IUpgradesContext
+public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorResolver
 {
     [SerializeField] private bool dontDestroyOnLoad = false;
 

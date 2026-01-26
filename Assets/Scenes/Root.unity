@@ -633,6 +633,8 @@ MonoBehaviour:
     type: 3}
   generatorUIContainer: {fileID: 1596328118}
   uiService: {fileID: 5399439}
+  upgradeDatabase: {fileID: 11400000, guid: 2f56e6efc156c4c79aab4105e80d94f0, type: 2}
+  modalManager: {fileID: 1120071346}
 --- !u!224 &1263566858
 RectTransform:
   m_ObjectHideFlags: 0
