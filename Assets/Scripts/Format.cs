@@ -35,7 +35,12 @@ public static class Format
             return "-" + Abbreviated(-value, decimals);
 
         if (value < 1000)
-            return value.ToString("0", Invariant);
+        {
+            // Below 1000: show up to 2 decimals (0.##), truncated (never rounded).
+            int d = Math.Min(2, decimals);
+            double truncated = TruncateDecimals(value, d);
+            return truncated.ToString("0.##", Invariant);
+        }
 
         int magnitude = (int)Math.Floor(Math.Log10(value) / 3);
         magnitude = Math.Min(magnitude, Suffixes.Length - 1);
