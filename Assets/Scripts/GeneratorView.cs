@@ -28,7 +28,7 @@ public class GeneratorView : MonoBehaviour
     private float lastCycleDuration;
     private bool waitingForCollect;
 
-    public void Bind(GeneratorViewModel vm, GeneratorService generatorService, PlayerWalletViewModel walletViewModel)
+    public void Bind(GeneratorViewModel vm, GeneratorService generatorService, WalletViewModel walletViewModel)
     {
         // Allow safe re-binding (e.g., scene reload / reuse) by clearing previous subscriptions.
         disposables.Dispose();

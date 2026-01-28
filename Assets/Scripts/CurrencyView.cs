@@ -7,9 +7,9 @@ public class CurrencyView : MonoBehaviour
 {
     [SerializeField] private CurrencyType currency;
     [SerializeField] private TextMeshProUGUI value;
-    private PlayerWalletViewModel walletViewModel;
+    private WalletViewModel walletViewModel;
 
-    public void Initialize(PlayerWalletViewModel viewModel)
+    public void Initialize(WalletViewModel viewModel)
     {
         walletViewModel = viewModel;
 

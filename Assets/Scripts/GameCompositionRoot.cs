@@ -4,28 +4,27 @@ using UniRx;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 
-public class GameController : MonoBehaviour
+public class GameCompositionRoot : MonoBehaviour
 {
-    [Header("Generator Database")]
+    [Header("Databases")]
     [SerializeField] private GeneratorDatabase generatorDatabase;
-
-    [Header("Generator UI")]
-    [SerializeField] private GameObject generatorUIRootPrefab;
-
-    [SerializeField] private Transform generatorUIContainer;
-    [SerializeField] private UiServiceRegistry uiService;
-
-    [Header("Upgrades")]
     [SerializeField] private UpgradeDatabase upgradeDatabase;
 
-    [Header("Modals")]
+    [Header("UI Composition")]
+    [SerializeField] private UiCompositionRoot uiRoot;
+    [SerializeField] private UiServiceRegistry uiService;
+
+    [Header("Managers")]
     [SerializeField] private ModalManager modalManager;
+    
+    [Header("Generator UI")]
+    [SerializeField] private GameObject generatorUIRootPrefab;
+    [SerializeField] private Transform generatorUIContainer;
 
     private WalletService walletService;
     private UpgradeService upgradeService;
-    // private AutomationService automationService;
     private TickService tickService;
-    private PlayerWalletViewModel walletViewModel;
+    private WalletViewModel walletViewModel;
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
     private readonly List<GeneratorViewModel> generatorViewModels = new();
@@ -77,7 +76,7 @@ public class GameController : MonoBehaviour
 
         // create and wire the wallet service -> viewmodel
         walletService = new WalletService();
-        walletViewModel = new PlayerWalletViewModel(walletService);
+        walletViewModel = new WalletViewModel(walletService);
 
         // UI service registry is required for UI-driven systems (eg: modals resolving services)
         if (uiService == null)
@@ -111,23 +110,34 @@ public class GameController : MonoBehaviour
             enabled = false;
             return;
         }
-
+        // ModalManager needs the UpgradeService for modals like Upgrades.
         modalManager.Initialize(upgradeService);
 
-        tickService = new TickService(TimeSpan.FromMilliseconds(100));
+        // Domain-facing modal API (intent-based)
+        var modalService = new ModalService(modalManager);
 
-        // create the automation service as pass in the wallet service
-        // automationService = new AutomationService(walletService, tickService);
+        if (uiRoot == null)
+        {
+            Debug.LogError("GameController: UiCompositionRoot is not assigned in the inspector.", this);
+            enabled = false;
+            return;
+        }
+
+        var uiCtx = new UiBindingsContext(
+            modalService,
+            uiService,
+            upgradeService,
+            walletService,
+            walletViewModel
+        );
+
+        uiRoot.Bind(uiCtx);
+
+        tickService = new TickService(TimeSpan.FromMilliseconds(100));
 
         // Load saved data once for generator initialization (WalletService already loads currency).
         var data = SaveSystem.LoadGame();
         upgradeService.LoadFrom(data);
-
-        // Inject the ViewModel into all relevant components
-        foreach (var currencyView in FindObjectsByType<CurrencyView>(FindObjectsSortMode.None))
-        {
-            currencyView.Initialize(walletViewModel);
-        }
 
         // Instantiate generator UI prefabs and wire up GeneratorView and AutomateButtonView for each generator
         for (int i = 0; i < generatorDefinitions.Count; i++)

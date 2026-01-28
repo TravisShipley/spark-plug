@@ -1,6 +1,6 @@
 using UniRx;
 
-public class PlayerWalletViewModel
+public class WalletViewModel
 {
     private readonly WalletService walletService;
 
@@ -10,7 +10,7 @@ public class PlayerWalletViewModel
 
     private CompositeDisposable disposables = new CompositeDisposable();
 
-    public PlayerWalletViewModel(WalletService walletService)
+    public WalletViewModel(WalletService walletService)
     {
         this.walletService = walletService;
 
