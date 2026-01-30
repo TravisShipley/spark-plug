@@ -32,11 +32,6 @@ public class GeneratorViewModel : IDisposable
                 .AddTo(disposables);
     }
 
-    // public void SetAutomated(bool value)
-    // {
-    //     generatorService.SetAutomated(value);
-    // }
-
     public void Dispose()
     {
         disposables.Dispose();

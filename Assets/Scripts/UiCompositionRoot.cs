@@ -4,6 +4,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 {
     [Header("Scene UI")]
     [SerializeField] private CurrencyView[] currencyViews;
+    [SerializeField] private BottomBarView bottomBarView;
 
     private bool isBound;
 
@@ -16,6 +17,9 @@ public sealed class UiCompositionRoot : MonoBehaviour
         }
         isBound = true;
 
+        var bottomBarVm = new BottomBarViewModel(ctx.Modals);
+        bottomBarView.Bind(bottomBarVm);
+
         // Wallet HUD
         if (currencyViews != null)
         {
@@ -23,6 +27,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
             {
                 if (v == null) continue;
                 v.Initialize(ctx.WalletVM);
+                
             }
         }
 

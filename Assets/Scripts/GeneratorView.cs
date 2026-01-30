@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -6,12 +5,15 @@ using UniRx;
 
 public class GeneratorView : MonoBehaviour
 {
+    private const float MinCycleDurationSeconds = 0.0001f;
+    private const float ProgressCompleteEpsilon = 0.0001f;
+
     [Header("UI")]
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private TextMeshProUGUI outputText;
     [SerializeField] private GameObject ownedContainer;
-    [SerializeField] private GameObject progressBar;
+    [SerializeField] private GameObject progressBar; // reserved for future use (show/hide, styling)
 
     [Header("Buttons")]
     [SerializeField] private ReactiveButtonView buildButtonView;
@@ -26,7 +28,15 @@ public class GeneratorView : MonoBehaviour
 
     private float cycleStartTime;
     private float lastCycleDuration;
-    private bool waitingForCollect;
+
+    private enum ProgressState
+    {
+        Idle,      // Not animating (unowned or waiting to start)
+        Animating, // Progress bar animates toward full
+        Complete   // Bar is full and held at 1.0 until player collects
+    }
+
+    private ProgressState progressState;
 
     public void Bind(GeneratorViewModel vm, GeneratorService generatorService, WalletViewModel walletViewModel)
     {
@@ -38,7 +48,13 @@ public class GeneratorView : MonoBehaviour
         Initialize(vm);
 
         lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
-        waitingForCollect = false;
+        progressState = ProgressState.Idle;
+
+        if (progressFill == null)
+        {
+            Debug.LogError("GeneratorView: progressFill is not assigned.", this);
+            return;
+        }
 
         var nextLevelCost =
                 vm.Level
@@ -62,13 +78,26 @@ public class GeneratorView : MonoBehaviour
             .Where(running => running)
             .Subscribe(_ =>
             {
-                waitingForCollect = false;
+                progressState = ProgressState.Animating;
 
                 cycleStartTime = Time.time;
                 lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
 
-                if (progressFill != null)
-                    progressFill.fillAmount = 0f;
+                progressFill.fillAmount = 0f;
+            })
+            .AddTo(disposables);
+
+        // Manual mode: when the sim stops, keep animating until the bar reaches full, then hold.
+        generatorService.IsRunning
+            .DistinctUntilChanged()
+            .Where(running => !running)
+            .Subscribe(_ =>
+            {
+                if (viewModel != null && viewModel.IsOwned.Value && !viewModel.IsAutomated.Value)
+                {
+                    // Collect can become available now; we keep animating until the bar reaches full.
+                    progressState = ProgressState.Animating;
+                }
             })
             .AddTo(disposables);
 
@@ -78,18 +107,16 @@ public class GeneratorView : MonoBehaviour
             .Subscribe(newDuration =>
             {
                 // If we're not actively running a cycle, just update the cached duration.
-                if (generatorService == null || !generatorService.IsRunning.Value)
+                if (!generatorService.IsRunning.Value)
                 {
                     lastCycleDuration = (float)newDuration;
                     return;
                 }
 
                 // Preserve elapsed percentage based on simulation progress to avoid drift.
-                float percent = 0f;
-                if (generatorService.CycleProgress != null)
-                    percent = Mathf.Clamp01((float)generatorService.CycleProgress.Value);
+                float percent = Mathf.Clamp01((float)generatorService.CycleProgress.Value);
 
-                lastCycleDuration = Mathf.Max(0.0001f, (float)newDuration);
+                lastCycleDuration = Mathf.Max(MinCycleDurationSeconds, (float)newDuration);
                 cycleStartTime = Time.time - percent * lastCycleDuration;
             })
             .AddTo(disposables);
@@ -191,25 +218,23 @@ public class GeneratorView : MonoBehaviour
         }
 
         // Visual sync on cycle completion:
-        // - Manual mode: snap to full and wait for Collect
+        // - Manual mode: animate to full and wait for Collect
         // - Automated mode: immediately restart from 0
         generatorService.CycleCompleted
             .Subscribe(_ =>
             {
-                if (viewModel != null && viewModel.IsAutomated.Value)
+                if (viewModel.IsAutomated.Value)
                 {
-                    waitingForCollect = false;
+                    progressState = ProgressState.Animating;
                     cycleStartTime = Time.time;
                     lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
 
-                    if (progressFill != null)
-                        progressFill.fillAmount = 0f;
+                    progressFill.fillAmount = 0f;
                 }
                 else
                 {
-                    waitingForCollect = true;
-                    if (progressFill != null)
-                        progressFill.fillAmount = 1f;
+                    // Manual: collect happened; next StartRun will restart animation.
+                    progressState = ProgressState.Idle;
                 }
             })
             .AddTo(disposables);
@@ -226,15 +251,10 @@ public class GeneratorView : MonoBehaviour
             .AddTo(disposables);
 
         // Output: react to BOTH output and duration changes
-        var durationStream =
-            this.generatorService != null
-                ? this.generatorService.CycleDurationSeconds.DistinctUntilChanged()
-                : Observable.Return(0.0);
-
         Observable
             .CombineLatest(
                 vm.OutputPerCycle.DistinctUntilChanged(),
-                durationStream,
+                generatorService.CycleDurationSeconds.DistinctUntilChanged(),
                 (output, duration) => $"{Format.Currency(output)} / {duration:0.00}s"
             )
             .Subscribe(text => outputText.text = text)
@@ -252,20 +272,26 @@ public class GeneratorView : MonoBehaviour
 
     private void Update()
     {
-        if (viewModel == null || !viewModel.IsOwned.Value || progressFill == null)
+        if (viewModel == null || !viewModel.IsOwned.Value)
             return;
 
-        // Manual mode: once completed, hold at full until Collect.
-        if (waitingForCollect)
+        if (progressState == ProgressState.Complete)
             return;
 
-        // Only animate while the generator is running.
-        if (generatorService == null || !generatorService.IsRunning.Value)
+        bool isRunning = generatorService.IsRunning.Value;
+        if (!isRunning && progressState != ProgressState.Animating)
             return;
 
-        float duration = Mathf.Max(0.0001f, lastCycleDuration);
+        float duration = Mathf.Max(MinCycleDurationSeconds, lastCycleDuration);
         float t = (Time.time - cycleStartTime) / duration;
-        progressFill.fillAmount = Mathf.Clamp01(t);
+        float fill = Mathf.Clamp01(t);
+        progressFill.fillAmount = fill;
+
+        if (progressState == ProgressState.Animating && fill >= 1f - ProgressCompleteEpsilon)
+        {
+            progressState = ProgressState.Complete;
+            progressFill.fillAmount = 1f;
+        }
     }
 
     private void OnDestroy()

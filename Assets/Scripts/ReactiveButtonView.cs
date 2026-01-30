@@ -3,6 +3,7 @@ using TMPro;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Events;
 
 [RequireComponent(typeof(Button))]
 public class ReactiveButtonView : MonoBehaviour
@@ -12,6 +13,7 @@ public class ReactiveButtonView : MonoBehaviour
     [SerializeField] private GameObject target; // optional; defaults to this GO
 
     private readonly CompositeDisposable disposables = new();
+    private UnityAction clickListener;
 
     private void Awake()
     {
@@ -26,6 +28,12 @@ public class ReactiveButtonView : MonoBehaviour
         Action onClick = null)
     {
         // Allow rebinding
+        if (clickListener != null && button != null)
+        {
+            button.onClick.RemoveListener(clickListener);
+            clickListener = null;
+        }
+
         disposables.Clear();
 
         if (label != null && labelText != null)
@@ -54,9 +62,27 @@ public class ReactiveButtonView : MonoBehaviour
 
         if (onClick != null)
         {
-            button.OnClickAsObservable()
-                .Subscribe(_ => onClick())
-                .AddTo(disposables);
+            // Helpful warning: if the Button has inspector-assigned click listeners, you'll get double actions.
+            if (button != null && button.onClick != null && button.onClick.GetPersistentEventCount() > 0)
+            {
+                Debug.LogWarning(
+                    "ReactiveButtonView: Button has persistent OnClick listeners assigned in the inspector. " +
+                    "If you also bind an onClick action here, it will run in addition to those listeners.",
+                    this
+                );
+            }
+
+            clickListener = () => onClick();
+            button.onClick.AddListener(clickListener);
+
+            // Ensure the listener is removed when we rebind/dispose.
+            Disposable.Create(() =>
+            {
+                if (button != null && clickListener != null)
+                    button.onClick.RemoveListener(clickListener);
+
+                clickListener = null;
+            }).AddTo(disposables);
         }
     }
 

@@ -1,24 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-7821396034702579027
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dda58cd9e9747484e8533f29d90c21ce, type: 3}
-  m_Name: upgrade_gen03_0002
-  m_EditorClassIdentifier: Assembly-CSharp::UpgradeDefinition
-  Id: upgrade_gen03_0002
-  DisplayName: Looooong Bananas
-  GeneratorId: gen03
-  Cost: 2048
-  EffectType: 0
-  Value: 1.5
---- !u!114 &-7168241959912776105
+--- !u!114 &-8715364289192604553
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -36,44 +18,7 @@ MonoBehaviour:
   Cost: 1337
   EffectType: 0
   Value: 1.5
---- !u!114 &-5594434458859142564
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dda58cd9e9747484e8533f29d90c21ce, type: 3}
-  m_Name: upgrade_gen03_0001
-  m_EditorClassIdentifier: Assembly-CSharp::UpgradeDefinition
-  Id: upgrade_gen03_0001
-  DisplayName: Extra Stickers
-  GeneratorId: gen03
-  Cost: 25
-  EffectType: 1
-  Value: 2
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d90867f5575934a0b9d1e6e7b5e6fcd8, type: 3}
-  m_Name: UpgradeDatabase
-  m_EditorClassIdentifier: Assembly-CSharp::UpgradeDatabase
-  upgrades:
-  - {fileID: 983835220639359587}
-  - {fileID: 5219053334584434012}
-  - {fileID: 1059652564479287481}
-  - {fileID: -7168241959912776105}
-  - {fileID: -5594434458859142564}
-  - {fileID: -7821396034702579027}
---- !u!114 &983835220639359587
+--- !u!114 &-5558316195213102053
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -86,12 +31,12 @@ MonoBehaviour:
   m_Name: upgrade_gen01_0001
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDefinition
   Id: upgrade_gen01_0001
-  DisplayName: Shinier Apples
+  DisplayName: Gluten-Free
   GeneratorId: gen01
   Cost: 10
   EffectType: 1
   Value: 2
---- !u!114 &1059652564479287481
+--- !u!114 &-4789028177911022566
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -101,15 +46,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dda58cd9e9747484e8533f29d90c21ce, type: 3}
-  m_Name: upgrade_gen02_0001
+  m_Name: upgrade_gen03_0002
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDefinition
-  Id: upgrade_gen02_0001
-  DisplayName: Pre-peeled Oranges
-  GeneratorId: gen02
-  Cost: 20
-  EffectType: 1
-  Value: 2
---- !u!114 &5219053334584434012
+  Id: upgrade_gen03_0002
+  DisplayName: Looooong Bananas
+  GeneratorId: gen03
+  Cost: 2048
+  EffectType: 0
+  Value: 1.5
+--- !u!114 &-3388358017686161261
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,3 +72,58 @@ MonoBehaviour:
   Cost: 1024
   EffectType: 0
   Value: 1.5
+--- !u!114 &-2318449772803030404
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dda58cd9e9747484e8533f29d90c21ce, type: 3}
+  m_Name: upgrade_gen02_0001
+  m_EditorClassIdentifier: Assembly-CSharp::UpgradeDefinition
+  Id: upgrade_gen02_0001
+  DisplayName: Pre-peeled Oranges
+  GeneratorId: gen02
+  Cost: 20
+  EffectType: 1
+  Value: 2
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d90867f5575934a0b9d1e6e7b5e6fcd8, type: 3}
+  m_Name: UpgradeDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::UpgradeDatabase
+  upgrades:
+  - {fileID: -5558316195213102053}
+  - {fileID: -3388358017686161261}
+  - {fileID: -2318449772803030404}
+  - {fileID: -8715364289192604553}
+  - {fileID: 2457147628792790591}
+  - {fileID: -4789028177911022566}
+--- !u!114 &2457147628792790591
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dda58cd9e9747484e8533f29d90c21ce, type: 3}
+  m_Name: upgrade_gen03_0001
+  m_EditorClassIdentifier: Assembly-CSharp::UpgradeDefinition
+  Id: upgrade_gen03_0001
+  DisplayName: Extra Stickers
+  GeneratorId: gen03
+  Cost: 25
+  EffectType: 1
+  Value: 2

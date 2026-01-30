@@ -22,11 +22,10 @@ public sealed class ModalService
     public void CloseTop() => modalManager.CloseTop();
 
     // Intent-based API (this is the real value)
-    public void ShowUpgrades() => modalManager.ShowById("Upgrades");
+    public void ShowUpgrades() => modalManager.ShowById("UPGRADES");
+    public void ShowManagers() => modalManager.ShowById("MANAGERS");
+    public void ShowStore() => modalManager.ShowById("STORE");
 
-    // Add more as you create modals:
-    // public void ShowSettings() => modalManager.ShowById("Settings");
-    // public void ConfirmResetSave(Action onConfirm) => modalManager.Show("Confirm", payload);
 }
 
 // TODO

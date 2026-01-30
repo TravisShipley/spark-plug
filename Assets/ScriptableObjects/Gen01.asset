@@ -15,7 +15,7 @@ MonoBehaviour:
   Id: gen01
   DisplayName: Apples
   BaseOutputPerCycle: 1
-  BaseCycleDurationSeconds: 2
+  BaseCycleDurationSeconds: 1
   BaseLevelCost: 0
   AutomationCost: 5
   LevelCostGrowth: 1.15

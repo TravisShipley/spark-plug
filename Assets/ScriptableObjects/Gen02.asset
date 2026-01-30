@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Gen02
   m_EditorClassIdentifier: 
   Id: gen02
-  DisplayName: Oranges
+  DisplayName: Grapes
   BaseOutputPerCycle: 15
-  BaseCycleDurationSeconds: 8
+  BaseCycleDurationSeconds: 6
   BaseLevelCost: 20
   AutomationCost: 40
   LevelCostGrowth: 1.15
