@@ -1,22 +1,22 @@
 public readonly struct UiBindingsContext
 {
-    public readonly WalletService Wallet;
-    public readonly WalletViewModel WalletVM;
-    public readonly UpgradeService Upgrades;
-    public readonly ModalService Modals;
-    public readonly UiServiceRegistry UiService;
+    public readonly WalletService WalletService;
+    public readonly WalletViewModel WalletViewModel;
+    public readonly UpgradeService UpgradeService;
+    public readonly ModalService ModalService;
+    public readonly UiServiceRegistry UiServices;
 
     public UiBindingsContext(
-        ModalService modals,
-        UiServiceRegistry uiService,
-        UpgradeService upgrades,
-        WalletService wallet,
-        WalletViewModel walletVM)
+        ModalService modalService,
+        UiServiceRegistry uiServices,
+        UpgradeService upgradeService,
+        WalletService walletService,
+        WalletViewModel walletViewModel)
     {
-        Modals = modals;
-        UiService = uiService;
-        Upgrades = upgrades;
-        Wallet = wallet;
-        WalletVM = walletVM;
+        ModalService = modalService;
+        UiServices = uiServices;
+        UpgradeService = upgradeService;
+        WalletService = walletService;
+        WalletViewModel = walletViewModel;
     }
 }

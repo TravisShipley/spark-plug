@@ -25,6 +25,7 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradeService upgradeService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
+    
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
     private readonly List<GeneratorViewModel> generatorViewModels = new();
@@ -32,97 +33,131 @@ public class GameCompositionRoot : MonoBehaviour
 
     private void Awake()
     {
-        if (generatorDatabase == null)
+        if (!ValidateReferences())
         {
-            Debug.LogError("GameController: GeneratorDatabase is not assigned in the inspector.");
             enabled = false;
             return;
         }
 
-        // Build the list of generator definitions to instantiate (up to 3 by default)
-        if (generatorDatabase.Generators == null || generatorDatabase.Generators.Count == 0)
-        {
-            Debug.LogError("GameController: GeneratorDatabase has no GeneratorDefinitions assigned.");
-            enabled = false;
-            return;
-        }
-
-        var generatorDefinitions = new List<GeneratorDefinition>(3);
-
-        foreach (var generatorDefinition in generatorDatabase.Generators)
-        {
-            if (generatorDefinition == null) continue;
-
-            generatorDefinitions.Add(generatorDefinition);
-            if (generatorDefinitions.Count >= 3) break;
-        }
-
+        var generatorDefinitions = GetGeneratorDefinitions(maxCount: 3);
         if (generatorDefinitions.Count == 0)
         {
-            Debug.LogError("GameController: No GeneratorDefinitions could be resolved.");
+            Debug.LogError("GameCompositionRoot: No GeneratorDefinitions could be resolved.", this);
             enabled = false;
             return;
+        }
+
+        InitializeCoreServices(out var modalService);
+        if (!enabled)
+            return;
+
+        BindSceneUi(modalService);
+
+        tickService = new TickService(TimeSpan.FromMilliseconds(100));
+
+        // Load saved data once for generator initialization (WalletService already loads currency).
+        var data = SaveSystem.LoadGame();
+        upgradeService.LoadFrom(data);
+
+        CreateGenerators(generatorDefinitions, data);
+
+        // Apply any saved upgrades (generators must be registered before this).
+        upgradeService.ApplyAllPurchased();
+    }
+
+    private bool ValidateReferences()
+    {
+        if (generatorDatabase == null)
+        {
+            Debug.LogError("GameCompositionRoot: GeneratorDatabase is not assigned in the inspector.", this);
+            return false;
+        }
+
+        if (generatorDatabase.Generators == null || generatorDatabase.Generators.Count == 0)
+        {
+            Debug.LogError("GameCompositionRoot: GeneratorDatabase has no GeneratorDefinitions assigned.", this);
+            return false;
         }
 
         if (generatorUIRootPrefab == null)
         {
-            Debug.LogError("GameController: Generator UI root prefab is not assigned in the inspector.");
-            enabled = false;
-            return;
+            Debug.LogError("GameCompositionRoot: Generator UI root prefab is not assigned in the inspector.", this);
+            return false;
         }
 
         if (generatorUIContainer == null)
             generatorUIContainer = transform;
 
-        // create and wire the wallet service -> viewmodel
-        walletService = new WalletService();
-        walletViewModel = new WalletViewModel(walletService);
-
-        // UI service registry is required for UI-driven systems (eg: modals resolving services)
         if (uiService == null)
         {
-            Debug.LogError("GameController: UiServiceRegistry is not assigned in the inspector.", this);
-            enabled = false;
-            return;
+            Debug.LogError("GameCompositionRoot: UiServiceRegistry is not assigned in the inspector.", this);
+            return false;
         }
-
-        uiService.Initialize(walletService);
 
         if (upgradeDatabase == null)
         {
-            Debug.LogError("GameController: UpgradeDatabase is not assigned in the inspector.", this);
-            enabled = false;
-            return;
+            Debug.LogError("GameCompositionRoot: UpgradeDatabase is not assigned in the inspector.", this);
+            return false;
         }
+
+        if (modalManager == null)
+        {
+            Debug.LogError("GameCompositionRoot: ModalManager is not assigned in the inspector.", this);
+            return false;
+        }
+
+        if (uiRoot == null)
+        {
+            Debug.LogError("GameCompositionRoot: UiCompositionRoot is not assigned in the inspector.", this);
+            return false;
+        }
+
+        return true;
+    }
+
+    private List<GeneratorDefinition> GetGeneratorDefinitions(int maxCount)
+    {
+        var list = new List<GeneratorDefinition>(maxCount);
+
+        foreach (var def in generatorDatabase.Generators)
+        {
+            if (def == null) continue;
+
+            list.Add(def);
+            if (list.Count >= maxCount)
+                break;
+        }
+
+        return list;
+    }
+
+    private void InitializeCoreServices(out ModalService modalService)
+    {
+        walletService = new WalletService();
+        walletViewModel = new WalletViewModel(walletService);
+
+        // Scene-bound registry that exposes runtime services to UI.
+        uiService.Initialize(walletService);
 
         if (uiService is not IGeneratorResolver generatorResolver)
         {
-            Debug.LogError("GameController: UiServiceRegistry must implement IGeneratorResolver for UpgradeService.", this);
+            Debug.LogError("GameCompositionRoot: UiServiceRegistry must implement IGeneratorResolver for UpgradeService.", this);
             enabled = false;
+            modalService = null;
             return;
         }
 
         upgradeService = new UpgradeService(upgradeDatabase, walletService, generatorResolver);
 
-        if (modalManager == null)
-        {
-            Debug.LogError("GameController: ModalManager is not assigned in the inspector.", this);
-            enabled = false;
-            return;
-        }
         // ModalManager needs the UpgradeService for modals like Upgrades.
         modalManager.Initialize(upgradeService);
 
         // Domain-facing modal API (intent-based)
-        var modalService = new ModalService(modalManager);
+        modalService = new ModalService(modalManager);
+    }
 
-        if (uiRoot == null)
-        {
-            Debug.LogError("GameController: UiCompositionRoot is not assigned in the inspector.", this);
-            enabled = false;
-            return;
-        }
-
+    private void BindSceneUi(ModalService modalService)
+    {
         var uiCtx = new UiBindingsContext(
             modalService,
             uiService,
@@ -132,113 +167,119 @@ public class GameCompositionRoot : MonoBehaviour
         );
 
         uiRoot.Bind(uiCtx);
+    }
 
-        tickService = new TickService(TimeSpan.FromMilliseconds(100));
-
-        // Load saved data once for generator initialization (WalletService already loads currency).
-        var data = SaveSystem.LoadGame();
-        upgradeService.LoadFrom(data);
-
-        // Instantiate generator UI prefabs and wire up GeneratorView and AutomateButtonView for each generator
+    private void CreateGenerators(List<GeneratorDefinition> generatorDefinitions, GameData data)
+    {
         for (int i = 0; i < generatorDefinitions.Count; i++)
         {
             var generatorDefinition = generatorDefinitions[i];
 
-            // Create UI instance for this generator
             var generatorUI = Instantiate(generatorUIRootPrefab, generatorUIContainer);
             generatorUI.name = $"Generator_{generatorDefinition.Id}";
 
             var generatorView = generatorUI.GetComponent<GeneratorView>();
             if (generatorView == null)
             {
-                Debug.LogError($"GameController: Generator UI root prefab is missing a GeneratorView (def '{generatorDefinition.Id}').", generatorUI);
+                Debug.LogError($"GameCompositionRoot: Generator UI root prefab is missing a GeneratorView (def '{generatorDefinition.Id}').", generatorUI);
                 continue;
             }
 
-            string id = generatorDefinition.Id;
+            CreateSingleGenerator(generatorDefinition, generatorView, data);
+        }
+    }
 
-            bool isOwned = false;
-            bool isAutomated = false;
-            int level = 0;
+    private void CreateSingleGenerator(GeneratorDefinition generatorDefinition, GeneratorView generatorView, GameData data)
+    {
+        string id = generatorDefinition.Id;
 
-            if (data != null && data.Generators != null)
+        LoadGeneratorState(data, id, out bool isOwned, out bool isAutomated, out int level);
+
+        var model = new GeneratorModel
+        {
+            Id = id,
+            Level = level,
+            IsOwned = isOwned,
+            IsAutomated = isAutomated,
+            CycleElapsedSeconds = 0
+        };
+
+        generatorModels.Add(model);
+
+        var service = new GeneratorService(
+            model,
+            generatorDefinition,
+            walletService,
+            tickService
+        );
+
+        var generatorViewModel = new GeneratorViewModel(model, generatorDefinition, service);
+
+        generatorServices.Add(service);
+        generatorViewModels.Add(generatorViewModel);
+
+        generatorView.Bind(generatorViewModel, service, walletViewModel);
+
+        // Register each generator and service with the UiServiceRegistry
+        uiService.RegisterGenerator(model.Id, service);
+
+        WireGeneratorPersistence(id, service);
+    }
+
+    private static void LoadGeneratorState(GameData data, string id, out bool isOwned, out bool isAutomated, out int level)
+    {
+        isOwned = false;
+        isAutomated = false;
+        level = 0;
+
+        if (data != null && data.Generators != null)
+        {
+            var savedGen = data.Generators.Find(g => g != null && g.Id == id);
+            if (savedGen != null)
             {
-                var savedGen = data.Generators.Find(g => g != null && g.Id == id);
-                if (savedGen != null)
-                {
-                    isOwned = savedGen.IsOwned;
-                    isAutomated = savedGen.IsAutomated;
-                    level = savedGen.Level;
-                }
+                isOwned = savedGen.IsOwned;
+                isAutomated = savedGen.IsAutomated;
+                level = savedGen.Level;
             }
-
-            // Normalize: automation implies ownership; ownership implies at least level 1
-            if (isAutomated) isOwned = true;
-            if (isOwned && level < 1) level = 1;
-            if (!isOwned) level = 0;
-
-            var model = new GeneratorModel
-            {
-                Id = id,
-                Level = level,
-                IsOwned = isOwned,
-                IsAutomated = isAutomated,
-                CycleElapsedSeconds = 0
-            };
-
-            generatorModels.Add(model);
-
-            var service = new GeneratorService(
-                model,
-                generatorDefinition,
-                walletService,
-                tickService
-            );
-
-            var generatorViewModel = new GeneratorViewModel(model, generatorDefinition, service);
-
-            generatorServices.Add(service);
-            generatorViewModels.Add(generatorViewModel);
-
-            generatorView.Bind(generatorViewModel, service, walletViewModel);
-
-            // Register each generator and service with the UiServiceRegistry
-            uiService.RegisterGenerator(model.Id, service);
-
-            // Persist generator state whenever it changes
-            Observable
-                .CombineLatest(
-                    service.Level.DistinctUntilChanged(),
-                    service.IsOwned.DistinctUntilChanged(),
-                    service.IsAutomated.DistinctUntilChanged(),
-                    (lvl, owned, automated) => (lvl, owned, automated)
-                )
-                .Subscribe(state =>
-                {
-                    var data = SaveSystem.LoadGame() ?? new GameData();
-                    data.Generators ??= new List<GameData.GeneratorStateData>();
-
-                    var entry = data.Generators.Find(g => g != null && g.Id == id);
-                    if (entry == null)
-                    {
-                        entry = new GameData.GeneratorStateData { Id = id };
-                        data.Generators.Add(entry);
-                    }
-
-                    entry.IsOwned = state.owned;
-                    entry.IsAutomated = state.automated;
-                    entry.Level = state.lvl;
-
-                    // Persist upgrade purchases alongside generator state
-                    upgradeService?.SaveInto(data);
-
-                    SaveSystem.SaveGame(data);
-                })
-                .AddTo(disposables);
         }
 
-        // Apply any saved upgrades
-        upgradeService.ApplyAllPurchased();
+        // Normalize: automation implies ownership; ownership implies at least level 1
+        if (isAutomated) isOwned = true;
+        if (isOwned && level < 1) level = 1;
+        if (!isOwned) level = 0;
+    }
+
+    private void WireGeneratorPersistence(string id, GeneratorService service)
+    {
+        Observable
+            .CombineLatest(
+                service.Level.DistinctUntilChanged(),
+                service.IsOwned.DistinctUntilChanged(),
+                service.IsAutomated.DistinctUntilChanged(),
+                (lvl, owned, automated) => (lvl, owned, automated)
+            )
+            .Subscribe(state =>
+            {
+                var data = SaveSystem.LoadGame() ?? new GameData();
+                data.Generators ??= new List<GameData.GeneratorStateData>();
+
+                var entry = data.Generators.Find(g => g != null && g.Id == id);
+                if (entry == null)
+                {
+                    entry = new GameData.GeneratorStateData { Id = id };
+                    data.Generators.Add(entry);
+                }
+
+                entry.IsOwned = state.owned;
+                entry.IsAutomated = state.automated;
+                entry.Level = state.lvl;
+
+                // Persist upgrade purchases alongside generator state
+                upgradeService.SaveInto(data);
+
+                SaveSystem.SaveGame(data);
+            })
+            .AddTo(disposables);
     }
 
     private void OnEnable()
