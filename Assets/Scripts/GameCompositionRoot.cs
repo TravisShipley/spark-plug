@@ -58,9 +58,10 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradeService upgradeService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
+    private SaveService saveService;
 
-    private GameData gameData;
-    private readonly Subject<Unit> saveRequests = new Subject<Unit>();
+    // Timing
+    private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
 
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
@@ -83,24 +84,17 @@ public class GameCompositionRoot : MonoBehaviour
             return;
         }
 
+        // SaveService owns an in-memory snapshot.
+        saveService = new SaveService();
+        saveService.Load();
+
         InitializeCoreServices(out var modalService);
         if (!enabled)
             return;
 
+        LoadSaveState();
+
         BindSceneUi(modalService);
-
-        // Load saved data once into memory (WalletService already loads currency).
-        gameData = SaveSystem.LoadGame() ?? new GameData();
-        gameData.Generators ??= new List<GameData.GeneratorStateData>();
-        gameData.Upgrades ??= new List<GameData.UpgradeStateData>();
-
-        // Debounced disk writes to avoid load/save churn.
-        saveRequests
-            .Throttle(TimeSpan.FromMilliseconds(250))
-            .Subscribe(_ => SaveSystem.SaveGame(gameData))
-            .AddTo(disposables);
-
-        upgradeService.LoadFrom(gameData);
 
         var generatorComposer = new GeneratorListComposer(
             generatorUIRootPrefab,
@@ -109,9 +103,8 @@ public class GameCompositionRoot : MonoBehaviour
             walletViewModel,
             tickService,
             uiService,
-            gameData,
+            saveService,
             upgradeService,
-            saveRequests,
             disposables,
             generatorModels,
             generatorServices,
@@ -122,6 +115,88 @@ public class GameCompositionRoot : MonoBehaviour
 
         // Apply any saved upgrades (generators must be registered before this).
         upgradeService.ApplyAllPurchased();
+    }
+
+    private List<GeneratorDefinition> GetGeneratorDefinitions(int maxCount)
+    {
+        var list = new List<GeneratorDefinition>(maxCount);
+
+        foreach (var def in generatorDatabase.Generators)
+        {
+            if (def == null)
+                continue;
+
+            list.Add(def);
+            if (list.Count >= maxCount)
+                break;
+        }
+
+        return list;
+    }
+
+    private void InitializeCoreServices(out ModalService modalService)
+    {
+        if (saveService == null)
+            throw new InvalidOperationException(
+                "GameCompositionRoot: SaveService must be created and loaded before InitializeCoreServices."
+            );
+
+        walletService = new WalletService(saveService);
+        walletViewModel = new WalletViewModel(walletService);
+
+        // Time source for simulation
+        tickService = new TickService(TickInterval);
+
+        // Scene-bound registry that exposes runtime services to UI.
+        uiService.Initialize(walletService);
+
+        if (uiService is not IGeneratorResolver generatorResolver)
+        {
+            Debug.LogError(
+                "GameCompositionRoot: UiServiceRegistry must implement IGeneratorResolver for UpgradeService.",
+                this
+            );
+            enabled = false;
+            modalService = null;
+            return;
+        }
+
+        upgradeService = new UpgradeService(upgradeDatabase, walletService, generatorResolver);
+
+        // ModalManager needs the UpgradeService for modals like Upgrades.
+        modalManager.Initialize(upgradeService);
+
+        // Domain-facing modal API (intent-based)
+        modalService = new ModalService(modalManager);
+    }
+
+    private void LoadSaveState()
+    {
+        if (saveService == null)
+            throw new InvalidOperationException(
+                "GameCompositionRoot: SaveService is null in LoadSaveState."
+            );
+
+        if (upgradeService == null)
+            throw new InvalidOperationException(
+                "GameCompositionRoot: UpgradeService is null in LoadSaveState."
+            );
+
+        // Load saved upgrade purchase facts. (WalletService loads currency from SaveService in its constructor.)
+        upgradeService.LoadFrom(saveService.Data);
+    }
+
+    private void BindSceneUi(ModalService modalService)
+    {
+        var uiCtx = new UiBindingsContext(
+            modalService,
+            uiService,
+            upgradeService,
+            walletService,
+            walletViewModel
+        );
+
+        uiRoot.Bind(uiCtx);
     }
 
     private bool ValidateReferences()
@@ -195,67 +270,6 @@ public class GameCompositionRoot : MonoBehaviour
         return true;
     }
 
-    private List<GeneratorDefinition> GetGeneratorDefinitions(int maxCount)
-    {
-        var list = new List<GeneratorDefinition>(maxCount);
-
-        foreach (var def in generatorDatabase.Generators)
-        {
-            if (def == null)
-                continue;
-
-            list.Add(def);
-            if (list.Count >= maxCount)
-                break;
-        }
-
-        return list;
-    }
-
-    private void InitializeCoreServices(out ModalService modalService)
-    {
-        walletService = new WalletService();
-        walletViewModel = new WalletViewModel(walletService);
-
-        // Time source for simulation
-        tickService = new TickService(TimeSpan.FromMilliseconds(100));
-
-        // Scene-bound registry that exposes runtime services to UI.
-        uiService.Initialize(walletService);
-
-        if (uiService is not IGeneratorResolver generatorResolver)
-        {
-            Debug.LogError(
-                "GameCompositionRoot: UiServiceRegistry must implement IGeneratorResolver for UpgradeService.",
-                this
-            );
-            enabled = false;
-            modalService = null;
-            return;
-        }
-
-        upgradeService = new UpgradeService(upgradeDatabase, walletService, generatorResolver);
-
-        // ModalManager needs the UpgradeService for modals like Upgrades.
-        modalManager.Initialize(upgradeService);
-
-        // Domain-facing modal API (intent-based)
-        modalService = new ModalService(modalManager);
-    }
-
-    private void BindSceneUi(ModalService modalService)
-    {
-        var uiCtx = new UiBindingsContext(
-            modalService,
-            uiService,
-            upgradeService,
-            walletService,
-            walletViewModel
-        );
-
-        uiRoot.Bind(uiCtx);
-    }
-
     private void OnEnable()
     {
         SaveSystem.OnSaveReset += OnSaveReset;
@@ -276,11 +290,7 @@ public class GameCompositionRoot : MonoBehaviour
     private void OnDestroy()
     {
         // Flush any pending save (best effort)
-        if (gameData != null)
-            SaveSystem.SaveGame(gameData);
-
-        saveRequests.OnCompleted();
-        saveRequests.Dispose();
+        saveService?.Dispose();
 
         disposables.Dispose();
 

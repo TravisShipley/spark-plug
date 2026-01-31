@@ -5,6 +5,7 @@
 Spark Plug is structured around **authoritative domain services**, **explicit composition roots**, and a **dumb, reactive UI**.
 
 - **Domain services** own game state and rules.
+- **SaveService** is the single authority over persistence and disk IO.
 - **ViewModels** adapt domain state for UI consumption.
 - **Views** render and forward intent only.
 - **Composition roots** wire everything together once at startup.
@@ -16,32 +17,40 @@ No scene searching. No hidden globals. No UI-owned game logic.
 ## 2. Naming conventions
 
 ### 2.1 Services
+
 **Rule:** All authoritative systems end in `Service`.
 
 Examples:
+
 - `WalletService`
 - `GeneratorService`
 - `UpgradeService`
 - `ModalService`
 - `TickService`
+- `SaveService`
 
 **Guidelines:**
+
 - Services are pure C# (no `MonoBehaviour`)
 - Created explicitly in `GameCompositionRoot`
 - Own state, rules, and persistence triggers
 - Never reference UI types
+- Only `SaveService` may read from or write to disk (`SaveSystem`).
 
 ---
 
 ### 2.2 ViewModels
+
 **Rule:** UI-facing adapters end in `ViewModel`.
 
 Examples:
+
 - `WalletViewModel`
 - `GeneratorViewModel`
 - `BottomBarViewModel`
 
 **Guidelines:**
+
 - Contain no Unity-specific code
 - Expose reactive properties (`IReadOnlyReactiveProperty<T>`)
 - Expose `UiCommand`s for user intent
@@ -50,14 +59,17 @@ Examples:
 ---
 
 ### 2.3 Views
+
 **Rule:** Scene components end in `View`.
 
 Examples:
+
 - `GeneratorView`
 - `CurrencyView`
 - `BottomBarView`
 
 **Guidelines:**
+
 - `MonoBehaviour` only
 - No gameplay logic
 - No state mutation
@@ -67,28 +79,35 @@ Examples:
 ---
 
 ### 2.4 Composition Roots
+
 **Rule:** Files that wire systems together use `CompositionRoot`.
 
 Examples:
+
 - `GameCompositionRoot`
 - `UiCompositionRoot`
 
 **Guidelines:**
+
 - Created once per scene
 - Responsible for construction, ordering, and binding
-- The *only* place where services and view models are instantiated
+- The _only_ place where services and view models are instantiated
 - No gameplay logic
+- Construction and save-state loading are separate phases
 
 ---
 
 ### 2.5 Context / Registry Objects
+
 **Rule:** Objects that bundle references are named `Context` or `Registry`, never `Service`.
 
 Examples:
+
 - `UiBindingsContext`
 - `UiServiceRegistry`
 
 **Guidelines:**
+
 - Read-only data containers
 - No business logic
 - Used to reduce parameter explosion
@@ -97,15 +116,18 @@ Examples:
 ---
 
 ### 2.6 Commands
+
 **Rule:** User intent is represented by `UiCommand`.
 
 Examples:
+
 - `ShowUpgrades`
 - `ShowPrestige`
 - `Collect`
 - `Build`
 
 **Guidelines:**
+
 - Owned by ViewModels
 - May expose:
   - `CanExecute`
@@ -115,16 +137,32 @@ Examples:
 
 ---
 
+## 2.7 Persistence
+
+**Rule:** Persistence is centralized in `SaveService`.
+
+**Guidelines:**
+
+- `SaveService` owns the in-memory `GameData` snapshot
+- All save mutations go through explicit methods on `SaveService`
+- Disk writes are debounced and scheduled internally
+- Other services never call `SaveSystem` directly
+- Scene reset is orchestrated by the composition root
+
+---
+
 ## 3. Property naming
 
 ### 3.1 Prefer explicit over abbreviated
 
 **Good:**
+
 - `WalletViewModel`
 - `UpgradeService`
 - `ModalService`
 
 **Avoid:**
+
 - `WalletVM`
 - `UpgSvc`
 - `UIService`
@@ -136,6 +174,7 @@ Examples:
 Context objects should expose properties whose names match their concrete types.
 
 Example:
+
 - `WalletService`
 - `WalletViewModel`
 - `UpgradeService`
@@ -151,6 +190,7 @@ This optimizes clarity at call sites and avoids abbreviation-based ambiguity.
 - UI-only state is explicitly named and local
 
 Examples:
+
 - `ProgressState` (visual-only)
 - `IsAnimating`, `IsWaitingForCollect` (presentation only)
 
@@ -160,9 +200,11 @@ UI state never affects simulation.
 
 ## 5. Persistence rules
 
+- `SaveService` is the single persistence authority
 - Save **facts**, not derived values
-- Recompute multipliers and timing on load
-- Services are responsible for reapplying saved state
+- Services mutate save state via `SaveService`, never directly
+- Multipliers and timing are recomputed on load
+- Scene reload is used to guarantee a clean reset
 
 ---
 

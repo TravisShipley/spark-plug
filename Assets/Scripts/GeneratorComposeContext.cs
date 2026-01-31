@@ -1,3 +1,7 @@
+using System.Collections.Generic;
+using UniRx;
+using UnityEngine;
+
 public readonly struct GeneratorComposeContext
 {
     public readonly GameObject GeneratorPrefab;
@@ -6,12 +10,10 @@ public readonly struct GeneratorComposeContext
     public readonly WalletService WalletService;
     public readonly WalletViewModel WalletViewModel;
     public readonly TickService TickService;
-
+    public readonly SaveService SaveService;
     public readonly UiServiceRegistry UiServices;
-
-    public readonly GameData GameData;
     public readonly UpgradeService UpgradeService;
-    public readonly Subject<Unit> SaveRequests;
+
     public readonly CompositeDisposable Disposables;
 
     public readonly List<GeneratorModel> Models;
@@ -24,10 +26,9 @@ public readonly struct GeneratorComposeContext
         WalletService walletService,
         WalletViewModel walletViewModel,
         TickService tickService,
+        SaveService saveService,
         UiServiceRegistry uiServices,
-        GameData gameData,
         UpgradeService upgradeService,
-        Subject<Unit> saveRequests,
         CompositeDisposable disposables,
         List<GeneratorModel> models,
         List<GeneratorService> services,
@@ -39,10 +40,9 @@ public readonly struct GeneratorComposeContext
         WalletService = walletService;
         WalletViewModel = walletViewModel;
         TickService = tickService;
+        SaveService = saveService;
         UiServices = uiServices;
-        GameData = gameData;
         UpgradeService = upgradeService;
-        SaveRequests = saveRequests;
         Disposables = disposables;
         Models = models;
         Services = services;

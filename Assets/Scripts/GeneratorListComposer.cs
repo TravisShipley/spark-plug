@@ -10,9 +10,8 @@ public class GeneratorListComposer
     private readonly WalletViewModel walletViewModel;
     private readonly TickService tickService;
     private readonly UiServiceRegistry uiService;
-    private readonly GameData gameData;
+    private readonly SaveService saveService;
     private readonly UpgradeService upgradeService;
-    private readonly Subject<Unit> saveRequests;
     private readonly CompositeDisposable disposables;
 
     private readonly List<GeneratorModel> generatorModels;
@@ -26,9 +25,8 @@ public class GeneratorListComposer
         WalletViewModel walletViewModel,
         TickService tickService,
         UiServiceRegistry uiService,
-        GameData gameData,
+        SaveService saveService,
         UpgradeService upgradeService,
-        Subject<Unit> saveRequests,
         CompositeDisposable disposables,
         List<GeneratorModel> generatorModels,
         List<GeneratorService> generatorServices,
@@ -41,9 +39,8 @@ public class GeneratorListComposer
         this.walletViewModel = walletViewModel;
         this.tickService = tickService;
         this.uiService = uiService;
-        this.gameData = gameData;
+        this.saveService = saveService;
         this.upgradeService = upgradeService;
-        this.saveRequests = saveRequests;
         this.disposables = disposables;
         this.generatorModels = generatorModels;
         this.generatorServices = generatorServices;
@@ -77,7 +74,7 @@ public class GeneratorListComposer
     {
         string id = generatorDefinition.Id;
 
-        LoadGeneratorState(gameData, id, out bool isOwned, out bool isAutomated, out int level);
+        LoadGeneratorState(saveService.Data, id, out bool isOwned, out bool isAutomated, out int level);
 
         var model = new GeneratorModel
         {
@@ -148,24 +145,14 @@ public class GeneratorListComposer
             )
             .Subscribe(state =>
             {
-                gameData.Generators ??= new List<GameData.GeneratorStateData>();
-
-                var entry = gameData.Generators.Find(g => g != null && g.Id == id);
-                if (entry == null)
-                {
-                    entry = new GameData.GeneratorStateData { Id = id };
-                    gameData.Generators.Add(entry);
-                }
-
-                entry.IsOwned = state.owned;
-                entry.IsAutomated = state.automated;
-                entry.Level = state.lvl;
+                // Update in-memory save snapshot (facts)
+                saveService.SetGeneratorState(id, state.lvl, state.owned, state.automated);
 
                 // Persist upgrade purchases alongside generator state
-                upgradeService.SaveInto(gameData);
+                upgradeService.SaveInto(saveService.Data);
 
                 // Request a debounced save
-                saveRequests.OnNext(Unit.Default);
+                saveService.RequestSave();
             })
             .AddTo(disposables);
     }

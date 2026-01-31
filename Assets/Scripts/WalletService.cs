@@ -1,5 +1,5 @@
-using UniRx;
 using System;
+using UniRx;
 
 public class WalletService : IDisposable
 {
@@ -7,41 +7,39 @@ public class WalletService : IDisposable
     public ReactiveProperty<double> GoldBalance { get; } = new ReactiveProperty<double>(0);
 
     private readonly CompositeDisposable disposables = new();
+    private readonly SaveService saveService;
 
-    public WalletService()
+    public WalletService(SaveService saveService)
     {
-        var data = SaveSystem.LoadGame();
+        this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
+
+        var data = this.saveService.Data;
         if (data != null)
         {
             CashBalance.Value = data.CashAmount;
             GoldBalance.Value = data.GoldAmount;
         }
 
-        Observable.Merge(
-                CashBalance.Skip(1).AsUnitObservable(),
-                GoldBalance.Skip(1).AsUnitObservable()
-            )
-            .Throttle(TimeSpan.FromMilliseconds(250))
-            .Subscribe(_ => Save())
+        Observable
+            .Merge(CashBalance.Skip(1).AsUnitObservable(), GoldBalance.Skip(1).AsUnitObservable())
+            .Subscribe(_ => PersistToSave())
             .AddTo(disposables);
 
-        EventSystem.OnIncrementBalance
-            .Subscribe(tuple => IncrementBalance(tuple.type, tuple.amount))
+        EventSystem
+            .OnIncrementBalance.Subscribe(tuple => IncrementBalance(tuple.type, tuple.amount))
             .AddTo(disposables);
     }
 
-    private void Save()
+    private void PersistToSave()
     {
-        // Merge currency into existing save so generator state is preserved
-        var data = SaveSystem.LoadGame() ?? new GameData();
+        var data = saveService.Data;
+        if (data == null)
+            return;
 
         data.CashAmount = CashBalance.Value;
         data.GoldAmount = GoldBalance.Value;
 
-        // Ensure generator list exists for newer save schema
-        data.Generators ??= new System.Collections.Generic.List<GameData.GeneratorStateData>();
-
-        SaveSystem.SaveGame(data);
+        saveService.RequestSave();
     }
 
     public void IncrementBalance(CurrencyType currency, double amount)
