@@ -1,3 +1,22 @@
+/*
+ * UiCompositionRoot
+ * -----------------
+ * Scene-level UI composition root responsible for binding runtime UI views
+ * to their corresponding view-models and services.
+ *
+ * Responsibilities:
+ * - Validate required UI scene references
+ * - Perform one-time binding of UI views to view-models
+ * - Bind wallet-related HUD elements (currency displays)
+ * - Construct and bind bottom bar UI and its view-model
+ *
+ * Design notes:
+ * - This class performs UI wiring only; it contains no game logic or state.
+ * - Binding is intentionally one-shot per scene lifetime to prevent duplicate
+ *   subscriptions or unintended side effects.
+ * - Receives all dependencies via UiBindingsContext to keep UI decoupled from
+ *   game composition and initialization order.
+ */
 using UnityEngine;
 
 public sealed class UiCompositionRoot : MonoBehaviour
