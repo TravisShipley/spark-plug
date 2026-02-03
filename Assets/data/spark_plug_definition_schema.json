@@ -42,14 +42,10 @@
       "max": null,
       "rounding": "none|floor|truncate|bankers",
       "expression": {
-        "type": "constant|add|mul|pow|log10|min|max|clamp|if",
+        "type": "constant|add|multiply|power|log10|min|max|clamp|if",
         "args": []
       },
-      "dependsOn": [
-        "resource.cash",
-        "state.run.someKey",
-        "var.otherVar"
-      ]
+      "dependsOn": ["resource.resourceId", "state.run.someKey", "var.otherVar"]
     }
   ],
 
@@ -63,7 +59,12 @@
       "zoneId": "zone.main",
 
       "inputs": [
-        { "resource": "resourceId", "amountPerCycle": "numberString" }
+        {
+          "resource": "resourceId",
+          "amountPerCycle": "numberString?",
+          "amountPerCycleFromVar": "varId?",
+          "amountPerCycleFromState": "state.path?"
+        }
       ],
       "outputs": [
         {
@@ -79,12 +80,12 @@
 
       "cycle": { "baseDurationSeconds": 1.0 },
 
-      "caps": [
+      "capacities": [
         {
           "resource": "resourceId",
-          "mode": "capacity|throughputPerSecond",
-          "baseCap": "numberString?",
-          "baseCapPerSecond": "numberString?"
+          "capacityMode": "capacity|throughputPerSecond",
+          "baseCapacity": "numberString?",
+          "baseCapacityPerSecond": "numberString?"
         }
       ],
 
@@ -95,17 +96,19 @@
 
         "priceCurve": {
           "type": "exponential|linear|piecewise|table",
-          "baseCost": "numberString",
+          "basePrice": "numberString",
           "growth": "numberString?",
           "increment": "numberString?",
-          "table": [
-            { "level": 1, "cost": "numberString" }
-          ],
+          "table": [{ "level": 1, "price": "numberString" }],
           "segments": [
             {
               "fromLevel": 1,
               "toLevel": 50,
-              "curve": { "type": "exponential", "baseCost": "10", "growth": "1.12" }
+              "curve": {
+                "type": "exponential",
+                "basePrice": "10",
+                "growth": "1.12"
+              }
             }
           ]
         },
@@ -117,9 +120,9 @@
           }
         ],
 
-        "capScaling": [
+        "capacityScaling": [
           {
-            "target": "caps[resourceId].baseCap|caps[resourceId].baseCapPerSecond",
+            "target": "capacities[resourceId].baseCapacity|capacities[resourceId].baseCapacityPerSecond",
             "perLevel": { "type": "add|multiply", "value": "numberString" }
           }
         ]
@@ -132,7 +135,10 @@
       },
 
       "requirements": [
-        { "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked", "args": {} }
+        {
+          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked",
+          "args": {}
+        }
       ]
     }
   ],
@@ -158,7 +164,7 @@
       "mode": "push|pull",
       "priority": 0,
       "lossFactor": "1.0",
-      "capPerSecondFrom": "state.path?|varId?",
+      "capacityPerSecondFrom": "state.path?|varId?",
       "enabledRequirements": []
     }
   ],
@@ -175,13 +181,16 @@
         "nodeTag": "string?",
         "resource": "resourceId?"
       },
-      "op": "add|multiply|set|capMin|capMax",
-      "target": "resourceGain.cash|nodeOutput.eggs|nodeCap.eggs.throughputPerSecond|state.run.key|var.clipPrice|automation.policy",
+      "operation": "add|multiply|set|clampMin|clampMax",
+      "target": "resourceGain.resourceId|nodeOutput.resourceId|nodeCapacity.resourceId.throughputPerSecond|state.run.key|var.varId|automation.policy",
       "value": "numberString?",
       "valueFromState": "state.path?",
       "valueFromVar": "varId?",
       "conditions": [
-        { "type": "phaseAtLeast|zone|nodeEnabled|hasUpgrade|randomChance", "args": {} }
+        {
+          "type": "phaseAtLeast|zone|nodeEnabled|hasUpgrade|randomChance",
+          "args": {}
+        }
       ]
     }
   ],
@@ -199,7 +208,7 @@
       "maxRank": 1,
       "rankCostScaling": {
         "type": "exponential|linear|table",
-        "baseCostMultiplier": "1",
+        "basePriceMultiplier": "1",
         "growth": "1.15"
       },
 
@@ -239,7 +248,10 @@
       "id": "unlockId",
       "zoneId": "zone.main",
       "unlocks": [
-        { "kind": "node|nodeInstance|upgrade|project|zone|phase|modifier", "id": "string" }
+        {
+          "kind": "node|nodeInstance|upgrade|project|zone|phase|modifier",
+          "id": "string"
+        }
       ],
       "requirements": []
     }
@@ -258,8 +270,8 @@
           "source": "buffId",
           "zoneId": "zone.main",
           "scope": { "kind": "global" },
-          "op": "multiply",
-          "target": "resourceGain.cash",
+          "operation": "multiply",
+          "target": "resourceGain.resourceId",
           "value": "2"
         }
       ]
@@ -272,10 +284,10 @@
     "prestigeResource": "resourceId",
     "formula": {
       "type": "sqrt|log10|linear|customExpr",
-      "basedOn": "lifetimeEarnings.cash|state.path|resource.id",
+      "basedOn": "lifetimeEarnings.softCurrency|state.path|resource.id",
       "multiplier": "numberString",
       "offset": "numberString",
-      "exprVarId": "varId?"
+      "expressionVarId": "varId?"
     },
     "resetScopes": {
       "resetNodes": true,
@@ -289,7 +301,12 @@
       {
         "id": "metaUpgradeId",
         "displayName": "string",
-        "computed": { "type": "linear", "basedOn": "resource.prestige", "multiplier": "0.01", "offset": "1" },
+        "computed": {
+          "type": "linear",
+          "basedOn": "resource.prestige",
+          "multiplier": "0.01",
+          "offset": "1"
+        },
         "writesToState": "state.path"
       }
     ]
