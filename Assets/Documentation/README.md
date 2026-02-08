@@ -97,21 +97,55 @@ Examples:
 
 ---
 
-### 2.5 Context / Registry Objects
+## 2.5 Context and Registry objects
 
 **Rule:** Objects that bundle references are named `Context` or `Registry`, never `Service`.
 
-Examples:
+**Intent:**  
+These types reduce constructor and method parameter lists by grouping related dependencies. They are structural containers only — not systems.
+
+### Context
+
+A `Context` represents a **read-only grouping of related data or dependencies** used together by a consumer.
+
+**Examples:**
 
 - `UiBindingsContext`
+- `UpgradesContext`
+
+**Guidelines:**
+
+- Immutable after construction
+- No business logic
+- No lifecycle management
+- Passed explicitly (never discovered)
+- Used when a consumer needs a small set of related values
+
+---
+
+### Registry
+
+A `Registry` provides **lookup access to shared runtime services**.
+
+**Examples:**
+
 - `UiServiceRegistry`
 
 **Guidelines:**
 
-- Read-only data containers
-- No business logic
-- Used to reduce parameter explosion
-- Explicitly passed (never discovered)
+- Holds references to already-created services
+- Does not create services
+- Does not own service lifetimes
+- Contains no business logic
+- Exists only to simplify access to commonly shared services
+
+---
+
+### Important
+
+- Contexts and registries are **structural helpers**, not architectural layers.
+- They must not contain behavior, domain rules, or state mutations.
+- If logic begins to accumulate, the type should likely become a `Service`.
 
 ---
 
@@ -215,3 +249,33 @@ UI state never affects simulation.
 - Avoid magic numbers; name intent
 - One responsibility per file
 - Optimize for “readable six months later”
+
+---
+
+## 7. Dependency direction
+
+Dependencies must flow inward toward domain services.
+
+Allowed dependencies:
+
+View → ViewModel  
+ViewModel → Services  
+Services → SaveService
+
+Forbidden:
+
+Services → ViewModel or View  
+Services → other Services unless explicitly composed  
+Views → Services directly  
+Any class → SaveSystem (except SaveService)
+
+---
+
+## 8. Reactive ownership
+
+Services own authoritative reactive state.
+
+ViewModels may transform or combine streams but must not
+introduce new authoritative state.
+
+Views subscribe only; they never publish domain state.
