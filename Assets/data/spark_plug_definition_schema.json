@@ -1,6 +1,6 @@
 {
-  "gameId": "string",
-  "version": 2,
+  "gameId": "spark_plug_schema",
+  "version": 0.2,
 
   "numberFormat": {
     "type": "mantissaExponent|decimalString",
@@ -25,6 +25,11 @@
     {
       "id": "zone.main",
       "displayName": "string",
+      "presentation": {
+        "descriptionKey": "localizationKey?",
+        "iconId": "iconId?",
+        "imageId": "imageId?"
+      },
       "description": "string?",
       "startingPhaseId": "phase.1",
       "localResources": ["resourceId"],
@@ -54,6 +59,11 @@
       "id": "nodeTypeId",
       "type": "producer|converter|bottleneck|sink",
       "displayName": "string",
+      "presentation": {
+        "descriptionKey": "localizationKey?",
+        "iconId": "iconId?",
+        "imageId": "imageId?"
+      },
       "tags": ["string"],
 
       "zoneId": "zone.main",
@@ -199,6 +209,11 @@
     {
       "id": "upgradeId",
       "displayName": "string",
+      "presentation": {
+        "descriptionKey": "localizationKey?",
+        "iconId": "iconId?",
+        "imageId": "imageId?"
+      },
       "category": "upgrade|research|card",
       "zoneId": "zone.main",
 
@@ -222,6 +237,11 @@
   "milestones": [
     {
       "id": "milestoneId",
+      "presentation": {
+        "descriptionKey": "localizationKey?",
+        "iconId": "iconId?",
+        "imageId": "imageId?"
+      },
       "nodeId": "nodeTypeId",
       "zoneId": "zone.main",
       "atLevel": 25,
@@ -233,6 +253,11 @@
     {
       "id": "projectId",
       "displayName": "string",
+      "presentation": {
+        "descriptionKey": "localizationKey?",
+        "iconId": "iconId?",
+        "imageId": "imageId?"
+      },
       "zoneId": "zone.main",
       "timeSeconds": 0,
       "cost": [{ "resource": "resourceId", "amount": "numberString" }],
@@ -261,6 +286,11 @@
     {
       "id": "buffId",
       "displayName": "string",
+      "presentation": {
+        "descriptionKey": "localizationKey?",
+        "iconId": "iconId?",
+        "imageId": "imageId?"
+      },
       "zoneId": "zone.main",
       "durationSeconds": 600,
       "stacking": "refresh|extend|ignore|stack",
@@ -283,8 +313,8 @@
     "zoneId": "zone.main",
     "prestigeResource": "resourceId",
     "formula": {
-      "type": "sqrt|log10|linear|customExpr",
-      "basedOn": "lifetimeEarnings.softCurrency|state.path|resource.id",
+      "type": "sqrt|log10|linear|customExpression",
+      "basedOn": "lifetimeEarnings.resourceId|state.path|resource.resourceId",
       "multiplier": "numberString",
       "offset": "numberString",
       "expressionVarId": "varId?"
@@ -303,7 +333,7 @@
         "displayName": "string",
         "computed": {
           "type": "linear",
-          "basedOn": "resource.prestige",
+          "basedOn": "resource.resourceId",
           "multiplier": "0.01",
           "offset": "1"
         },
