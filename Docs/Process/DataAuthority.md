@@ -8,10 +8,10 @@ Clear authority boundaries prevent corruption, duplication, and hidden state.
 
 ## 1. Content Data
 
-| Data                                 | Authority               | Location    | Mutated By              |
-| ------------------------------------ | ----------------------- | ----------- | ----------------------- |
-| Game content (nodes, upgrades, etc.) | Google Sheets           | External    | Designers / Sheet edits |
-| Imported pack                        | JSON (`pack_v0_2.json`) | Assets/Data | Importer only           |
+| Data                                 | Authority                  | Location    | Mutated By              |
+| ------------------------------------ | -------------------------- | ----------- | ----------------------- |
+| Game content (nodes, upgrades, etc.) | Google Sheets              | External    | Designers / Sheet edits |
+| Imported pack                        | JSON (`content_pack.json`) | Assets/Data | Importer only           |
 
 Rules:
 
@@ -92,7 +92,7 @@ Google Sheets
     ↓
 Importer (Editor)
     ↓
-pack_v0_2.json
+content_pack.json
     ↓
 PackLoaderService (runtime)
 ```
