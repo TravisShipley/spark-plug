@@ -29,7 +29,7 @@ using UnityEngine.Networking;
 
 public static class GoogleSheetImporter
 {
-    private const string OutputPath = "Assets/Data/content_pack.json";
+    private const string OutputPath = "Assets/Data/game_definition.json";
     private const string IndexSheetName = "__Index";
 
     [MenuItem("SparkPlug/Import From Google Sheet")]
