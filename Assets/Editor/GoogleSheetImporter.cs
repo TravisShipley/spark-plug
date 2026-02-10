@@ -1,20 +1,20 @@
 // Assets/Editor/GoogleSheetImporter.cs
 //
-// SparkPlug - Google Sheet Importer (Index-driven, no auto-discovery)
+// SparkPlug - Google Sheet Importer (Index-driven, Sheets API v4)
 //
 // Rules:
-// - Config only needs spreadsheetId (can be full URL or ID, including published "e/..." form)
-// - Import list is defined by __Index (or Index) sheet
-// - __Index defines: tableName, enabled, order (column names are flexible; see ResolveColumn)
-// - Only explicitly supported tables are imported (IdentifySheet-based)
-// - Unknown tables are ignored with a warning
-// - Commented-out tables (tableName starting with "__" or "//") are ignored
-// - Commented-out rows (first cell starts with "_" or blank) are ignored
+// - Config needs spreadsheetId (can be full URL or ID) and apiKey
+// - Import list is defined by __Index sheet
+// - __Index defines: sheet, enabled, order (column names are required and case-insensitive)
+// - Sheet names must be unique (throws error if duplicates found)
+// - Tables listed in __Index are imported as-is
+// - Commented-out sheets (starting with "__" or "//") are ignored
+// - Commented-out rows (first cell starts with "_" or "//" or blank) are ignored
 //
 // Notes:
-// - No Google API key required.
-// - This importer intentionally avoids tab auto-discovery.
-// - If your sheet is NOT public, downloads will fail (needs sharing or publish-to-web).
+// - Requires Google API key for Sheets API v4
+// - Uses spreadsheet metadata to find sheets by name
+// - Fetches data via Sheets API values endpoint
 
 using System;
 using System.Collections.Generic;
@@ -30,8 +30,7 @@ using UnityEngine.Networking;
 public static class GoogleSheetImporter
 {
     private const string OutputPath = "Assets/Data/content_pack.json";
-    private const string IndexSheetNamePrimary = "__Index";
-    private const string IndexSheetNameFallback = "Index";
+    private const string IndexSheetName = "__Index";
 
     [MenuItem("SparkPlug/Import From Google Sheet")]
     public static void Import()
@@ -42,7 +41,7 @@ public static class GoogleSheetImporter
             EditorUtility.DisplayDialog(
                 "Import Failed",
                 "No GoogleSheetImportConfig found. Create one via Assets > Create > SparkPlug > Google Sheet Import Config, "
-                    + "assign the spreadsheet ID (or full URL), then run the import again.",
+                    + "assign the spreadsheet ID (or full URL) and API key, then run the import again.",
                 "OK"
             );
             return;
@@ -59,15 +58,25 @@ public static class GoogleSheetImporter
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(config.apiKey))
+        {
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                "Config has no API key. Set it to your Google Sheets API key.",
+                "OK"
+            );
+            return;
+        }
+
         try
         {
-            var tables = FetchAllTables(spreadsheetId);
+            var tables = FetchAllTables(spreadsheetId, config.apiKey);
             if (tables.Count == 0)
             {
                 EditorUtility.DisplayDialog(
                     "Import Failed",
-                    "No recognizable tables were imported.\n\n"
-                        + "Ensure the spreadsheet is shared (Anyone with the link can view) or published to web.",
+                    "No tables were imported from __Index entries.\n\n"
+                        + "Ensure the __Index sheet exists and your API key is valid.",
                     "OK"
                 );
                 return;
@@ -120,7 +129,7 @@ public static class GoogleSheetImporter
     //
     // Returns:
     // - "<id>" for normal sheets
-    // - "e/<token>" for published sheets
+    // - "<id>" for published sheets (extracts the base ID)
     private static string NormalizeSpreadsheetId(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
@@ -147,9 +156,9 @@ public static class GoogleSheetImporter
                 if (!string.IsNullOrEmpty(id) && id != "e")
                     return id;
 
-                // /spreadsheets/d/e/<token>/...
+                // /spreadsheets/d/e/<id>/... (published form - extract the actual ID)
                 if (id == "e" && dIndex + 2 < parts.Length)
-                    return "e/" + parts[dIndex + 2];
+                    return parts[dIndex + 2];
             }
 
             return input; // fallback
@@ -158,34 +167,48 @@ public static class GoogleSheetImporter
         return input;
     }
 
-    private static string BuildExportUrl(string spreadsheetId, string sheetName)
+    private static string BuildSheetMetadataUrl(string spreadsheetId, string apiKey)
     {
-        // Name-based export is the whole point here (no gid needed).
-        // Works for most public sheets.
-        // For published "e/<token>" sheets, Google uses /pub?output=csv&sheet=<name>&single=true.
-        var isPublished = spreadsheetId.StartsWith("e/", StringComparison.Ordinal);
-        var baseId = isPublished ? spreadsheetId.Substring(2) : spreadsheetId;
+        return $"https://sheets.googleapis.com/v4/spreadsheets/{Uri.EscapeDataString(spreadsheetId)}?key={Uri.EscapeDataString(apiKey)}";
+    }
 
-        var sheet = Uri.EscapeDataString(sheetName);
-
-        return isPublished
-            ? $"https://docs.google.com/spreadsheets/d/e/{baseId}/pub?output=csv&single=true&sheet={sheet}"
-            : $"https://docs.google.com/spreadsheets/d/{baseId}/export?format=csv&sheet={sheet}";
+    private static string BuildValuesUrl(string spreadsheetId, string range, string apiKey)
+    {
+        return $"https://sheets.googleapis.com/v4/spreadsheets/{Uri.EscapeDataString(spreadsheetId)}/values/{Uri.EscapeDataString(range)}?key={Uri.EscapeDataString(apiKey)}";
     }
 
     // ----------------------------
-    // Index-driven import
+    // Index-driven import (Sheets API v4)
     // ----------------------------
 
     private static Dictionary<string, List<Dictionary<string, object>>> FetchAllTables(
-        string spreadsheetId
+        string spreadsheetId,
+        string apiKey
     )
     {
-        // 1) Load __Index (or Index)
-        var indexCsv = DownloadIndexCsv(spreadsheetId);
+        // 1) Get spreadsheet metadata
+        var metadata = GetSpreadsheetMetadata(spreadsheetId, apiKey);
+        Debug.Log($"[GoogleSheetImporter] Fetched metadata for spreadsheet: {spreadsheetId}");
+
+        // 2) Validate no duplicate sheet names
+        ValidateNoDuplicateSheetNames(metadata);
+
+        // 3) Find __Index sheet
+        var indexSheet = FindSheetByName(metadata, IndexSheetName);
+        if (indexSheet == null)
+        {
+            throw new InvalidOperationException(
+                $"Could not find '{IndexSheetName}' sheet in spreadsheet metadata."
+            );
+        }
+
+        // 4) Load index data
+        var indexRange = $"'{IndexSheetName}'!A:Z";
+        var indexValues = GetSheetValues(spreadsheetId, indexRange, apiKey);
+        var indexCsv = ValuesToCsv(indexValues);
         var index = ParseIndex(indexCsv);
 
-        // 2) Import tables in order
+        // 5) Import tables in order
         var tables = new Dictionary<string, List<Dictionary<string, object>>>(
             StringComparer.OrdinalIgnoreCase
         );
@@ -199,9 +222,48 @@ public static class GoogleSheetImporter
                 index.Count == 0 ? 1f : (i + 1f) / index.Count
             );
 
-            var url = BuildExportUrl(spreadsheetId, entry.TableName);
-            var csv = DownloadText(url);
-            if (string.IsNullOrWhiteSpace(csv))
+            // Find the sheet by name
+            var sheet = FindSheetByName(metadata, entry.TableName);
+            if (sheet == null)
+            {
+                throw new InvalidOperationException(
+                    $"Sheet '{entry.TableName}' listed in __Index does not exist in the spreadsheet."
+                );
+            }
+
+            if (!(sheet is Dictionary<string, object> sheetDict))
+            {
+                Debug.LogWarning(
+                    $"[GoogleSheetImporter] Invalid sheet metadata for '{entry.TableName}'. Skipping."
+                );
+                continue;
+            }
+
+            if (
+                !sheetDict.TryGetValue("properties", out var propsObj)
+                || !(propsObj is Dictionary<string, object> props)
+                || !props.TryGetValue("title", out var titleObj)
+            )
+            {
+                Debug.LogWarning(
+                    $"[GoogleSheetImporter] Could not get sheet name for '{entry.TableName}'. Skipping."
+                );
+                continue;
+            }
+
+            var sheetName = titleObj?.ToString();
+            if (string.IsNullOrEmpty(sheetName))
+            {
+                Debug.LogWarning(
+                    $"[GoogleSheetImporter] Empty sheet name for '{entry.TableName}'. Skipping."
+                );
+                continue;
+            }
+
+            var range = $"'{sheetName}'!A:Z";
+            var values = GetSheetValues(spreadsheetId, range, apiKey);
+
+            if (values == null || values.Count == 0)
             {
                 Debug.LogWarning(
                     $"[GoogleSheetImporter] Could not download sheet '{entry.TableName}'. Skipping."
@@ -209,6 +271,7 @@ public static class GoogleSheetImporter
                 continue;
             }
 
+            var csv = ValuesToCsv(values);
             var rows = ParseCsv(csv);
             if (rows.Count < 1)
                 continue;
@@ -216,30 +279,8 @@ public static class GoogleSheetImporter
             var headerRow = rows[0];
 
             // If the table tab itself is "commented out" (starts with "__"), ignore.
-            // (Index also supports this by skipping entry names.)
             if (entry.TableName.StartsWith("__", StringComparison.Ordinal))
                 continue;
-
-            // Identify what this sheet *is* by header shape.
-            // Only import explicitly supported sheets.
-            var recognizedName = IdentifySheet(headerRow);
-            if (string.IsNullOrEmpty(recognizedName))
-            {
-                Debug.LogWarning(
-                    $"[GoogleSheetImporter] Unknown/unsupported sheet '{entry.TableName}'. Ignoring."
-                );
-                continue;
-            }
-
-            // Enforce good habits: sheet name should match what it claims to be.
-            // If you intentionally want aliases, remove this check.
-            if (!string.Equals(entry.TableName, recognizedName, StringComparison.OrdinalIgnoreCase))
-            {
-                Debug.LogWarning(
-                    $"[GoogleSheetImporter] Sheet '{entry.TableName}' looks like '{recognizedName}' based on headers. "
-                        + "Importing it under the recognized name."
-                );
-            }
 
             var dataRows = rows.Skip(1)
                 .Where(r => !IsCommentRow(r))
@@ -248,31 +289,373 @@ public static class GoogleSheetImporter
                 .ToList();
 
             // Meta sheets may be empty but still meaningful.
-            if (dataRows.Count > 0 || IsMetaSheet(recognizedName))
-                tables[recognizedName] = dataRows;
+            if (dataRows.Count > 0 || IsMetaSheet(entry.TableName))
+                tables[entry.TableName] = dataRows;
         }
 
         return tables;
     }
 
-    private static string DownloadIndexCsv(string spreadsheetId)
+    // ----------------------------
+    // Sheets API v4 helpers
+    // ----------------------------
+
+    private sealed class SheetMetadata
     {
-        // Try __Index first, then Index.
-        var urlA = BuildExportUrl(spreadsheetId, IndexSheetNamePrimary);
-        var csvA = DownloadText(urlA);
-        if (!string.IsNullOrWhiteSpace(csvA))
-            return csvA;
+        public List<object> sheets;
+    }
 
-        var urlB = BuildExportUrl(spreadsheetId, IndexSheetNameFallback);
-        var csvB = DownloadText(urlB);
-        if (!string.IsNullOrWhiteSpace(csvB))
-            return csvB;
+    private static SheetMetadata GetSpreadsheetMetadata(string spreadsheetId, string apiKey)
+    {
+        var url = BuildSheetMetadataUrl(spreadsheetId, apiKey);
+        var json = DownloadJson(url);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            throw new InvalidOperationException(
+                "Could not fetch spreadsheet metadata. Check your API key and spreadsheet ID."
+            );
+        }
 
-        throw new InvalidOperationException(
-            "Could not download __Index (or Index).\n\n"
-                + "Ensure the spreadsheet is shared (Anyone with the link can view) or published to web.\n"
-                + "Also ensure a sheet exists named '__Index' (preferred) or 'Index'."
-        );
+        // Parse minimal JSON to extract sheets
+        return ParseMetadataJson(json);
+    }
+
+    private static List<List<object>> GetSheetValues(
+        string spreadsheetId,
+        string range,
+        string apiKey
+    )
+    {
+        var url = BuildValuesUrl(spreadsheetId, range, apiKey);
+        var json = DownloadJson(url);
+        if (string.IsNullOrWhiteSpace(json))
+            return new List<List<object>>();
+
+        return ParseValuesJson(json);
+    }
+
+    private static object FindSheetByName(SheetMetadata metadata, string sheetName)
+    {
+        if (metadata?.sheets == null)
+            return null;
+
+        foreach (var sheet in metadata.sheets)
+        {
+            if (sheet is not Dictionary<string, object> sheetDict)
+                continue;
+
+            if (!sheetDict.TryGetValue("properties", out var propsObj))
+                continue;
+
+            if (propsObj is not Dictionary<string, object> props)
+                continue;
+
+            if (!props.TryGetValue("title", out var titleObj))
+                continue;
+
+            var title = titleObj?.ToString();
+            if (string.Equals(title, sheetName, StringComparison.Ordinal))
+                return sheetDict;
+        }
+
+        return null;
+    }
+
+    private static void ValidateNoDuplicateSheetNames(SheetMetadata metadata)
+    {
+        if (metadata?.sheets == null || metadata.sheets.Count == 0)
+            return;
+
+        var names = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var sheet in metadata.sheets)
+        {
+            if (!(sheet is Dictionary<string, object> sheetDict))
+                continue;
+
+            if (!sheetDict.TryGetValue("properties", out var propsObj))
+                continue;
+
+            if (!(propsObj is Dictionary<string, object> props))
+                continue;
+
+            if (!props.TryGetValue("title", out var titleObj))
+                continue;
+
+            var title = titleObj?.ToString();
+            if (string.IsNullOrEmpty(title))
+                continue;
+
+            if (names.TryGetValue(title, out _))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate sheet name found: '{title}'. All sheet names must be unique."
+                );
+            }
+
+            names[title] = 1;
+        }
+    }
+
+    private static SheetMetadata ParseMetadataJson(string json)
+    {
+        // Minimal JSON parser for sheets metadata
+        var sheets = new List<object>();
+
+        // Find "sheets" array
+        var sheetsStart = json.IndexOf("\"sheets\":", StringComparison.OrdinalIgnoreCase);
+        if (sheetsStart < 0)
+            return new SheetMetadata { sheets = sheets };
+
+        var arrStart = json.IndexOf('[', sheetsStart);
+        if (arrStart < 0)
+            return new SheetMetadata { sheets = sheets };
+
+        var depth = 0;
+        var arrEnd = -1;
+        for (int i = arrStart; i < json.Length; i++)
+        {
+            if (json[i] == '[')
+                depth++;
+            else if (json[i] == ']')
+                depth--;
+
+            if (depth == 0)
+            {
+                arrEnd = i;
+                break;
+            }
+        }
+
+        if (arrEnd < 0)
+            return new SheetMetadata { sheets = sheets };
+
+        var sheetsJson = json.Substring(arrStart + 1, arrEnd - arrStart - 1);
+        var sheetObjects = SplitTopLevelJsonObjects(sheetsJson);
+
+        foreach (var sheetJson in sheetObjects)
+        {
+            var sheet = ParseJsonObject(sheetJson);
+            if (sheet != null)
+                sheets.Add(sheet);
+        }
+
+        return new SheetMetadata { sheets = sheets };
+    }
+
+    private static List<List<object>> ParseValuesJson(string json)
+    {
+        var values = new List<List<object>>();
+
+        // Find "values" array
+        var valuesStart = json.IndexOf("\"values\":", StringComparison.OrdinalIgnoreCase);
+        if (valuesStart < 0)
+            return values;
+
+        var arrStart = json.IndexOf('[', valuesStart);
+        if (arrStart < 0)
+            return values;
+
+        var depth = 0;
+        var arrEnd = -1;
+        for (int i = arrStart; i < json.Length; i++)
+        {
+            if (json[i] == '[')
+                depth++;
+            else if (json[i] == ']')
+                depth--;
+
+            if (depth == 0)
+            {
+                arrEnd = i;
+                break;
+            }
+        }
+
+        if (arrEnd < 0)
+            return values;
+
+        var valuesJson = json.Substring(arrStart + 1, arrEnd - arrStart - 1);
+        var rowObjects = SplitTopLevelJsonArrays(valuesJson);
+
+        foreach (var rowJson in rowObjects)
+        {
+            var row = ParseJsonArray(rowJson);
+            if (row != null)
+                values.Add(row);
+        }
+
+        return values;
+    }
+
+    private static string ValuesToCsv(List<List<object>> values)
+    {
+        if (values == null || values.Count == 0)
+            return "";
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < values.Count; i++)
+        {
+            var row = values[i];
+            for (int j = 0; j < row.Count; j++)
+            {
+                if (j > 0)
+                    sb.Append(",");
+
+                var cell = row[j]?.ToString() ?? "";
+                if (cell.Contains(",") || cell.Contains("\"") || cell.Contains("\n"))
+                {
+                    sb.Append("\"").Append(cell.Replace("\"", "\"\"")).Append("\"");
+                }
+                else
+                {
+                    sb.Append(cell);
+                }
+            }
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+
+    private static List<string> SplitTopLevelJsonObjects(string json)
+    {
+        var objects = new List<string>();
+        var depth = 0;
+        var start = 0;
+        var inStr = false;
+        var escape = false;
+
+        for (int i = 0; i < json.Length; i++)
+        {
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (inStr)
+            {
+                if (json[i] == '\\')
+                    escape = true;
+                else if (json[i] == '"')
+                    inStr = false;
+                continue;
+            }
+
+            if (json[i] == '"')
+            {
+                inStr = true;
+                continue;
+            }
+
+            if (json[i] == '{')
+            {
+                if (depth == 0)
+                    start = i;
+                depth++;
+            }
+            else if (json[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    objects.Add(json.Substring(start, i - start + 1));
+                }
+            }
+        }
+
+        return objects;
+    }
+
+    private static List<string> SplitTopLevelJsonArrays(string json)
+    {
+        var arrays = new List<string>();
+        var depth = 0;
+        var start = 0;
+        var inStr = false;
+        var escape = false;
+
+        for (int i = 0; i < json.Length; i++)
+        {
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (inStr)
+            {
+                if (json[i] == '\\')
+                    escape = true;
+                else if (json[i] == '"')
+                    inStr = false;
+                continue;
+            }
+
+            if (json[i] == '"')
+            {
+                inStr = true;
+                continue;
+            }
+
+            if (json[i] == '[')
+            {
+                if (depth == 0)
+                    start = i;
+                depth++;
+            }
+            else if (json[i] == ']')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    arrays.Add(json.Substring(start, i - start + 1));
+                }
+            }
+        }
+
+        return arrays;
+    }
+
+    private static Dictionary<string, object> ParseJsonObject(string json)
+    {
+        json = (json ?? "").Trim();
+        if (!json.StartsWith("{") || !json.EndsWith("}"))
+            return null;
+
+        var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        var inner = json.Substring(1, json.Length - 2).Trim();
+        if (string.IsNullOrEmpty(inner))
+            return result;
+
+        var pairs = SplitJsonObject(inner);
+        foreach (var kv in pairs)
+        {
+            result[kv.Key] = ParseJsonLikeValue(kv.Value);
+        }
+
+        return result;
+    }
+
+    private static List<object> ParseJsonArray(string json)
+    {
+        json = (json ?? "").Trim();
+        if (!json.StartsWith("[") || !json.EndsWith("]"))
+            return null;
+
+        var result = new List<object>();
+        var inner = json.Substring(1, json.Length - 2).Trim();
+        if (string.IsNullOrEmpty(inner))
+            return result;
+
+        var items = SplitJsonArray(inner);
+        foreach (var item in items)
+        {
+            result.Add(ParseJsonLikeValue(item));
+        }
+
+        return result;
     }
 
     private sealed class IndexEntry
@@ -291,14 +674,16 @@ public static class GoogleSheetImporter
 
         var header = rows[0].Select(h => (h ?? "").Trim()).ToList();
 
-        var tableCol = ResolveColumn(header, "tableName", "table", "sheet", "name");
-        var enabledCol = ResolveColumn(header, "enabled", "isEnabled", "active", "status");
-        var orderCol = ResolveColumn(header, "order", "importOrder", "sortOrder", "sort");
+        var sheetCol = FindColumnIndex(header, "sheet");
+        var enabledCol = FindColumnIndex(header, "enabled");
+        var orderCol = FindColumnIndex(header, "order");
 
-        if (tableCol < 0)
-            throw new InvalidOperationException(
-                "__Index must include a 'tableName' column (or table/sheet/name)."
-            );
+        if (sheetCol < 0)
+            throw new InvalidOperationException("__Index must include a 'sheet' column.");
+        if (enabledCol < 0)
+            throw new InvalidOperationException("__Index must include an 'enabled' column.");
+        if (orderCol < 0)
+            throw new InvalidOperationException("__Index must include an 'order' column.");
 
         var entries = new List<IndexEntry>();
 
@@ -308,7 +693,7 @@ public static class GoogleSheetImporter
             if (IsCommentRow(row))
                 continue;
 
-            var rawName = GetCell(row, tableCol).Trim();
+            var rawName = GetCell(row, sheetCol).Trim();
             if (string.IsNullOrWhiteSpace(rawName))
                 continue;
 
@@ -321,17 +706,16 @@ public static class GoogleSheetImporter
             )
                 continue;
 
-            if (enabledCol >= 0 && !IsEnabled(GetCell(row, enabledCol)))
+            if (!IsEnabled(GetCell(row, enabledCol)))
                 continue;
 
             var ord = 0;
-            if (orderCol >= 0)
-                int.TryParse(
-                    GetCell(row, orderCol),
-                    NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
-                    out ord
-                );
+            int.TryParse(
+                GetCell(row, orderCol),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out ord
+            );
 
             entries.Add(new IndexEntry { TableName = rawName, Order = ord });
         }
@@ -343,41 +727,33 @@ public static class GoogleSheetImporter
             .ToList();
     }
 
+    private static int FindColumnIndex(List<string> header, string columnName)
+    {
+        for (int i = 0; i < header.Count; i++)
+        {
+            if (string.Equals(header[i], columnName, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+
     private static bool IsEnabled(string raw)
     {
         raw = (raw ?? "").Trim();
 
-        // Default: if column exists but value is empty, treat as enabled? I'd prefer "fail loud".
-        // However, since you asked for "enabled is TRUE", we'll be strict.
         if (string.IsNullOrEmpty(raw))
+            throw new InvalidOperationException(
+                "'enabled' column requires explicit 'true' or 'false' value (case-insensitive). Empty values are not allowed."
+            );
+
+        if (string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (string.Equals(raw, "false", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        if (bool.TryParse(raw, out var b))
-            return b;
-
-        // Accept common spreadsheet toggles.
-        if (string.Equals(raw, "1", StringComparison.OrdinalIgnoreCase))
-            return true;
-        if (string.Equals(raw, "yes", StringComparison.OrdinalIgnoreCase))
-            return true;
-        if (string.Equals(raw, "y", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return false;
-    }
-
-    private static int ResolveColumn(List<string> headerRow, params string[] candidates)
-    {
-        for (int i = 0; i < headerRow.Count; i++)
-        {
-            var h = (headerRow[i] ?? "").Trim();
-            for (int c = 0; c < candidates.Length; c++)
-            {
-                if (string.Equals(h, candidates[c], StringComparison.OrdinalIgnoreCase))
-                    return i;
-            }
-        }
-        return -1;
+        throw new InvalidOperationException(
+            $"Invalid 'enabled' value: '{raw}'. Must be 'true' or 'false' (case-insensitive)."
+        );
     }
 
     private static string GetCell(List<string> row, int col)
@@ -419,6 +795,37 @@ public static class GoogleSheetImporter
 
             throw new InvalidOperationException(
                 $"Download failed: {req.error} (HTTP {req.responseCode}).{(hint == null ? "" : " " + hint)}\nURL: {url}"
+            );
+        }
+
+        return req.downloadHandler?.text;
+    }
+
+    private static string DownloadJson(string url)
+    {
+        using var req = UnityWebRequest.Get(url);
+        req.SetRequestHeader("User-Agent", "Unity-Editor/SparkPlug-Importer");
+
+        req.SendWebRequest();
+        while (!req.isDone)
+        {
+            EditorApplication.QueuePlayerLoopUpdate();
+            Thread.Sleep(8);
+        }
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            if (req.responseCode == 404)
+                return null;
+
+            var hint =
+                req.responseCode == 400 ? "Invalid request. Check your API key and spreadsheet ID."
+                : req.responseCode == 403
+                    ? "Access denied. Check your API key has Sheets API v4 enabled."
+                : null;
+
+            throw new InvalidOperationException(
+                $"Sheets API request failed: {req.error} (HTTP {req.responseCode}).{(hint == null ? "" : " " + hint)}\nURL: {url}"
             );
         }
 
@@ -502,7 +909,9 @@ public static class GoogleSheetImporter
             return true;
 
         var first = (row[0] ?? "").Trim();
-        return string.IsNullOrWhiteSpace(first) || first.StartsWith("_", StringComparison.Ordinal);
+        return string.IsNullOrWhiteSpace(first)
+            || first.StartsWith("_", StringComparison.Ordinal)
+            || first.StartsWith("//", StringComparison.Ordinal);
     }
 
     // ----------------------------
@@ -797,87 +1206,6 @@ public static class GoogleSheetImporter
 
         k = k.Trim().Trim('"');
         result.Add(new KeyValuePair<string, string>(k, v));
-    }
-
-    // ----------------------------
-    // Sheet classification (supported only)
-    // ----------------------------
-
-    private static string IdentifySheet(List<string> headerRow)
-    {
-        var headers = new HashSet<string>(
-            headerRow.Select(h => (h ?? "").Trim()).Where(h => !string.IsNullOrEmpty(h)),
-            StringComparer.OrdinalIgnoreCase
-        );
-
-        // This mirrors your existing "supported tables" logic.
-        if (headers.Contains("gameId") || (headers.Contains("version") && headers.Count <= 6))
-            return "PackMeta";
-        if (headers.Contains("id") && headers.Contains("displayName") && headers.Contains("kind"))
-            return "Resources";
-        if (
-            headers.Contains("id")
-            && headers.Contains("displayName")
-            && headers.Contains("description")
-        )
-            return "Phases";
-        if (
-            headers.Contains("id")
-            && headers.Contains("displayName")
-            && headers.Contains("startingPhaseId")
-        )
-            return "Zones";
-        if (
-            headers.Contains("nodeId")
-            && headers.Contains("resource")
-            && (headers.Contains("basePayout") || headers.Contains("basePerSecond"))
-        )
-            return "NodeOutputs";
-        if (
-            headers.Contains("id")
-            && headers.Contains("type")
-            && headers.Contains("zoneId")
-            && headers.Contains("cycle.baseDurationSeconds")
-        )
-            return "Nodes";
-        if (
-            headers.Contains("id")
-            && headers.Contains("nodeId")
-            && headers.Any(h => h.StartsWith("initialState", StringComparison.OrdinalIgnoreCase))
-        )
-            return "NodeInstances";
-        if (
-            headers.Contains("id")
-            && headers.Contains("source")
-            && (headers.Contains("operation") || headers.Contains("op"))
-            && headers.Contains("target")
-        )
-            return "Modifiers";
-        if (
-            headers.Contains("id")
-            && headers.Contains("displayName")
-            && (headers.Contains("cost_json") || headers.Contains("cost"))
-        )
-            return "Upgrades";
-        if (headers.Contains("id") && headers.Contains("nodeId") && headers.Contains("atLevel"))
-            return "Milestones";
-        if (
-            headers.Contains("id")
-            && headers.Contains("zoneId")
-            && headers.Contains("unlocks_json")
-        )
-            return "UnlockGraph";
-        if (
-            headers.Contains("enabled")
-            && headers.Contains("zoneId")
-            && headers.Contains("prestigeResource")
-        )
-            return "Prestige";
-
-        Debug.Log(
-            $"[GoogleSheetImporter] First header raw: '{headerRow[0]}' (len {headerRow[0]?.Length})"
-        );
-        return null;
     }
 
     private static bool IsMetaSheet(string name) =>
