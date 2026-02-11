@@ -30,7 +30,9 @@ using UnityEngine.Networking;
 public static class GoogleSheetImporter
 {
     private const string OutputPath = "Assets/Data/game_definition.json";
+    private const string SchemaPath = "Assets/Data/spark_plug_definition_schema.json";
     private const string IndexSheetName = "__Index";
+    private const int MaxSchemaValidationErrors = 25;
 
     [MenuItem("SparkPlug/Import From Google Sheet")]
     public static void Import()
@@ -1267,7 +1269,10 @@ public static class GoogleSheetImporter
                 .ToList();
 
         if (tables.TryGetValue("Nodes", out var nodeRows))
-            pack["nodes"] = nodeRows.Select(FlattenNested).Cast<object>().ToList();
+            pack["nodes"] = nodeRows
+                .Select(r => FlattenNestedWithArrays(r, "tags"))
+                .Cast<object>()
+                .ToList();
 
         if (
             tables.TryGetValue("NodeOutputs", out var outRows)
@@ -1295,8 +1300,15 @@ public static class GoogleSheetImporter
                 var outputs = outputsByNode
                     .Where(g => string.Equals(g.Key, nodeId, StringComparison.OrdinalIgnoreCase))
                     .SelectMany(g => g)
-                    .Select(FlattenNested)
-                    .Cast<object>()
+                    .Select(r =>
+                    {
+                        var o = FlattenNested(r);
+
+                        // NodeOutputs is a join table; when embedding into a node, remove join-only columns.
+                        o.Remove("nodeId");
+
+                        return (object)o;
+                    })
                     .ToList();
 
                 if (outputs.Count > 0)
@@ -1464,6 +1476,15 @@ public static class GoogleSheetImporter
     {
         var d = FlattenNested(flat);
         RenameKey(d, "metaUpgrades_json", "metaUpgrades");
+
+        // resetScopes uses _json columns in Sheets, but the final JSON should not.
+        if (d.TryGetValue("resetScopes", out var rsObj) && rsObj is Dictionary<string, object> rs)
+        {
+            RenameKey(rs, "keepUnlocks_json", "keepUnlocks");
+            RenameKey(rs, "keepUpgrades_json", "keepUpgrades");
+            RenameKey(rs, "keepProjects_json", "keepProjects");
+        }
+
         return d;
     }
 
@@ -1489,6 +1510,265 @@ public static class GoogleSheetImporter
             || zones.Count == 0
         )
             throw new InvalidOperationException("Pack must have at least one zone.");
+
+        ValidatePackAgainstSchema(pack);
+    }
+
+    private static void ValidatePackAgainstSchema(Dictionary<string, object> pack)
+    {
+        if (!File.Exists(SchemaPath))
+        {
+            throw new InvalidOperationException(
+                $"Schema file not found: {SchemaPath}. Cannot validate import."
+            );
+        }
+
+        var schemaJson = File.ReadAllText(SchemaPath, Encoding.UTF8).TrimStart('\uFEFF');
+        var parsedSchema = ParseJsonLikeValue(schemaJson);
+        if (parsedSchema is not Dictionary<string, object> schemaRoot)
+        {
+            throw new InvalidOperationException(
+                $"Schema file '{SchemaPath}' is invalid. Expected a top-level JSON object."
+            );
+        }
+
+        var errors = new List<string>();
+        ValidateNodeAgainstSchema(pack, schemaRoot, "$", errors);
+
+        if (errors.Count > 0)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Pack failed spark_plug_definition_schema validation:");
+            for (int i = 0; i < errors.Count; i++)
+                sb.AppendLine($"- {errors[i]}");
+
+            if (errors.Count >= MaxSchemaValidationErrors)
+                sb.AppendLine($"- ...stopped after {MaxSchemaValidationErrors} errors.");
+
+            throw new InvalidOperationException(sb.ToString().TrimEnd());
+        }
+    }
+
+    private static void ValidateNodeAgainstSchema(
+        object dataNode,
+        object schemaNode,
+        string path,
+        List<string> errors
+    )
+    {
+        if (errors.Count >= MaxSchemaValidationErrors)
+            return;
+
+        if (schemaNode is Dictionary<string, object> schemaObj)
+        {
+            if (dataNode is not Dictionary<string, object> dataObj)
+            {
+                AddSchemaError(errors, $"{path}: expected object.");
+                return;
+            }
+
+            foreach (var dataKv in dataObj)
+            {
+                if (!schemaObj.TryGetValue(dataKv.Key, out var childSchema))
+                {
+                    AddSchemaError(
+                        errors,
+                        $"{path}.{dataKv.Key}: key is not defined by spark_plug_definition_schema."
+                    );
+                    if (errors.Count >= MaxSchemaValidationErrors)
+                        return;
+                    continue;
+                }
+
+                ValidateNodeAgainstSchema(
+                    dataKv.Value,
+                    childSchema,
+                    $"{path}.{dataKv.Key}",
+                    errors
+                );
+                if (errors.Count >= MaxSchemaValidationErrors)
+                    return;
+            }
+
+            return;
+        }
+
+        if (schemaNode is List<object> schemaList)
+        {
+            if (dataNode is not List<object> dataList)
+            {
+                AddSchemaError(errors, $"{path}: expected array.");
+                return;
+            }
+
+            if (schemaList.Count == 0)
+                return;
+
+            var itemSchema = schemaList[0];
+            for (int i = 0; i < dataList.Count; i++)
+            {
+                ValidateNodeAgainstSchema(dataList[i], itemSchema, $"{path}[{i}]", errors);
+                if (errors.Count >= MaxSchemaValidationErrors)
+                    return;
+            }
+
+            return;
+        }
+
+        ValidatePrimitiveAgainstSchemaToken(dataNode, schemaNode, path, errors);
+    }
+
+    private static void ValidatePrimitiveAgainstSchemaToken(
+        object dataNode,
+        object schemaNode,
+        string path,
+        List<string> errors
+    )
+    {
+        if (schemaNode == null)
+            return; // null in schema is treated as "nullable/unspecified"
+
+        if (schemaNode is bool)
+        {
+            if (dataNode is not bool)
+                AddSchemaError(errors, $"{path}: expected boolean.");
+            return;
+        }
+
+        if (IsNumber(schemaNode))
+        {
+            if (!IsNumber(dataNode))
+                AddSchemaError(errors, $"{path}: expected number.");
+            return;
+        }
+
+        if (schemaNode is not string schemaToken)
+            return;
+
+        var optional = IsOptionalSchemaToken(schemaToken);
+        if (dataNode == null)
+        {
+            if (!optional)
+                AddSchemaError(errors, $"{path}: value is required.");
+            return;
+        }
+
+        var token = schemaToken.Trim();
+        var tokenParts = token
+            .Split('|')
+            .Select(p => p.Trim().TrimEnd('?'))
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        if (tokenParts.Count == 0)
+            return;
+
+        if (
+            tokenParts.Any(p =>
+                string.Equals(p, "numberString", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(p, "bigNumberString", StringComparison.OrdinalIgnoreCase)
+            )
+        )
+        {
+            // Accept either a numeric string OR a numeric value already parsed from CSV.
+            if (dataNode is string)
+                return;
+
+            if (!IsNumber(dataNode))
+                AddSchemaError(errors, $"{path}: expected number or numeric string.");
+            return;
+        }
+
+        if (tokenParts.All(IsConcreteEnumToken))
+        {
+            if (dataNode is not string enumValue)
+            {
+                AddSchemaError(errors, $"{path}: expected enum string.");
+                return;
+            }
+
+            if (!tokenParts.Contains(enumValue, StringComparer.Ordinal))
+            {
+                AddSchemaError(
+                    errors,
+                    $"{path}: '{enumValue}' is not allowed. Expected one of [{string.Join(", ", tokenParts)}]."
+                );
+            }
+
+            return;
+        }
+
+        if (LooksNumericLiteralToken(token))
+        {
+            if (!(dataNode is string) && !IsNumber(dataNode))
+                AddSchemaError(errors, $"{path}: expected number-like value.");
+            return;
+        }
+
+        if (dataNode is not string)
+            AddSchemaError(errors, $"{path}: expected string.");
+    }
+
+    private static bool LooksNumericLiteralToken(string token) =>
+        double.TryParse(
+            token.Trim().TrimEnd('?'),
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture,
+            out _
+        );
+
+    private static bool IsOptionalSchemaToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        var parts = token.Split('|');
+        return parts.Any(p => p.Trim().EndsWith("?", StringComparison.Ordinal));
+    }
+
+    private static bool IsConcreteEnumToken(string tokenPart)
+    {
+        if (string.IsNullOrWhiteSpace(tokenPart))
+            return false;
+
+        var lowered = tokenPart.Trim();
+        // Numeric literals should not be treated as enum tokens.
+        if (double.TryParse(lowered, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return false;
+
+        if (lowered.IndexOf('.') >= 0 || lowered.IndexOf('[') >= 0 || lowered.IndexOf(']') >= 0)
+            return false;
+
+        if (
+            lowered.IndexOf("string", StringComparison.OrdinalIgnoreCase) >= 0
+            || lowered.IndexOf("number", StringComparison.OrdinalIgnoreCase) >= 0
+            || lowered.IndexOf("path", StringComparison.OrdinalIgnoreCase) >= 0
+            || lowered.EndsWith("Id", StringComparison.OrdinalIgnoreCase)
+        )
+            return false;
+
+        return true;
+    }
+
+    private static bool IsNumber(object value)
+    {
+        return value is sbyte
+            || value is byte
+            || value is short
+            || value is ushort
+            || value is int
+            || value is uint
+            || value is long
+            || value is ulong
+            || value is float
+            || value is double
+            || value is decimal;
+    }
+
+    private static void AddSchemaError(List<string> errors, string message)
+    {
+        if (errors.Count < MaxSchemaValidationErrors)
+            errors.Add(message);
     }
 
     private static void WriteJson(Dictionary<string, object> pack)

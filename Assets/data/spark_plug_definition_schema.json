@@ -1,5 +1,5 @@
 {
-  "gameId": "spark_plug_schema",
+  "gameId": "string",
   "version": 0.2,
 
   "numberFormat": {
@@ -71,7 +71,7 @@
       "inputs": [
         {
           "resource": "resourceId",
-          "amountPerCycle": "numberString?",
+          "amountPerCycle": "bigNumberString?",
           "amountPerCycleFromVar": "varId?",
           "amountPerCycleFromState": "state.path?"
         }
@@ -80,22 +80,22 @@
         {
           "resource": "resourceId",
           "mode": "rate|cycle",
-          "basePerSecond": "numberString?",
-          "basePayout": "numberString?",
-          "amountPerCycle": "numberString?",
+          "basePerSecond": "bigNumberString?",
+          "basePayout": "bigNumberString?",
+          "amountPerCycle": "bigNumberString?",
           "amountPerCycleFromVar": "varId?",
           "amountPerCycleFromState": "state.path?"
         }
       ],
 
-      "cycle": { "baseDurationSeconds": 1.0 },
+      "cycle": { "baseDurationSeconds": "numberString" },
 
       "capacities": [
         {
           "resource": "resourceId",
           "capacityMode": "capacity|throughputPerSecond",
-          "baseCapacity": "numberString?",
-          "baseCapacityPerSecond": "numberString?"
+          "baseCapacity": "bigNumberString?",
+          "baseCapacityPerSecond": "bigNumberString?"
         }
       ],
 
@@ -106,18 +106,18 @@
 
         "priceCurve": {
           "type": "exponential|linear|piecewise|table",
-          "basePrice": "numberString",
+          "basePrice": "bigNumberString",
           "growth": "numberString?",
-          "increment": "numberString?",
-          "table": [{ "level": 1, "price": "numberString" }],
+          "increment": "bigNumberString?",
+          "table": [{ "level": 1, "price": "bigNumberString" }],
           "segments": [
             {
               "fromLevel": 1,
               "toLevel": 50,
               "curve": {
                 "type": "exponential",
-                "basePrice": "10",
-                "growth": "1.12"
+                "basePrice": "bigNumberString",
+                "growth": "numberString"
               }
             }
           ]
@@ -192,8 +192,8 @@
         "resource": "resourceId?"
       },
       "operation": "add|multiply|set|clampMin|clampMax",
-      "target": "resourceGain.resourceId|nodeOutput.resourceId|nodeCapacity.resourceId.throughputPerSecond|state.run.key|var.varId|automation.policy",
-      "value": "numberString?",
+      "target": "nodeSpeedMultiplier|resourceGain[resourceId]|nodeOutput[resourceId]|nodeInput[resourceId]|nodeCapacity[resourceId].throughputPerSecond|state.run.key|var.varId|automation.policy",
+      "value": "numberString?|bigNumberString?",
       "valueFromState": "state.path?",
       "valueFromVar": "varId?",
       "conditions": [
@@ -217,14 +217,14 @@
       "category": "upgrade|research|card",
       "zoneId": "zone.main",
 
-      "cost": [{ "resource": "resourceId", "amount": "numberString" }],
+      "cost": [{ "resource": "resourceId", "amount": "bigNumberString" }],
 
       "repeatable": false,
       "maxRank": 1,
       "rankCostScaling": {
         "type": "exponential|linear|table",
-        "basePriceMultiplier": "1",
-        "growth": "1.15"
+        "basePriceMultiplier": "numberString",
+        "growth": "numberString"
       },
 
       "effects": [{ "modifierId": "modifierId" }],
@@ -260,7 +260,7 @@
       },
       "zoneId": "zone.main",
       "timeSeconds": 0,
-      "cost": [{ "resource": "resourceId", "amount": "numberString" }],
+      "cost": [{ "resource": "resourceId", "amount": "bigNumberString" }],
       "effects": [{ "modifierId": "modifierId" }],
       "requirements": [],
       "exclusiveGroup": "string?",
@@ -302,7 +302,7 @@
           "scope": { "kind": "global" },
           "operation": "multiply",
           "target": "resourceGain.resourceId",
-          "value": "2"
+          "value": "numberString"
         }
       ]
     }
@@ -316,7 +316,7 @@
       "type": "sqrt|log10|linear|customExpression",
       "basedOn": "lifetimeEarnings.resourceId|state.path|resource.resourceId",
       "multiplier": "numberString",
-      "offset": "numberString",
+      "offset": "bigNumberString",
       "expressionVarId": "varId?"
     },
     "resetScopes": {
@@ -334,8 +334,8 @@
         "computed": {
           "type": "linear",
           "basedOn": "resource.resourceId",
-          "multiplier": "0.01",
-          "offset": "1"
+          "multiplier": "numberString",
+          "offset": "bigNumberString"
         },
         "writesToState": "state.path"
       }
