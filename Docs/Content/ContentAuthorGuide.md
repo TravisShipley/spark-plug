@@ -10,8 +10,9 @@ This guide explains how to safely edit the Spark Plug Google Sheets.
 2. IDs must be unique.
 3. Do not rename IDs after release.
 4. Empty rows are ignored.
-5. Rows starting with `_` are treated as comments.
-6. Tabs starting with `_` are ignored by the importer.
+5. Rows starting with `//` are treated as comments.
+6. Tabs starting with `//` are ignored by the importer.
+7. Tabs starting with `__` are for internal system metadata.
 
 ---
 
