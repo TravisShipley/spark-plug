@@ -11,7 +11,8 @@ public sealed class UiCommand
     public UiCommand(
         Action execute,
         IReadOnlyReactiveProperty<bool> canExecute = null,
-        IReadOnlyReactiveProperty<bool> isVisible = null)
+        IReadOnlyReactiveProperty<bool> isVisible = null
+    )
     {
         this.execute = execute ?? throw new ArgumentNullException(nameof(execute));
 

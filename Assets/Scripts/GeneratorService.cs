@@ -1,5 +1,5 @@
-using UniRx;
 using System;
+using UniRx;
 using UnityEngine;
 
 public class GeneratorService : IDisposable
@@ -8,7 +8,7 @@ public class GeneratorService : IDisposable
     private readonly GeneratorDefinition definition;
     private readonly WalletService wallet;
     private readonly TickService tickService;
-    
+
     private double lastIntervalSeconds;
 
     private readonly CompositeDisposable disposables = new();
@@ -49,8 +49,13 @@ public class GeneratorService : IDisposable
 
         return Math.Max(0.0001, definition.BaseCycleDurationSeconds / speed);
     }
-    
-    public GeneratorService(GeneratorModel model, GeneratorDefinition definition, WalletService wallet, TickService tickService)
+
+    public GeneratorService(
+        GeneratorModel model,
+        GeneratorDefinition definition,
+        WalletService wallet,
+        TickService tickService
+    )
     {
         this.model = model;
 
@@ -68,9 +73,7 @@ public class GeneratorService : IDisposable
         cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
         lastIntervalSeconds = cycleDurationSeconds.Value;
 
-        tickService.OnTick
-            .Subscribe(_ => OnTick())
-            .AddTo(disposables);
+        tickService.OnTick.Subscribe(_ => OnTick()).AddTo(disposables);
 
         // Preserve elapsed percentage when speed changes mid-cycle so progress does not jump.
         speedMultiplier
@@ -195,7 +198,10 @@ public class GeneratorService : IDisposable
         double growth = Math.Max(1.0, definition.LevelCostGrowth);
 
         int currentLevel = Math.Max(1, model.Level);
-        baseCost = (baseCost > 0) ? baseCost : (model.Level == 0) ? 0 : 1;
+        baseCost =
+            (baseCost > 0) ? baseCost
+            : (model.Level == 0) ? 0
+            : 1;
         return baseCost * Math.Pow(growth, currentLevel - 1);
     }
 
@@ -223,7 +229,7 @@ public class GeneratorService : IDisposable
 
         if (wallet.CashBalance.Value < cost)
             return false;
-            
+
         wallet.IncrementBalance(CurrencyType.Cash, -cost);
         model.Level = model.Level + 1;
         level.Value = model.Level;
@@ -251,22 +257,46 @@ public class GeneratorService : IDisposable
         isRunning.Value = true;
     }
 
-    public void ApplyUpgrade(UpgradeDefinition upgrade)
+    public void ApplyUpgrade(UpgradeEntry upgrade)
     {
-        switch (upgrade.EffectType)
+        switch (upgrade.effectType)
         {
             case UpgradeEffectType.OutputMultiplier:
-                MultiplyOutput(upgrade.Value);
+                MultiplyOutput(upgrade.value);
                 break;
 
             case UpgradeEffectType.SpeedMultiplier:
-                MultiplySpeed(upgrade.Value);
+                MultiplySpeed(upgrade.value);
 
                 // Debug: log the new effective cycle duration (Option A: duration = base / speedMultiplier)
-                double newSeconds = Math.Max(0.0001, definition.BaseCycleDurationSeconds / speedMultiplier.Value);
-                Debug.Log($"[GeneratorService] {definition.Id} speed x{upgrade.Value:0.##} → {newSeconds:0.###}s/cycle (mult={speedMultiplier.Value:0.###})");
+                double newSeconds = Math.Max(
+                    0.0001,
+                    definition.BaseCycleDurationSeconds / speedMultiplier.Value
+                );
+                Debug.Log(
+                    $"[GeneratorService] {definition.Id} speed x{upgrade.value:0.##} → {newSeconds:0.###}s/cycle (mult={speedMultiplier.Value:0.###})"
+                );
                 break;
         }
+    }
+
+    // Backwards-compat overload to accept legacy UpgradeDefinition assets.
+    public void ApplyUpgrade(UpgradeDefinition upgrade)
+    {
+        if (upgrade == null)
+            return;
+
+        var ue = new UpgradeEntry
+        {
+            id = upgrade.Id,
+            displayName = upgrade.DisplayName,
+            generatorId = upgrade.GeneratorId,
+            costSimple = upgrade.Cost,
+            effectType = upgrade.EffectType,
+            value = upgrade.Value,
+        };
+
+        ApplyUpgrade(ue);
     }
 
     public void Dispose()

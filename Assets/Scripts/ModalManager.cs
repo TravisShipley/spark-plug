@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-
 public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
 {
     // Inspector helper for modal registry
@@ -13,31 +12,48 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
         public string Id;
         public ModalView Prefab;
     }
-    
+
     [Header("Services")]
-    [SerializeField] private UiServiceRegistry uiServices;
+    [SerializeField]
+    private UiServiceRegistry uiServices;
 
     [Header("Scene References")]
-    [SerializeField] private Transform modalContainer;
-    [SerializeField] private Button backdropButton;   // full-screen button behind modal(s)
-    [SerializeField] private CanvasGroup backdropGroup;
-    [SerializeField] private Canvas backdropCanvas;
+    [SerializeField]
+    private Transform modalContainer;
+
+    [SerializeField]
+    private Button backdropButton; // full-screen button behind modal(s)
+
+    [SerializeField]
+    private CanvasGroup backdropGroup;
+
+    [SerializeField]
+    private Canvas backdropCanvas;
 
     [Header("Behavior")]
-    [SerializeField] private bool closeOnEscape = true;
-    [SerializeField] private bool closeOnBackdropClick = true;
+    [SerializeField]
+    private bool closeOnEscape = true;
+
+    [SerializeField]
+    private bool closeOnBackdropClick = true;
 
     [Header("Stacking")]
-    [SerializeField] private int baseModalSortingOrder = 100;
-    [SerializeField] private int sortingStep = 10;
+    [SerializeField]
+    private int baseModalSortingOrder = 100;
+
+    [SerializeField]
+    private int sortingStep = 10;
 
     [Header("Modal Registry")]
-    [SerializeField] private List<ModalEntry> modalPrefabs = new();
+    [SerializeField]
+    private List<ModalEntry> modalPrefabs = new();
 
     private readonly Stack<ModalView> stack = new();
     private Dictionary<string, ModalView> modalById;
 
     public UpgradeService UpgradeService { get; private set; }
+    public UpgradeCatalog UpgradeCatalog { get; set; }
+    public GameDefinitionService GameDefinitionService { get; set; }
 
     public void Initialize(UpgradeService upgradeService)
     {
@@ -52,11 +68,15 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
 
     private void Awake()
     {
-        if (modalContainer == null) modalContainer = transform;
+        if (modalContainer == null)
+            modalContainer = transform;
 
         if (uiServices == null)
         {
-            Debug.LogError("ModalManager: UiServiceRegistry is not assigned. Assign it in the inspector so modals can resolve generators.", this);
+            Debug.LogError(
+                "ModalManager: UiServiceRegistry is not assigned. Assign it in the inspector so modals can resolve generators.",
+                this
+            );
         }
 
         if (backdropButton != null)
@@ -81,13 +101,19 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
             var id = (entry.Id ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(id))
             {
-                Debug.LogWarning($"ModalManager: ModalEntry with empty Id on prefab '{entry.Prefab.name}' was ignored.", this);
+                Debug.LogWarning(
+                    $"ModalManager: ModalEntry with empty Id on prefab '{entry.Prefab.name}' was ignored.",
+                    this
+                );
                 continue;
             }
 
             if (modalById.ContainsKey(id))
             {
-                Debug.LogWarning($"ModalManager: Duplicate modal Id '{id}' found. Keeping the first, ignoring '{entry.Prefab.name}'.", this);
+                Debug.LogWarning(
+                    $"ModalManager: Duplicate modal Id '{id}' found. Keeping the first, ignoring '{entry.Prefab.name}'.",
+                    this
+                );
                 continue;
             }
 
@@ -99,12 +125,14 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
 
     private void Update()
     {
-        if (!closeOnEscape) return;
+        if (!closeOnEscape)
+            return;
 
         // Esc on desktop; Android back often maps to Escape too.
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            if (stack.Count == 0) return;
+            if (stack.Count == 0)
+                return;
 
             var top = stack.Peek();
             if (top != null && top.Dismissible && top.CloseOnEscape)
@@ -133,8 +161,9 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
         EnsureUpgradeServiceInitializedIfNeeded();
         Show(id);
     }
-    
-    public T Show<T>(T modalPrefab, object payload = null) where T : ModalView
+
+    public T Show<T>(T modalPrefab, object payload = null)
+        where T : ModalView
     {
         if (modalPrefab == null)
             throw new ArgumentNullException(nameof(modalPrefab));
@@ -216,8 +245,10 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
 
     private void OnBackdropClicked()
     {
-        if (!closeOnBackdropClick) return;
-        if (stack.Count == 0) return;
+        if (!closeOnBackdropClick)
+            return;
+        if (stack.Count == 0)
+            return;
 
         var top = stack.Peek();
         if (top != null && top.Dismissible && top.CloseOnBackdrop)
@@ -260,7 +291,11 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
         int i = 0;
         foreach (var modal in stack)
         {
-            if (modal == null) { i++; continue; }
+            if (modal == null)
+            {
+                i++;
+                continue;
+            }
 
             bool isTop = (i == 0);
 

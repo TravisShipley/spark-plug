@@ -2,30 +2,38 @@ using System;
 using TMPro;
 using UniRx;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(Button))]
 public class ReactiveButtonView : MonoBehaviour
 {
-    [SerializeField] private Button button;
-    [SerializeField] private TextMeshProUGUI label;
-    [SerializeField] private GameObject target; // optional; defaults to this GO
+    [SerializeField]
+    private Button button;
+
+    [SerializeField]
+    private TextMeshProUGUI label;
+
+    [SerializeField]
+    private GameObject target; // optional; defaults to this GO
 
     private readonly CompositeDisposable disposables = new();
     private UnityAction clickListener;
 
     private void Awake()
     {
-        if (button == null) button = GetComponent<Button>();
-        if (target == null) target = gameObject;
+        if (button == null)
+            button = GetComponent<Button>();
+        if (target == null)
+            target = gameObject;
     }
 
     public void Bind(
         IObservable<string> labelText = null,
         IObservable<bool> interactable = null,
         IObservable<bool> visible = null,
-        Action onClick = null)
+        Action onClick = null
+    )
     {
         // Allow rebinding
         if (clickListener != null && button != null)
@@ -38,10 +46,7 @@ public class ReactiveButtonView : MonoBehaviour
 
         if (label != null && labelText != null)
         {
-            labelText
-                .DistinctUntilChanged()
-                .Subscribe(t => label.text = t)
-                .AddTo(disposables);
+            labelText.DistinctUntilChanged().Subscribe(t => label.text = t).AddTo(disposables);
         }
 
         if (interactable != null)
@@ -54,20 +59,21 @@ public class ReactiveButtonView : MonoBehaviour
 
         if (visible != null)
         {
-            visible
-                .DistinctUntilChanged()
-                .Subscribe(v => target.SetActive(v))
-                .AddTo(disposables);
+            visible.DistinctUntilChanged().Subscribe(v => target.SetActive(v)).AddTo(disposables);
         }
 
         if (onClick != null)
         {
             // Helpful warning: if the Button has inspector-assigned click listeners, you'll get double actions.
-            if (button != null && button.onClick != null && button.onClick.GetPersistentEventCount() > 0)
+            if (
+                button != null
+                && button.onClick != null
+                && button.onClick.GetPersistentEventCount() > 0
+            )
             {
                 Debug.LogWarning(
-                    "ReactiveButtonView: Button has persistent OnClick listeners assigned in the inspector. " +
-                    "If you also bind an onClick action here, it will run in addition to those listeners.",
+                    "ReactiveButtonView: Button has persistent OnClick listeners assigned in the inspector. "
+                        + "If you also bind an onClick action here, it will run in addition to those listeners.",
                     this
                 );
             }
@@ -76,13 +82,15 @@ public class ReactiveButtonView : MonoBehaviour
             button.onClick.AddListener(clickListener);
 
             // Ensure the listener is removed when we rebind/dispose.
-            Disposable.Create(() =>
-            {
-                if (button != null && clickListener != null)
-                    button.onClick.RemoveListener(clickListener);
+            Disposable
+                .Create(() =>
+                {
+                    if (button != null && clickListener != null)
+                        button.onClick.RemoveListener(clickListener);
 
-                clickListener = null;
-            }).AddTo(disposables);
+                    clickListener = null;
+                })
+                .AddTo(disposables);
         }
     }
 

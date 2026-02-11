@@ -5,19 +5,29 @@ using UnityEngine;
 
 public sealed class UpgradeEntryView : MonoBehaviour
 {
-    [SerializeField] private TextMeshProUGUI nameText;
-    [SerializeField] private TextMeshProUGUI costText;
-    [SerializeField] private TextMeshProUGUI infoText;
-    [SerializeField] private ReactiveButtonView buyButton;
-    [SerializeField] private GameObject checkmark;
+    [SerializeField]
+    private TextMeshProUGUI nameText;
+
+    [SerializeField]
+    private TextMeshProUGUI costText;
+
+    [SerializeField]
+    private TextMeshProUGUI infoText;
+
+    [SerializeField]
+    private ReactiveButtonView buyButton;
+
+    [SerializeField]
+    private GameObject checkmark;
 
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
     public void Bind(
-        UpgradeDefinition upgrade,
+        UpgradeEntry upgrade,
         GeneratorService generator,
         UpgradeService upgradeService,
-        IReadOnlyReactiveProperty<int> purchasedCount)
+        IReadOnlyReactiveProperty<int> purchasedCount
+    )
     {
         disposables.Clear();
 
@@ -45,55 +55,55 @@ public sealed class UpgradeEntryView : MonoBehaviour
             return;
         }
 
-        var isPurchased =
-            purchasedCount
-                .Select(c => c > 0)
-                .DistinctUntilChanged();
+        var isPurchased = purchasedCount.Select(c => c > 0).DistinctUntilChanged();
 
         if (checkmark != null)
             checkmark.SetActive(purchasedCount.Value > 0);
 
         if (nameText != null)
-            nameText.text = upgrade.DisplayName;
+            nameText.text = string.IsNullOrEmpty(upgrade.displayName)
+                ? upgrade.id
+                : upgrade.displayName;
 
         if (infoText != null)
         {
             // Example: "Pizza profits x2" or "Pizza speed x1.1"
-            string effectLabel = upgrade.EffectType switch
+            string effectLabel = upgrade.effectType switch
             {
                 UpgradeEffectType.OutputMultiplier => "profits",
-                UpgradeEffectType.SpeedMultiplier  => "speed",
+                UpgradeEffectType.SpeedMultiplier => "speed",
                 _ => throw new ArgumentOutOfRangeException(
-                        nameof(upgrade.EffectType),
-                        upgrade.EffectType,
-                        "UpgradeEntryView: Unsupported UpgradeEffectType. Did you forget to handle a new enum value?"
-                    )
+                    nameof(upgrade.effectType),
+                    upgrade.effectType,
+                    "UpgradeEntryView: Unsupported UpgradeEffectType. Did you forget to handle a new enum value?"
+                ),
             };
 
             // Use our truncating formatter for the multiplier value.
-            string multText = Format.Abbreviated(upgrade.Value);
+            string multText = Format.Abbreviated(upgrade.value);
 
             infoText.text = $"{generator.DisplayName} {effectLabel} x{multText}";
         }
 
-        double cost = upgrade.Cost;
+        double cost = upgrade.costSimple;
+        if (cost <= 0 && upgrade.cost != null && upgrade.cost.Length > 0)
+        {
+            // Try to parse first cost item's amount as a fallback.
+            if (!double.TryParse(upgrade.cost[0].amount, out cost))
+                cost = 0;
+        }
 
         if (costText != null)
             costText.text = Format.Currency(cost);
 
-        var canAfford =
-            upgradeService.Wallet.CashBalance
-                .DistinctUntilChanged()
-                .Select(cash => cash >= cost)
-                .DistinctUntilChanged();
+        var canAfford = upgradeService
+            .Wallet.CashBalance.DistinctUntilChanged()
+            .Select(cash => cash >= cost)
+            .DistinctUntilChanged();
 
-        var interactable =
-            Observable.CombineLatest(
-                    canAfford,
-                    isPurchased,
-                    (afford, purchased) => afford && !purchased
-                )
-                .DistinctUntilChanged();
+        var interactable = Observable
+            .CombineLatest(canAfford, isPurchased, (afford, purchased) => afford && !purchased)
+            .DistinctUntilChanged();
 
         isPurchased
             .Subscribe(purchased =>
@@ -110,7 +120,7 @@ public sealed class UpgradeEntryView : MonoBehaviour
             labelText: Observable.Return($"Buy\n{Format.Currency(cost)}"),
             interactable: interactable,
             visible: Observable.Return(true),
-            onClick: () => upgradeService.TryPurchase(upgrade.Id)
+            onClick: () => upgradeService.TryPurchase(upgrade.id)
         );
     }
 
@@ -122,10 +132,12 @@ public sealed class UpgradeEntryView : MonoBehaviour
 #if UNITY_EDITOR
     private void OnValidate()
     {
-        if (nameText == null) nameText = GetComponentInChildren<TextMeshProUGUI>(true);
+        if (nameText == null)
+            nameText = GetComponentInChildren<TextMeshProUGUI>(true);
         if (infoText == null)
             infoText = GetComponentInChildren<TextMeshProUGUI>(true);
-        if (buyButton == null) buyButton = GetComponentInChildren<ReactiveButtonView>(true);
+        if (buyButton == null)
+            buyButton = GetComponentInChildren<ReactiveButtonView>(true);
     }
 #endif
 }

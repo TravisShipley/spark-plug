@@ -33,9 +33,6 @@ public class GameCompositionRoot : MonoBehaviour
     [SerializeField]
     private GeneratorDatabase generatorDatabase;
 
-    [SerializeField]
-    private UpgradeDatabase upgradeDatabase;
-
     [Header("UI Composition")]
     [SerializeField]
     private UiCompositionRoot uiRoot;
@@ -56,6 +53,7 @@ public class GameCompositionRoot : MonoBehaviour
 
     private WalletService walletService;
     private UpgradeService upgradeService;
+    private GameDefinitionService gameDefinitionService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
     private SaveService saveService;
@@ -161,10 +159,22 @@ public class GameCompositionRoot : MonoBehaviour
             return;
         }
 
-        upgradeService = new UpgradeService(upgradeDatabase, walletService, generatorResolver);
+        // Load content-driven definitions and build an in-memory catalog
+        gameDefinitionService = new GameDefinitionService();
+
+        // Construct UpgradeService with the authoritative UpgradeCatalog
+        upgradeService = new UpgradeService(
+            gameDefinitionService.Catalog,
+            walletService,
+            generatorResolver
+        );
 
         // ModalManager needs the UpgradeService for modals like Upgrades.
         modalManager.Initialize(upgradeService);
+        // Provide the content-driven catalog to modals so they can render upgrades.
+        modalManager.UpgradeCatalog = gameDefinitionService.Catalog;
+        // Also expose the full GameDefinitionService for modals that need richer access.
+        modalManager.GameDefinitionService = gameDefinitionService;
 
         // Domain-facing modal API (intent-based)
         modalService = new ModalService(modalManager);
@@ -235,15 +245,6 @@ public class GameCompositionRoot : MonoBehaviour
         {
             Debug.LogError(
                 "GameCompositionRoot: UiServiceRegistry is not assigned in the inspector.",
-                this
-            );
-            return false;
-        }
-
-        if (upgradeDatabase == null)
-        {
-            Debug.LogError(
-                "GameCompositionRoot: UpgradeDatabase is not assigned in the inspector.",
                 this
             );
             return false;

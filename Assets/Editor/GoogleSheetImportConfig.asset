@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8243f4b40ee7e478abe27cc2e9b2466c, type: 3}
   m_Name: GoogleSheetImportConfig
   m_EditorClassIdentifier: Assembly-CSharp-Editor::GoogleSheetImportConfig
-  spreadsheetId: https://docs.google.com/spreadsheets/d/1ILzPwrsXiR3u724Fs3OnUHCKHM-hJ8EY60Ukcs1hHZs/edit?usp=sharing
+  spreadsheetId: https://docs.google.com/spreadsheets/d/1ILzPwrsXiR3u724Fs3OnUHCKHM-hJ8EY60Ukcs1hHZs/edit?gid=1947149075#gid=1947149075
+  apiKey: AIzaSyCdCtu_TZrJ-1tm8PShf7Su08C10ctOc9c

@@ -87,7 +87,7 @@ public static class GoogleSheetImporter
             WriteJson(pack);
 
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("Import Complete", $"Wrote {OutputPath}", "OK");
+            Debug.Log($"<color=green>✔ Import Complete</color>\nWrote {OutputPath}");
         }
         catch (Exception ex)
         {

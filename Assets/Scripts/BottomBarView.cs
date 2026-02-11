@@ -3,9 +3,14 @@ using UnityEngine;
 
 public sealed class BottomBarView : MonoBehaviour
 {
-    [SerializeField] private ReactiveButtonView upgradesButton;
-    [SerializeField] private ReactiveButtonView managersButton;
-    [SerializeField] private ReactiveButtonView storeButton;
+    [SerializeField]
+    private ReactiveButtonView upgradesButton;
+
+    [SerializeField]
+    private ReactiveButtonView managersButton;
+
+    [SerializeField]
+    private ReactiveButtonView storeButton;
 
     private readonly CompositeDisposable disposables = new();
     private bool isBound;
@@ -14,7 +19,10 @@ public sealed class BottomBarView : MonoBehaviour
     {
         if (isBound)
         {
-            Debug.LogWarning("BottomBarView: Bind called more than once; ignoring to avoid duplicate button subscriptions.", this);
+            Debug.LogWarning(
+                "BottomBarView: Bind called more than once; ignoring to avoid duplicate button subscriptions.",
+                this
+            );
             return;
         }
         isBound = true;
@@ -40,7 +48,6 @@ public sealed class BottomBarView : MonoBehaviour
             visible: vm.ShowStore.IsVisible,
             onClick: vm.ShowStore.Execute
         );
-
     }
 
     private void OnDestroy()

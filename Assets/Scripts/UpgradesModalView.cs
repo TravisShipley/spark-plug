@@ -4,15 +4,18 @@ using TMPro;
 using UniRx;
 using UnityEngine;
 
-
 public sealed class UpgradesModalView : ModalView
 {
     [Header("UI")]
-    [SerializeField] private Transform listContainer;
-    [SerializeField] private UpgradeEntryView entryPrefab;
+    [SerializeField]
+    private Transform listContainer;
+
+    [SerializeField]
+    private UpgradeEntryView entryPrefab;
 
     [Header("Data")]
-    [SerializeField] private UpgradeDatabase upgradeDatabase;
+    // Upgrades are now driven by the content pack -> UpgradeCatalog.
+    // Resolve the catalog from ModalManager at runtime.
 
     private UpgradeService upgradeService;
 
@@ -23,28 +26,57 @@ public sealed class UpgradesModalView : ModalView
         disposables.Clear();
         ClearList();
 
-        if (upgradeDatabase == null)
+        // Prefer GameDefinitionService as the authoritative source of upgrades.
+        GameDefinitionService gameDefService = null;
+        var gdsProp = Manager.GetType().GetProperty("GameDefinitionService");
+        if (gdsProp != null)
+            gameDefService = gdsProp.GetValue(Manager) as GameDefinitionService;
+
+        UpgradeCatalog upgradeCatalog = null;
+        if (gameDefService != null)
+            upgradeCatalog = new UpgradeCatalog(gameDefService.Upgrades);
+        else
         {
-            Debug.LogError("UpgradesModalView: UpgradeDatabase is not assigned.", this);
+            var catalogProp = Manager.GetType().GetProperty("UpgradeCatalog");
+            if (catalogProp != null)
+                upgradeCatalog = catalogProp.GetValue(Manager) as UpgradeCatalog;
+        }
+
+        if (upgradeCatalog == null)
+        {
+            Debug.LogError(
+                "UpgradesModalView: Could not resolve upgrades source from ModalManager. "
+                    + "Expose `GameDefinitionService` or `UpgradeCatalog` on ModalManager and assign it during bootstrap.",
+                this
+            );
             return;
         }
 
         if (entryPrefab == null || listContainer == null)
         {
-            Debug.LogError("UpgradesModalView: entryPrefab or listContainer is not assigned.", this);
+            Debug.LogError(
+                "UpgradesModalView: entryPrefab or listContainer is not assigned.",
+                this
+            );
             return;
         }
 
         if (Manager == null)
         {
-            Debug.LogError("UpgradesModalView: Manager is not set; this modal must be shown via ModalManager.", this);
+            Debug.LogError(
+                "UpgradesModalView: Manager is not set; this modal must be shown via ModalManager.",
+                this
+            );
             return;
         }
 
         // Generator lookup is provided by the ModalManager (delegates to UiServiceRegistry).
         if (Manager is not IGeneratorResolver generatorResolver)
         {
-            Debug.LogError("UpgradesModalView: ModalManager must implement IGeneratorResolver.", this);
+            Debug.LogError(
+                "UpgradesModalView: ModalManager must implement IGeneratorResolver.",
+                this
+            );
             return;
         }
 
@@ -57,8 +89,8 @@ public sealed class UpgradesModalView : ModalView
         if (upgradeService == null)
         {
             Debug.LogError(
-                "UpgradesModalView: UpgradeService could not be resolved from ModalManager. " +
-                "Expose a public property `public UpgradeService UpgradeService { get; }` on ModalManager and assign it during bootstrap.",
+                "UpgradesModalView: UpgradeService could not be resolved from ModalManager. "
+                    + "Expose a public property `public UpgradeService UpgradeService { get; }` on ModalManager and assign it during bootstrap.",
                 this
             );
             return;
@@ -66,16 +98,20 @@ public sealed class UpgradesModalView : ModalView
 
         if (upgradeService.Wallet == null)
         {
-            Debug.LogError("UpgradesModalView: UpgradeService.Wallet is null (did bootstrap initialize it?).", this);
+            Debug.LogError(
+                "UpgradesModalView: UpgradeService.Wallet is null (did bootstrap initialize it?).",
+                this
+            );
             return;
         }
 
-        // Show all upgrades in the database. Each entry wires itself to the generator specified by upgrade.GeneratorId.
-        foreach (var upgrade in upgradeDatabase.Upgrades)
+        // Show all upgrades in the catalog. Each entry wires itself to the generator specified by upgrade.generatorId.
+        foreach (var upgrade in upgradeCatalog.Upgrades)
         {
-            if (upgrade == null) continue;
+            if (upgrade == null)
+                continue;
 
-            string genId = (upgrade.GeneratorId ?? string.Empty).Trim();
+            string genId = (upgrade.generatorId ?? string.Empty).Trim();
 
             // For v1, require a GeneratorId so we can wire it. (Global upgrades can be added later.)
             if (string.IsNullOrEmpty(genId))
@@ -83,32 +119,30 @@ public sealed class UpgradesModalView : ModalView
 
             if (!generatorResolver.TryGetGenerator(genId, out var generator) || generator == null)
             {
-                Debug.LogWarning($"UpgradesModalView: No generator found for GeneratorId '{genId}' (upgrade '{upgrade.Id}').", this);
+                Debug.LogWarning(
+                    $"UpgradesModalView: No generator found for GeneratorId '{genId}' (upgrade '{upgrade.id}').",
+                    this
+                );
                 continue;
             }
 
             var entry = Instantiate(entryPrefab, listContainer);
-            entry.name = $"Upgrade_{upgrade.Id}";
+            entry.name = $"Upgrade_{upgrade.id}";
 
-            var purchasedCount =
-                upgradeService
-                    .PurchasedCount(upgrade.Id)
-                    .DistinctUntilChanged()
-                    .ToReadOnlyReactiveProperty()
-                    .AddTo(disposables);
+            var purchasedCount = upgradeService
+                .PurchasedCount(upgrade.id)
+                .DistinctUntilChanged()
+                .ToReadOnlyReactiveProperty()
+                .AddTo(disposables);
 
-            entry.Bind(
-                upgrade,
-                generator,
-                upgradeService,
-                purchasedCount
-            );
+            entry.Bind(upgrade, generator, upgradeService, purchasedCount);
         }
     }
 
     private void ClearList()
     {
-        if (listContainer == null) return;
+        if (listContainer == null)
+            return;
 
         for (int i = listContainer.childCount - 1; i >= 0; i--)
         {
