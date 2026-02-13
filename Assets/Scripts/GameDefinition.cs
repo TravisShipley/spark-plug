@@ -5,6 +5,8 @@ using UnityEngine;
 [Serializable]
 public sealed class GameDefinition
 {
+    public List<NodeDefinition> nodes = new List<NodeDefinition>();
+    public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
 }
 

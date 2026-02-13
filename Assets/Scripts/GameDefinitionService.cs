@@ -1,14 +1,13 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
-using UnityEngine;
 
 public sealed class GameDefinitionService
 {
     public const string DefaultPath = "Assets/Data/game_definition.json";
     private readonly string path;
     private GameDefinition definition;
-    private UpgradeCatalog catalog;
+    private NodeCatalog nodeCatalog;
+    private NodeInstanceCatalog nodeInstanceCatalog;
+    private UpgradeCatalog upgradeCatalog;
 
     public GameDefinitionService(string projectRelativePath = "Assets/Data/game_definition.json")
     {
@@ -19,21 +18,52 @@ public sealed class GameDefinitionService
     public void Reload()
     {
         definition = GameDefinitionLoader.LoadFromFile(path);
-        catalog = new UpgradeCatalog(definition?.upgrades);
+        nodeCatalog = new NodeCatalog(definition?.nodes);
+        nodeInstanceCatalog = new NodeInstanceCatalog(definition?.nodeInstances);
+        upgradeCatalog = new UpgradeCatalog(definition?.upgrades);
     }
 
-    public IReadOnlyList<UpgradeEntry> Upgrades => catalog?.Upgrades ?? new List<UpgradeEntry>();
+    public IReadOnlyList<NodeDefinition> Nodes => nodeCatalog?.Nodes ?? new List<NodeDefinition>();
+    public IReadOnlyList<NodeInstanceDefinition> NodeInstances =>
+        nodeInstanceCatalog?.NodeInstances ?? new List<NodeInstanceDefinition>();
+    public IReadOnlyList<UpgradeEntry> Upgrades =>
+        upgradeCatalog?.Upgrades ?? new List<UpgradeEntry>();
+
+    public bool TryGetNode(string id, out NodeDefinition node)
+    {
+        if (nodeCatalog == null)
+        {
+            node = null;
+            return false;
+        }
+
+        return nodeCatalog.TryGet(id, out node);
+    }
+
+    public bool TryGetNodeInstance(string id, out NodeInstanceDefinition nodeInstance)
+    {
+        if (nodeInstanceCatalog == null)
+        {
+            nodeInstance = null;
+            return false;
+        }
+
+        return nodeInstanceCatalog.TryGet(id, out nodeInstance);
+    }
 
     public bool TryGetUpgrade(string id, out UpgradeEntry entry)
     {
-        if (catalog == null)
+        if (upgradeCatalog == null)
         {
             entry = null;
             return false;
         }
 
-        return catalog.TryGet(id, out entry);
+        return upgradeCatalog.TryGet(id, out entry);
     }
 
-    public UpgradeCatalog Catalog => catalog;
+    public NodeCatalog NodeCatalog => nodeCatalog;
+    public NodeInstanceCatalog NodeInstanceCatalog => nodeInstanceCatalog;
+    public UpgradeCatalog UpgradeCatalog => upgradeCatalog;
+    public UpgradeCatalog Catalog => upgradeCatalog;
 }

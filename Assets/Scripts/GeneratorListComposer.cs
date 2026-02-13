@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public class GeneratorListComposer
 {
@@ -12,6 +14,7 @@ public class GeneratorListComposer
     private readonly UiServiceRegistry uiService;
     private readonly SaveService saveService;
     private readonly UpgradeService upgradeService;
+    private readonly GameDefinitionService gameDefinitionService;
     private readonly CompositeDisposable disposables;
 
     private readonly List<GeneratorModel> generatorModels;
@@ -27,6 +30,7 @@ public class GeneratorListComposer
         UiServiceRegistry uiService,
         SaveService saveService,
         UpgradeService upgradeService,
+        GameDefinitionService gameDefinitionService,
         CompositeDisposable disposables,
         List<GeneratorModel> generatorModels,
         List<GeneratorService> generatorServices,
@@ -41,40 +45,85 @@ public class GeneratorListComposer
         this.uiService = uiService;
         this.saveService = saveService;
         this.upgradeService = upgradeService;
+        this.gameDefinitionService = gameDefinitionService;
         this.disposables = disposables;
         this.generatorModels = generatorModels;
         this.generatorServices = generatorServices;
         this.generatorViewModels = generatorViewModels;
     }
 
-    public void Compose(List<GeneratorDefinition> generatorDefinitions)
+    public void Compose()
     {
-        for (int i = 0; i < generatorDefinitions.Count; i++)
+        var instances = gameDefinitionService?.NodeInstances;
+        if (instances == null || instances.Count == 0)
         {
-            var generatorDefinition = generatorDefinitions[i];
+            Debug.LogError("GeneratorListComposer: No node instances found in GameDefinitionService.");
+            return;
+        }
+
+        for (int i = 0; i < instances.Count; i++)
+        {
+            var nodeInstance = instances[i];
+            if (nodeInstance == null)
+                continue;
+
+            var instanceId = (nodeInstance.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(instanceId))
+                continue;
+
+            var nodeTypeId = (nodeInstance.nodeId ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(nodeTypeId))
+            {
+                Debug.LogWarning(
+                    $"GeneratorListComposer: Node instance '{instanceId}' is missing nodeId."
+                );
+                continue;
+            }
+
+            if (!gameDefinitionService.TryGetNode(nodeTypeId, out var nodeDef) || nodeDef == null)
+            {
+                Debug.LogWarning(
+                    $"GeneratorListComposer: Node instance '{instanceId}' references missing nodeId '{nodeTypeId}'."
+                );
+                continue;
+            }
+
+            var generatorDefinition = CreateRuntimeDefinition(nodeDef, nodeInstance);
 
             var generatorUI = Object.Instantiate(generatorUIRootPrefab, generatorUIContainer);
-            generatorUI.name = $"Generator_{generatorDefinition.Id}";
+            generatorUI.name = $"Generator_{instanceId}";
 
             var generatorView = generatorUI.GetComponent<GeneratorView>();
             if (generatorView == null)
             {
                 Debug.LogError(
-                    $"GameCompositionRoot: Generator UI root prefab is missing a GeneratorView (def '{generatorDefinition.Id}').",
+                    $"GameCompositionRoot: Generator UI root prefab is missing a GeneratorView (instance '{instanceId}').",
                     generatorUI
                 );
                 continue;
             }
 
-            ComposeSingle(generatorDefinition, generatorView);
+            ComposeSingle(generatorDefinition, nodeInstance, generatorView, nodeTypeId);
         }
     }
 
-    private void ComposeSingle(GeneratorDefinition generatorDefinition, GeneratorView generatorView)
+    private void ComposeSingle(
+        GeneratorDefinition generatorDefinition,
+        NodeInstanceDefinition nodeInstance,
+        GeneratorView generatorView,
+        string nodeTypeId
+    )
     {
         string id = generatorDefinition.Id;
 
-        LoadGeneratorState(saveService.Data, id, out bool isOwned, out bool isAutomated, out int level);
+        LoadGeneratorState(
+            saveService.Data,
+            id,
+            nodeInstance,
+            out bool isOwned,
+            out bool isAutomated,
+            out int level
+        );
 
         var model = new GeneratorModel
         {
@@ -96,23 +145,61 @@ public class GeneratorListComposer
 
         generatorView.Bind(generatorViewModel, service, walletViewModel);
 
-        // Register each generator and service with the UiServiceRegistry
+        // Register by instance id (authoritative runtime id).
         uiService.RegisterGenerator(model.Id, service);
+        // Compatibility path: allow lookups by node type id when there is a 1:1 instance mapping.
+        if (!string.IsNullOrWhiteSpace(nodeTypeId))
+            uiService.RegisterGenerator(nodeTypeId.Trim(), service);
 
         WireGeneratorPersistence(id, service);
+    }
+
+    private static GeneratorDefinition CreateRuntimeDefinition(
+        NodeDefinition nodeDef,
+        NodeInstanceDefinition nodeInstance
+    )
+    {
+        var definition = ScriptableObject.CreateInstance<GeneratorDefinition>();
+
+        definition.Id = (nodeInstance.id ?? string.Empty).Trim();
+
+        var displayNameOverride = (nodeInstance.displayNameOverride ?? string.Empty).Trim();
+        definition.DisplayName = string.IsNullOrEmpty(displayNameOverride)
+            ? nodeDef.displayName
+            : displayNameOverride;
+
+        definition.BaseCycleDurationSeconds = Math.Max(
+            0.0001,
+            nodeDef?.cycle?.baseDurationSeconds ?? 1.0
+        );
+
+        // v1 runtime mapping: use first output entry (fallback to 0)
+        var output = nodeDef?.outputs != null && nodeDef.outputs.Count > 0 ? nodeDef.outputs[0] : null;
+        var payout = output?.basePayout ?? 0.0;
+        var perSecond = output?.basePerSecond ?? 0.0;
+        definition.BaseOutputPerCycle = payout > 0 ? payout : perSecond * definition.BaseCycleDurationSeconds;
+
+        definition.BaseLevelCost = Math.Max(0.0, nodeDef?.leveling?.priceCurve?.basePrice ?? 0.0);
+        definition.LevelCostGrowth = Math.Max(1.0, nodeDef?.leveling?.priceCurve?.growth ?? 1.0);
+
+        // No explicit automation cost in node schema yet; keep existing default.
+        definition.AutomationCost = Math.Max(0.0, definition.AutomationCost);
+
+        return definition;
     }
 
     private static void LoadGeneratorState(
         GameData data,
         string id,
+        NodeInstanceDefinition nodeInstance,
         out bool isOwned,
         out bool isAutomated,
         out int level
     )
     {
-        isOwned = false;
+        isOwned = nodeInstance?.initialState?.enabled ?? false;
         isAutomated = false;
-        level = 0;
+        level = Math.Max(0, nodeInstance?.initialState?.level ?? 0);
 
         if (data != null && data.Generators != null)
         {

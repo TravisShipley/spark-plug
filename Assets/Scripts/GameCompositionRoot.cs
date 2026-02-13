@@ -29,10 +29,6 @@ using UnityEngine.SceneManagement;
 
 public class GameCompositionRoot : MonoBehaviour
 {
-    [Header("Databases")]
-    [SerializeField]
-    private GeneratorDatabase generatorDatabase;
-
     [Header("UI Composition")]
     [SerializeField]
     private UiCompositionRoot uiRoot;
@@ -74,14 +70,6 @@ public class GameCompositionRoot : MonoBehaviour
             return;
         }
 
-        var generatorDefinitions = GetGeneratorDefinitions(maxCount: 3);
-        if (generatorDefinitions.Count == 0)
-        {
-            Debug.LogError("GameCompositionRoot: No GeneratorDefinitions could be resolved.", this);
-            enabled = false;
-            return;
-        }
-
         // SaveService owns an in-memory snapshot.
         saveService = new SaveService();
         saveService.Load();
@@ -89,6 +77,13 @@ public class GameCompositionRoot : MonoBehaviour
         InitializeCoreServices(out var modalService);
         if (!enabled)
             return;
+
+        if (gameDefinitionService.NodeInstances == null || gameDefinitionService.NodeInstances.Count == 0)
+        {
+            Debug.LogError("GameCompositionRoot: No node instances could be resolved.", this);
+            enabled = false;
+            return;
+        }
 
         LoadSaveState();
 
@@ -103,33 +98,17 @@ public class GameCompositionRoot : MonoBehaviour
             uiService,
             saveService,
             upgradeService,
+            gameDefinitionService,
             disposables,
             generatorModels,
             generatorServices,
             generatorViewModels
         );
 
-        generatorComposer.Compose(generatorDefinitions);
+        generatorComposer.Compose();
 
         // Apply any saved upgrades (generators must be registered before this).
         upgradeService.ApplyAllPurchased();
-    }
-
-    private List<GeneratorDefinition> GetGeneratorDefinitions(int maxCount)
-    {
-        var list = new List<GeneratorDefinition>(maxCount);
-
-        foreach (var def in generatorDatabase.Generators)
-        {
-            if (def == null)
-                continue;
-
-            list.Add(def);
-            if (list.Count >= maxCount)
-                break;
-        }
-
-        return list;
     }
 
     private void InitializeCoreServices(out ModalService modalService)
@@ -211,24 +190,6 @@ public class GameCompositionRoot : MonoBehaviour
 
     private bool ValidateReferences()
     {
-        if (generatorDatabase == null)
-        {
-            Debug.LogError(
-                "GameCompositionRoot: GeneratorDatabase is not assigned in the inspector.",
-                this
-            );
-            return false;
-        }
-
-        if (generatorDatabase.Generators == null || generatorDatabase.Generators.Count == 0)
-        {
-            Debug.LogError(
-                "GameCompositionRoot: GeneratorDatabase has no GeneratorDefinitions assigned.",
-                this
-            );
-            return false;
-        }
-
         if (generatorUIRootPrefab == null)
         {
             Debug.LogError(
