@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -80,6 +81,8 @@ public sealed class UpgradesModalView : ModalView
             return;
         }
 
+        LogNodeTaggedUpgradeSummaries(upgradeCatalog, generatorResolver);
+
         // UpgradeService should be exposed by ModalManager via a public property `UpgradeService`.
         upgradeService = null;
         var prop = Manager.GetType().GetProperty("UpgradeService");
@@ -115,12 +118,18 @@ public sealed class UpgradesModalView : ModalView
 
             // For v1, require a GeneratorId so we can wire it. (Global upgrades can be added later.)
             if (string.IsNullOrEmpty(genId))
+            {
+                Debug.LogWarning(
+                    $"UpgradesModalView: Missing generatorId while building entries. {BuildUpgradeDebugContext(upgrade)}",
+                    this
+                );
                 continue;
+            }
 
             if (!generatorResolver.TryGetGenerator(genId, out var generator) || generator == null)
             {
                 Debug.LogWarning(
-                    $"UpgradesModalView: No generator found for GeneratorId '{genId}' (upgrade '{upgrade.id}').",
+                    $"UpgradesModalView: No generator found for generatorId '{genId}'. {BuildUpgradeDebugContext(upgrade)}",
                     this
                 );
                 continue;
@@ -155,5 +164,89 @@ public sealed class UpgradesModalView : ModalView
     private void OnDestroy()
     {
         disposables.Dispose();
+    }
+
+    private static void LogNodeTaggedUpgradeSummaries(
+        UpgradeCatalog upgradeCatalog,
+        IGeneratorResolver generatorResolver
+    )
+    {
+        if (upgradeCatalog?.Upgrades == null)
+            return;
+
+        var nodeSummaries = upgradeCatalog
+            .Upgrades.Where(u => u != null && u.tags != null)
+            .Where(u => u.tags.Any(t => string.Equals(t, "node", StringComparison.OrdinalIgnoreCase)))
+            .Select(u =>
+            {
+                var displayName = string.IsNullOrWhiteSpace(u.displayName) ? u.id : u.displayName;
+
+                var generatorId = (u.generatorId ?? string.Empty).Trim();
+                var targetName = generatorId;
+                if (!string.IsNullOrEmpty(generatorId))
+                {
+                    if (generatorResolver != null && generatorResolver.TryGetGenerator(generatorId, out var g))
+                        targetName = g?.DisplayName ?? generatorId;
+                    else
+                        Debug.LogWarning(
+                            $"UpgradesModalView: Node-tagged upgrade references unresolved generatorId '{generatorId}'. {BuildUpgradeDebugContext(u)}"
+                        );
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"UpgradesModalView: Node-tagged upgrade missing generatorId. {BuildUpgradeDebugContext(u)}"
+                    );
+                    targetName = "Global";
+                }
+
+                var effectLabel = u.effectType switch
+                {
+                    UpgradeEffectType.NodeSpeedMultiplier or UpgradeEffectType.SpeedMultiplier => "Speed",
+                    UpgradeEffectType.NodeOutput or UpgradeEffectType.OutputMultiplier => "Output",
+                    UpgradeEffectType.ResourceGain => "Resource Gain",
+                    UpgradeEffectType.NodeInput => "Input",
+                    UpgradeEffectType.NodeCapacityThroughputPerSecond => "Capacity",
+                    UpgradeEffectType.StateValue => "State Value",
+                    UpgradeEffectType.VariableValue => "Variable Value",
+                    UpgradeEffectType.AutomationPolicy => "Automation",
+                    _ => u.effectType.ToString(),
+                };
+
+                var effectAmount = u.value > 0 ? $" x{Format.Abbreviated(u.value)}" : string.Empty;
+                return $"{displayName}. {targetName} {effectLabel}{effectAmount}";
+            })
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToArray();
+
+        if (nodeSummaries.Length == 0)
+        {
+            Debug.Log("UpgradesModalView: No upgrades tagged 'node' found.");
+            return;
+        }
+
+        foreach (var summary in nodeSummaries)
+            Debug.Log($"UpgradesModalView: {summary}");
+    }
+
+    private static string BuildUpgradeDebugContext(UpgradeEntry upgrade)
+    {
+        if (upgrade == null)
+            return "upgrade=<null>";
+
+        var name = string.IsNullOrWhiteSpace(upgrade.displayName) ? "<none>" : upgrade.displayName;
+        var tags =
+            upgrade.tags == null || upgrade.tags.Length == 0 ? "<none>" : string.Join(",", upgrade.tags);
+        var effectIds =
+            upgrade.effects == null || upgrade.effects.Length == 0
+                ? "<none>"
+                : string.Join(
+                    ",",
+                    upgrade.effects
+                        .Where(e => e != null && !string.IsNullOrWhiteSpace(e.modifierId))
+                        .Select(e => e.modifierId)
+                );
+
+        return $"upgradeId='{upgrade.id}', displayName='{name}', category='{upgrade.category}', zoneId='{upgrade.zoneId}', tags=[{tags}], effectType='{upgrade.effectType}', value='{upgrade.value}', modifierIds=[{effectIds}]";
     }
 }
