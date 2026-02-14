@@ -297,25 +297,6 @@ public class GeneratorService : IDisposable
         }
     }
 
-    // Backwards-compat overload to accept legacy UpgradeDefinition assets.
-    public void ApplyUpgrade(UpgradeDefinition upgrade)
-    {
-        if (upgrade == null)
-            return;
-
-        var ue = new UpgradeEntry
-        {
-            id = upgrade.Id,
-            displayName = upgrade.DisplayName,
-            generatorId = upgrade.GeneratorId,
-            costSimple = upgrade.Cost,
-            effectType = upgrade.EffectType,
-            value = upgrade.Value,
-        };
-
-        ApplyUpgrade(ue);
-    }
-
     public void Dispose()
     {
         cycleCompleted.OnCompleted();
