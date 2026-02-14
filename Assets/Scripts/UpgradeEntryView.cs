@@ -1,4 +1,3 @@
-using System;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -67,22 +66,15 @@ public sealed class UpgradeEntryView : MonoBehaviour
 
         if (infoText != null)
         {
-            // Example: "Pizza profits x2" or "Pizza speed x1.1"
-            string effectLabel = upgrade.effectType switch
+            string effectText = upgrade.effectType switch
             {
-                UpgradeEffectType.OutputMultiplier => "profits",
-                UpgradeEffectType.SpeedMultiplier => "speed",
-                _ => throw new ArgumentOutOfRangeException(
-                    nameof(upgrade.effectType),
-                    upgrade.effectType,
-                    "UpgradeEntryView: Unsupported UpgradeEffectType. Did you forget to handle a new enum value?"
-                ),
+                UpgradeEffectType.OutputMultiplier => $"profits x{Format.Abbreviated(upgrade.value)}",
+                UpgradeEffectType.SpeedMultiplier => $"speed x{Format.Abbreviated(upgrade.value)}",
+                UpgradeEffectType.AutomationPolicy => "automation enabled",
+                _ => upgrade.effectType.ToString(),
             };
 
-            // Use our truncating formatter for the multiplier value.
-            string multText = Format.Abbreviated(upgrade.value);
-
-            infoText.text = $"{generator.DisplayName} {effectLabel} x{multText}";
+            infoText.text = $"{generator.DisplayName} {effectText}";
         }
 
         double cost = upgrade.costSimple;

@@ -7,6 +7,7 @@ public sealed class GameDefinition
 {
     public List<NodeDefinition> nodes = new List<NodeDefinition>();
     public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
+    public List<ModifierEntry> modifiers = new List<ModifierEntry>();
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
 }
 
@@ -82,4 +83,26 @@ public sealed class RequirementItem
 {
     public string type;
     public string args; // raw JSON for args
+}
+
+[Serializable]
+public sealed class ModifierEntry
+{
+    public string id;
+    public string source;
+    public string zoneId;
+    public ModifierScope scope;
+    public string operation;
+    public string target;
+    public double value;
+}
+
+[Serializable]
+public sealed class ModifierScope
+{
+    public string kind;
+    public string zoneId;
+    public string nodeId;
+    public string nodeTag;
+    public string resource;
 }

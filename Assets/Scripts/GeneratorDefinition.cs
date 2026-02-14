@@ -12,7 +12,7 @@ public class GeneratorDefinition : ScriptableObject
 
     [Header("Costs")]
     public double BaseLevelCost = 10.0;
-    public double AutomationCost = 50.0;
+    public double AutomationCost = 123.0;
 
     [Header("Growth Values")]
     public double LevelCostGrowth = 1.15;

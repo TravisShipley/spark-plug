@@ -22,7 +22,7 @@ public class GeneratorView : MonoBehaviour
     private GameObject ownedContainer;
 
     [SerializeField]
-    private GameObject progressBar; // reserved for future use (show/hide, styling)
+    private GameObject progressBar;
 
     [Header("Buttons")]
     [SerializeField]
@@ -33,9 +33,6 @@ public class GeneratorView : MonoBehaviour
 
     [SerializeField]
     private ReactiveButtonView collectButtonView;
-
-    [SerializeField]
-    private ReactiveButtonView automateButtonView;
 
     [SerializeField]
     private Image progressFill;
@@ -142,120 +139,89 @@ public class GeneratorView : MonoBehaviour
             })
             .AddTo(disposables);
 
-        if (buildButtonView != null)
-        {
-            var label = nextLevelCost.Select(cost => $"Build\n${cost:0.00}");
+            if (buildButtonView != null)
+            {
+                var label = nextLevelCost.Select(cost => $"Build\n${cost:0.00}");
 
-            buildButtonView.Bind(
-                labelText: label,
-                interactable: canAffordLevel,
-                visible: isOwned.Select(x => !x),
-                onClick: () =>
-                {
-                    if (generatorService.TryBuyLevel())
+                buildButtonView.Bind(
+                    labelText: label,
+                    interactable: canAffordLevel,
+                    visible: isOwned.Select(x => !x),
+                    onClick: () =>
                     {
+                        if (generatorService.TryBuyLevel())
+                        {
+                            generatorService.StartRun();
+                        }
+                    }
+                );
+            }
+
+            if (levelUpButtonView != null)
+            {
+                var label = nextLevelCost.Select(cost => $"Level Up\n${cost:0.00}");
+
+                levelUpButtonView.Bind(
+                    labelText: label,
+                    interactable: canAffordLevel,
+                    visible: isOwned,
+                    onClick: () => generatorService.TryBuyLevel()
+                );
+            }
+
+            if (collectButtonView != null)
+            {
+                var label = Observable.Return("Collect");
+
+                // Interactable: only when not currently running (i.e., ready for player to start the next cycle)
+                var canCollect = generatorService
+                    .IsRunning.Select(running => !running)
+                    .DistinctUntilChanged();
+
+                // Visible: only show once owned, and only when NOT automated
+                var visible = Observable
+                    .CombineLatest(
+                        vm.IsOwned.DistinctUntilChanged(),
+                        vm.IsAutomated.DistinctUntilChanged(),
+                        (owned, automated) => owned && !automated
+                    )
+                    .DistinctUntilChanged();
+
+                collectButtonView.Bind(
+                    labelText: label,
+                    interactable: canCollect,
+                    visible: visible,
+                    onClick: () =>
+                    {
+                        // Player-initiated collection: collect now, then immediately start the next cycle.
+                        generatorService.Collect();
                         generatorService.StartRun();
                     }
-                }
-            );
-        }
+                );
+            }
 
-        if (levelUpButtonView != null)
-        {
-            var label = nextLevelCost.Select(cost => $"Level Up\n${cost:0.00}");
-
-            levelUpButtonView.Bind(
-                labelText: label,
-                interactable: canAffordLevel,
-                visible: isOwned,
-                onClick: () => generatorService.TryBuyLevel()
-            );
-        }
-
-        if (collectButtonView != null)
-        {
-            var label = Observable.Return("Collect");
-
-            // Interactable: only when not currently running (i.e., ready for player to start the next cycle)
-            var canCollect = generatorService
-                .IsRunning.Select(running => !running)
-                .DistinctUntilChanged();
-
-            // Visible: only show once owned, and only when NOT automated
-            var visible = Observable
-                .CombineLatest(
-                    vm.IsOwned.DistinctUntilChanged(),
-                    vm.IsAutomated.DistinctUntilChanged(),
-                    (owned, automated) => owned && !automated
-                )
-                .DistinctUntilChanged();
-
-            collectButtonView.Bind(
-                labelText: label,
-                interactable: canCollect,
-                visible: visible,
-                onClick: () =>
+            // Visual sync on cycle completion:
+            // - Manual mode: animate to full and wait for Collect
+            // - Automated mode: immediately restart from 0
+            generatorService
+                .CycleCompleted.Subscribe(_ =>
                 {
-                    // Player-initiated collection: collect now, then immediately start the next cycle.
-                    generatorService.Collect();
-                    generatorService.StartRun();
-                }
-            );
+                    if (viewModel.IsAutomated.Value)
+                    {
+                        progressState = ProgressState.Animating;
+                        cycleStartTime = Time.time;
+                        lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+
+                        progressFill.fillAmount = 0f;
+                    }
+                    else
+                    {
+                        // Manual: collect happened; next StartRun will restart animation.
+                        progressState = ProgressState.Idle;
+                    }
+                })
+                .AddTo(disposables);
         }
-
-        if (automateButtonView != null)
-        {
-            // Automation cost is owned by the service/definition (per-generator)
-            double automationCost = generatorService.AutomationCost;
-
-            // Label (constant for now; if you ever make automation cost dynamic, turn this into a reactive stream)
-            var label = Observable.Return($"Automate\n${automationCost:0.00}");
-
-            // Interactable: can afford automation
-            var canAfford = walletViewModel
-                .CashBalance.DistinctUntilChanged()
-                .Select(cash => cash >= automationCost)
-                .DistinctUntilChanged();
-
-            // Visible: only show if owned and not already automated
-            var visible = Observable
-                .CombineLatest(
-                    vm.IsOwned.DistinctUntilChanged(),
-                    vm.IsAutomated.DistinctUntilChanged(),
-                    (owned, automated) => owned && !automated
-                )
-                .DistinctUntilChanged();
-
-            automateButtonView.Bind(
-                labelText: label,
-                interactable: canAfford,
-                visible: visible,
-                onClick: () => generatorService.TryBuyAutomation()
-            );
-        }
-
-        // Visual sync on cycle completion:
-        // - Manual mode: animate to full and wait for Collect
-        // - Automated mode: immediately restart from 0
-        generatorService
-            .CycleCompleted.Subscribe(_ =>
-            {
-                if (viewModel.IsAutomated.Value)
-                {
-                    progressState = ProgressState.Animating;
-                    cycleStartTime = Time.time;
-                    lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
-
-                    progressFill.fillAmount = 0f;
-                }
-                else
-                {
-                    // Manual: collect happened; next StartRun will restart animation.
-                    progressState = ProgressState.Idle;
-                }
-            })
-            .AddTo(disposables);
-    }
 
     public void Initialize(GeneratorViewModel vm)
     {
@@ -266,13 +232,8 @@ public class GeneratorView : MonoBehaviour
         vm.Level.Subscribe(level => levelText.text = $"Lv {level}").AddTo(disposables);
 
         // Output: react to BOTH output and duration changes
-        Observable
-            .CombineLatest(
-                vm.OutputPerCycle.DistinctUntilChanged(),
-                generatorService.CycleDurationSeconds.DistinctUntilChanged(),
-                (output, duration) => $"{Format.Currency(output)} / {duration:0.00}s"
-            )
-            .Subscribe(text => outputText.text = text)
+        vm.OutputPerCycle.DistinctUntilChanged()
+            .Subscribe(output => outputText.text = $"{Format.Currency(output)}")
             .AddTo(disposables);
 
         vm.IsOwned.DistinctUntilChanged()
@@ -280,6 +241,8 @@ public class GeneratorView : MonoBehaviour
             {
                 if (ownedContainer != null)
                     ownedContainer.SetActive(owned);
+                if (progressBar != null)
+                    progressBar.SetActive(owned);
             })
             .AddTo(disposables);
     }

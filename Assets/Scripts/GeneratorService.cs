@@ -223,6 +223,19 @@ public class GeneratorService : IDisposable
         return true;
     }
 
+    public void EnableAutomationFromUpgrade()
+    {
+        if (model.IsAutomated)
+            return;
+
+        model.IsAutomated = true;
+        isAutomated.Value = true;
+
+        // Automation implies continuous running.
+        if (isOwned.Value)
+            isRunning.Value = true;
+    }
+
     public bool TryBuyLevel()
     {
         double cost = NextLevelCost;
@@ -276,6 +289,10 @@ public class GeneratorService : IDisposable
                 Debug.Log(
                     $"[GeneratorService] {definition.Id} speed x{upgrade.value:0.##} → {newSeconds:0.###}s/cycle (mult={speedMultiplier.Value:0.###})"
                 );
+                break;
+
+            case UpgradeEffectType.AutomationPolicy:
+                EnableAutomationFromUpgrade();
                 break;
         }
     }
