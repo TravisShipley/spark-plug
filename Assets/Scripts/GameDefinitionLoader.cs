@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -23,6 +24,21 @@ public static class GameDefinitionLoader
             if (gd == null)
                 throw new InvalidOperationException("Failed to deserialize game definition JSON.");
 
+            // Fail loud on missing required roots.
+            if (gd.nodes == null || gd.nodes.Count == 0)
+                throw new InvalidOperationException("GameDefinition: 'nodes' is missing or empty.");
+
+            if (gd.nodeInstances == null || gd.nodeInstances.Count == 0)
+                throw new InvalidOperationException("GameDefinition: 'nodeInstances' is missing or empty.");
+
+            // Optional roots (may be empty, but should not be null if present in schema).
+            if (gd.upgrades == null)
+                gd.upgrades = new List<UpgradeEntry>();
+
+            if (gd.modifiers == null)
+                gd.modifiers = new List<ModifierEntry>();
+
+            GameDefinitionValidator.Validate(gd);
             return gd;
         }
         catch (Exception ex)
