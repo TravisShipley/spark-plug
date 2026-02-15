@@ -7,110 +7,74 @@ status: active
 
 # Spark Plug – Data Authority
 
-This document defines **where each type of data lives** and who is allowed to modify it.
-
-Clear authority boundaries prevent corruption, duplication, and hidden state.
-
----
+This document defines where each type of data lives and who can mutate it.
 
 ## 1. Content Data
 
-| Data                                 | Authority                     | Location    | Mutated By              |
-| ------------------------------------ | ----------------------------- | ----------- | ----------------------- |
-| Game content (nodes, upgrades, etc.) | Google Sheets                 | External    | Designers / Sheet edits |
-| Imported pack                        | JSON (`game_definition.json`) | Assets/Data | Importer only           |
+| Data | Authority | Location | Mutated By |
+| --- | --- | --- | --- |
+| Game content (nodes, upgrades, etc.) | Google Sheets | External | Designers |
+| Imported pack | JSON (`game_definition.json`) | `Assets/Data` | Importer only |
 
 Rules:
 
-- JSON is a build artifact
-- Never edit JSON manually
-- Reimport from Sheets to change content
+- Treat imported content as read-only at runtime.
+- Change content through sheets + importer, never manual JSON edits.
 
----
+## 2. Player Facts
 
-## 2. Player State
-
-| Data               | Authority   | Location | Mutated By               |
-| ------------------ | ----------- | -------- | ------------------------ |
-| Wallet balances    | SaveService | GameData | Services via SaveService |
-| Generator state    | SaveService | GameData | Services via SaveService |
-| Purchased upgrades | SaveService | GameData | UpgradeService           |
+| Data | Authority | Location | Mutated By |
+| --- | --- | --- | --- |
+| Wallet balances | `SaveService` | `GameData` | Domain services via `SaveService` |
+| Generator state | `SaveService` | `GameData` | Domain services via `SaveService` |
+| Purchased upgrades | `SaveService` | `GameData` | `UpgradeService` via `SaveService` |
 
 Rules:
 
-- Only `SaveService` writes to disk
-- Services must call SaveService methods
-- No other class accesses `SaveSystem`
+- Only `SaveService` writes to disk.
+- Only facts are persisted.
 
----
-
-## 3. Derived Values
+## 3. Derived Runtime State
 
 Examples:
 
 - Effective cycle duration
 - Output multipliers
-- Global bonuses
+- Transient run/progress state
 
-Authority: **Services**
+Authority: domain services.
 
 Rules:
 
-- Computed at runtime
-- Not saved
-- Recomputed on load
+- Derived at runtime
+- Not persisted as facts
+- Reconstructed on load
 
----
-
-## 4. UI State
+## 4. UI Presentation State
 
 Examples:
 
-- Progress animation
-- Button visibility
-- Visual timers
+- Progress animation smoothing
+- Button visibility transitions
+- Local visual timers
 
-Authority: **Views**
+Authority: views.
 
 Rules:
 
-- Never affects simulation
-- Never saved
-- Must be reconstructible from Service state
+- Never authoritative for simulation
+- Never persisted
 
----
+## 5. Reset Authority
 
-## 5. Reset Behavior
+Reset behavior:
 
-Reset is achieved by:
+1. Clear persisted facts
+2. Rebuild runtime graph from content + defaults
+3. Resume simulation from reconstructed state
 
-1. Clearing SaveService data
-2. Reloading the scene
-3. Reinitializing services from content + defaults
+Related docs:
 
----
-
-## 6. Import Pipeline Authority
-
-Flow:
-
-```
-Google Sheets
-    ↓
-Importer (Editor)
-    ↓
-game_definition.json
-    ↓
-PackLoaderService (runtime)
-```
-
-Runtime must treat content as **read-only**.
-
----
-
-## 7. Principles
-
-- Single source of truth for every piece of data
-- Save facts, not derived values
-- Runtime state must be reconstructible
-- Fail loud if data is missing or invalid
+- `../Architecture/ArchitectureRules.md` (constraints)
+- `../Architecture/SystemMap.md` (runtime flow)
+- `ContentImportWorkflow.md` (import process)

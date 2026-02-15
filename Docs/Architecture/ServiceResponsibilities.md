@@ -7,269 +7,62 @@ status: active
 
 # Spark Plug – Service Responsibilities
 
-This document defines **which Service owns which domain behavior**.
+This document maps domain ownership to services.
+For constraints and forbidden patterns, use `ArchitectureRules.md`.
 
-The goal is to prevent responsibility drift and ensure that authoritative logic remains centralized and predictable.
+## Ownership Summary
 
-If a feature does not clearly belong to a Service listed here, a new Service should likely be introduced.
+| Service | Owns | Writes Facts To |
+| --- | --- | --- |
+| `WalletService` | Currency balances, spend/earn validation | `SaveService` |
+| `GeneratorService` | Generator state, cycle timing, output calculation | `SaveService` |
+| `UpgradeService` | Purchase state/rank and effect application | `SaveService` |
+| `SaveService` | In-memory `GameData`, disk persistence scheduling | Disk (`SaveSystem`) |
+| `TickService` | Shared simulation time stream | n/a |
+| `ModalService` | Modal orchestration boundary for UI | n/a |
+| `PackLoaderService` | Runtime content loading + validation | n/a |
 
----
+## Detailed Boundaries
 
-## Principles
+### WalletService
 
-- Services own **domain state and rules**
-- Services are the **only source of authoritative values**
-- Services never reference UI
-- Services mutate persistence **only through SaveService**
-- Services should not depend directly on other Services unless explicitly composed
+- Owns balances and spend/earn rules.
+- Does not know generator simulation or UI rendering.
 
----
+### GeneratorService
 
-## WalletService
+- Owns ownership/level/automation/running state and cycle progression.
+- Exposes authoritative timing/output values.
+- Does not format UI strings or animation behavior.
 
-**Authority:** Player currency balances
+### UpgradeService
 
-### Owns
+- Owns purchased state and rank progression.
+- Validates purchase conditions and applies upgrade effects.
+- Does not own UI presentation.
 
-- Current balances for all resources
-- Spending validation
-- Earning logic
+### SaveService
 
-### Public Responsibilities
+- Owns persistence boundary and disk write scheduling.
+- Only service allowed to touch `SaveSystem`.
 
-- `TrySpend(resource, amount)`
-- `Earn(resource, amount)`
-- Expose reactive balances
+### TickService
 
-### Does NOT
+- Provides a central tick source.
+- Contains no game economy or progression rules.
 
-- Know about generators or upgrades
-- Apply multipliers (handled by UpgradeService / GeneratorService)
-- Access disk directly
+### ModalService
 
-Persistence: Writes via `SaveService`
+- UI boundary for opening/closing modals.
+- Contains no domain simulation logic.
 
----
+### PackLoaderService
 
-## GeneratorService
+- Loads and validates content data.
+- Treats content as read-only runtime input.
 
-**Authority:** Generator simulation
+Related docs:
 
-### Owns
-
-- Ownership state
-- Level
-- Automation state
-- Running state
-- Cycle timing
-- Output calculation
-
-### Authoritative Values
-
-- `CycleDurationSeconds`
-- `OutputPerCycle`
-- `IsRunning`
-- `IsReadyForCollect`
-- `IsAutomated`
-- `IsOwned`
-
-### Responsibilities
-
-- Start/stop cycles
-- Handle manual collection
-- Handle automated collection
-- Apply level-based scaling
-- Apply upgrade multipliers (provided externally)
-
-### Does NOT
-
-- Format values for UI
-- Animate progress bars
-- Decide UI visibility
-
-Persistence: Writes state via `SaveService`
-
----
-
-## UpgradeService
-
-**Authority:** Purchased upgrades and their effects
-
-### Owns
-
-- Purchased upgrade state
-- Upgrade rank (for repeatables)
-- Application of upgrade effects
-
-### Responsibilities
-
-- Validate purchase conditions
-- Deduct cost via `WalletService`
-- Apply effects to target Services
-- Expose reactive purchase state
-
-### Effect Targets
-
-- Generator speed multipliers
-- Generator output multipliers
-- Global economy modifiers
-
-### Does NOT
-
-- Store derived values permanently
-- Modify UI directly
-
-Persistence: Writes purchases via `SaveService`
-
----
-
-## SaveService
-
-**Authority:** Player persistence
-
-### Owns
-
-- In-memory `GameData`
-- Disk read/write
-- Save scheduling and debouncing
-
-### Responsibilities
-
-- Load save state
-- Provide mutation methods for Services
-- Persist changes to disk
-- Reset to default state
-
-### Rules
-
-- Only SaveService may access `SaveSystem`
-- Save **facts only**
-- Never store derived or computed values
-
----
-
-## TickService
-
-**Authority:** Time progression
-
-### Owns
-
-- Central update stream
-- Delta time distribution
-
-### Responsibilities
-
-- Provide a consistent time source for simulation
-- Drive generator progression
-
-### Does NOT
-
-- Contain gameplay logic
-
----
-
-## ModalService
-
-**Authority:** UI modal orchestration (UI boundary)
-
-### Responsibilities
-
-- Open/close modal windows
-- Provide a stable interface for ViewModels (`UiCommand` targets)
-
-### Does NOT
-
-- Contain game logic
-- Reference domain Services
-
----
-
-## PackLoaderService
-
-**Authority:** Runtime content data
-
-### Responsibilities
-
-- Load imported JSON pack
-- Validate content integrity
-- Provide read-only access to content definitions
-
-### Rules
-
-- Content is immutable at runtime
-
----
-
-## Composition Roots
-
-**GameCompositionRoot**
-
-Responsibilities:
-
-- Construct all Services
-- Load save state
-- Apply content definitions
-- Create ViewModels
-- Bind Views
-
-**UiCompositionRoot**
-
-Responsibilities:
-
-- Bind scene-level UI
-- Provide UI contexts and registries
-
----
-
-## Responsibility Boundaries
-
-### If a value affects simulation → Service
-
-Examples:
-
-- Cycle duration
-- Output amount
-- Upgrade multiplier
-
-### If a value affects only presentation → View
-
-Examples:
-
-- Progress bar animation
-- Button transitions
-- Visual timers
-
-### If a value adapts domain state for UI → ViewModel
-
-Examples:
-
-- Formatted strings
-- Visibility flags
-- `UiCommand`
-
----
-
-## Common Mistakes
-
-❌ Calculating cycle duration in ViewModel  
-❌ Applying upgrade multipliers in View  
-❌ Saving derived values  
-❌ Letting multiple Services write to disk  
-❌ Moving logic into UI for convenience
-
----
-
-## When to Create a New Service
-
-Create a new Service if:
-
-- State must be authoritative
-- Multiple systems depend on the behavior
-- The logic is not purely presentation
-- The logic must be persisted or restored
-
-Examples:
-
-- PrestigeService
-- BuffService
-- EconomyService
+- `SystemMap.md` (runtime flow)
+- `SimulationModel.md` (generator lifecycle/timing details)
+- `../Process/DataAuthority.md` (fact ownership + storage)

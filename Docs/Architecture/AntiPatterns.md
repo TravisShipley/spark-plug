@@ -7,109 +7,40 @@ status: active
 
 # Spark Plug – Architectural Anti-Patterns
 
-These patterns are explicitly **forbidden** because they lead to hidden state, tight coupling, or long-term instability.
+This page is a quick "do not do this" checklist.
+Canonical rules live in `ArchitectureRules.md`.
 
----
-
-## 1. Logic in Views
-
-Forbidden:
+## 1. UI Owns Gameplay State
 
 - Gameplay logic in `MonoBehaviour`
-- State mutation from UI
-- Services accessed directly from Views
+- Views mutating domain state directly
+- ViewModels computing authoritative simulation values
 
-Views should only:
+## 2. Runtime Dependency Discovery
 
-- Bind
-- Display
-- Forward user intent
+- `FindObjectOfType`, `FindAnyObjectByType`, `GameObject.Find`
+- Tag-based dependency lookups
 
----
+## 3. Multiple Persistence Paths
 
-## 2. Authoritative Logic in ViewModels
+- Any class calling `SaveSystem` except `SaveService`
+- Saving derived values as facts
+- Writing to disk from multiple subsystems
 
-ViewModels must not:
+## 4. Hidden or Implicit State
 
-- Compute game rules
-- Store independent state
-- Derive values that should come from Services
+- Static singletons as hidden authority
+- Globals that bypass composition roots
+- State ownership without a named authority
 
-If a value affects simulation, it belongs in a Service.
-
----
-
-## 3. Scene Searching
-
-Forbidden:
-
-- `FindObjectOfType`
-- `FindAnyObjectByType`
-- Tag-based lookups
-
-All dependencies must be injected via CompositionRoots.
-
----
-
-## 4. Service-to-Service Coupling
-
-Services should not directly depend on other Services unless explicitly composed.
-
-If coordination is needed:
-
-- Use CompositionRoot
-- Or create a dedicated orchestration service
-
----
-
-## 5. Multiple Persistence Paths
-
-Forbidden:
-
-- Calling `SaveSystem` outside `SaveService`
-- Writing to disk from multiple locations
-- Saving derived values
-
----
-
-## 6. Silent Fallbacks
-
-Forbidden:
+## 5. Silent Data Failure
 
 - Ignoring missing references
-- Defaulting silently when data is invalid
+- Defaulting invalid content silently
+- Continuing execution after critical validation failures
 
-Always log or throw clear errors.
+Related docs:
 
----
-
-## 7. One-Off UI Classes
-
-Avoid:
-
-- Custom class per button
-- Duplicated binding logic
-
-Prefer reusable binders and `UiCommand`.
-
----
-
-## 8. Magic Numbers
-
-Replace:
-
-```
-progress >= 0.9999f
-```
-
-With named constants expressing intent.
-
----
-
-## 9. Hidden State
-
-Avoid:
-
-- Static singletons
-- Implicit globals
-- State stored outside Services without clear authority
+- `ArchitectureRules.md` (authoritative constraints)
+- `ServiceResponsibilities.md` (ownership map)
+- `SimulationModel.md` (generator timing behavior)
