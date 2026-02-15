@@ -1,3 +1,10 @@
+---
+document_role: design
+audience: ai, developers
+scope: architecture
+status: active
+---
+
 # Spark Plug – Service Responsibilities
 
 This document defines **which Service owns which domain behavior**.

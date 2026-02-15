@@ -1,3 +1,10 @@
+---
+document_role: design
+audience: ai, developers
+scope: architecture
+status: draft
+---
+
 # Spark Plug – Display Data Pipeline (Future Architecture)
 
 **Status:** Planned / Not yet implemented  

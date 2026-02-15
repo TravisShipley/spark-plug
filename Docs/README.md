@@ -1,7 +1,19 @@
-## AI Read Order
+---
+document_role: process
+audience: ai, developers
+scope: docs
+status: active
+---
 
-1. DOCS_GUIDELINES.md
-2. Policies/AI_SCOPE_BOUNDARIES.md
-3. Architecture/SystemMap.md
-4. Architecture/Overview.md
-5. Data/MinimalRuntimeSchema.md
+# Docs Read Order
+
+1. `DOCS_GUIDELINES.md`
+2. `Policies/AI/AI_README.md`
+3. `Architecture/Overview.md`
+4. `Architecture/SystemMap.md`
+5. `Data/MinimalRuntimeSchema.md`
+
+## Notes
+
+- Policy documents are authoritative when they conflict with design/reference/process docs.
+- Keep docs in their intended role to avoid duplication.

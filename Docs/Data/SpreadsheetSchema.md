@@ -1,3 +1,10 @@
+---
+document_role: reference
+audience: ai, developers
+scope: data
+status: active
+---
+
 # Spark Plug – Google Sheets Schema (v0.2)
 
 This document describes the structure of the Spark Plug content spreadsheet used to define game data.

@@ -1,3 +1,10 @@
+---
+document_role: reference
+audience: ai, developers
+scope: data
+status: active
+---
+
 # Spark Plug – Minimal Runtime Schema
 
 This is the smallest set of tables required to run a basic idle game.

@@ -1,3 +1,10 @@
+---
+document_role: policy
+audience: ai, developers
+scope: architecture
+status: active
+---
+
 # Spark Plug – Architecture & Naming Conventions
 
 ## 1. High-level architecture

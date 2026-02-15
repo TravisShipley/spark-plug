@@ -1,3 +1,10 @@
+---
+document_role: reference
+audience: ai, developers
+scope: data
+status: active
+---
+
 # Spark Plug – \_\_Enums Reference
 
 The `__Enums` sheet defines controlled string values used across the content spreadsheet.

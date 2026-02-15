@@ -1,3 +1,10 @@
+---
+document_role: design
+audience: ai, developers
+scope: architecture
+status: active
+---
+
 # Spark Plug – Simulation Model
 
 This document defines the **authoritative runtime behavior** of generators and the core simulation loop.

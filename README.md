@@ -7,4 +7,5 @@ Documentation:
 - Docs/Architecture
 - Docs/Data
 - Docs/Content
+- Docs/Policies
 - Docs/Process

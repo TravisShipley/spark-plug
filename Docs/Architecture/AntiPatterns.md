@@ -1,3 +1,10 @@
+---
+document_role: policy
+audience: ai, developers
+scope: architecture
+status: active
+---
+
 # Spark Plug – Architectural Anti-Patterns
 
 These patterns are explicitly **forbidden** because they lead to hidden state, tight coupling, or long-term instability.

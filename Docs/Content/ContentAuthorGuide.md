@@ -1,3 +1,10 @@
+---
+document_role: process
+audience: ai, developers
+scope: content
+status: active
+---
+
 # Spark Plug – Content Author Guide
 
 This guide explains how to safely edit the Spark Plug Google Sheets.

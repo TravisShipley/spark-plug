@@ -1,3 +1,10 @@
+---
+document_role: policy
+audience: ai, developers
+scope: repository
+status: active
+---
+
 # Spark Plug – Data Authority
 
 This document defines **where each type of data lives** and who is allowed to modify it.

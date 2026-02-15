@@ -1,25 +1,26 @@
-# Spark Plug – Schema Dependency Map
-
-This document shows relationships between spreadsheet tables.
-
-Understanding dependencies helps prevent broken references and helps maintain a correct import order.
-
 ---
+document_role: reference
+audience: ai, developers
+scope: data
+status: active
+---
+
+# Schema Dependency Map
+
+This document lists table-to-table relationships in the spreadsheet schema.
 
 ## Core Structure
 
-```
+```text
 PackMeta
 ├─ Resources
 ├─ Phases
 └─ Zones
 ```
 
----
-
 ## Production Graph
 
-```
+```text
 Nodes
 ├─ NodeOutputs
 ├─ NodeInputs
@@ -31,14 +32,12 @@ Nodes
 └─ NodeRequirements
 
 NodeInstances
-└─ (references Nodes)
+└─ references Nodes
 ```
-
----
 
 ## Economy Layer
 
-```
+```text
 Modifiers
    ▲
    │
@@ -49,71 +48,36 @@ Projects
 Prestige
 ```
 
-Modifiers are the central effect system.  
-Most progression systems grant or enable modifiers.
-
----
-
 ## Progression Layer
 
-```
+```text
 UnlockGraph
 ├─ NodeInstances
 ├─ Upgrades
 └─ Projects
 ```
 
----
+## Resource Flow
 
-## Resource Flow (optional)
-
-```
+```text
 Links
 ├─ from: NodeInstance
-├─ to:   NodeInstance
+├─ to: NodeInstance
 └─ resource: Resources
 ```
 
----
-
 ## Key Reference Paths
 
-| Table         | References                    |
-| ------------- | ----------------------------- |
-| NodeOutputs   | Nodes, Resources              |
-| NodeInputs    | Nodes, Resources              |
-| NodeInstances | Nodes, Zones                  |
-| Modifiers     | Nodes / Resources (via scope) |
-| Upgrades      | Modifiers                     |
-| Milestones    | Nodes, Modifiers              |
-| Buffs         | Modifiers                     |
-| Projects      | Modifiers                     |
-| Prestige      | Resources                     |
+| Table         | References                  |
+| ------------- | --------------------------- |
+| NodeOutputs   | Nodes, Resources            |
+| NodeInputs    | Nodes, Resources            |
+| NodeInstances | Nodes, Zones                |
+| Modifiers     | Nodes/Resources (via scope) |
+| Upgrades      | Modifiers                   |
+| Milestones    | Nodes, Modifiers            |
+| Buffs         | Modifiers                   |
+| Projects      | Modifiers                   |
+| Prestige      | Resources                   |
 
----
-
-## Recommended Import Order
-
-```
-1. PackMeta
-2. Resources
-3. Phases
-4. Zones
-5. Nodes
-6. NodeOutputs / Inputs / Scaling / Capacities
-7. NodeInstances
-8. Modifiers
-9. Upgrades / Milestones / Buffs / Projects
-10. UnlockGraph
-11. Prestige
-```
-
----
-
-## Dependency Guidelines
-
-- A referenced ID must exist before it is used.
-- Modifiers should be imported before any system that references them.
-- NodeInstances should only reference valid Node types.
-- UnlockGraph should be processed after all unlock targets exist.
-- Unknown references should fail import loudly.
+For operational import steps, see `Docs/Process/ContentImportWorkflow.md`.
