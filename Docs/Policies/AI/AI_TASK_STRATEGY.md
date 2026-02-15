@@ -1,5 +1,6 @@
 ---
 document_role: policy
+topic: ai
 audience: ai, developers
 scope: repository
 status: active

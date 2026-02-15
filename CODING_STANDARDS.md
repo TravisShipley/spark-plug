@@ -1,3 +1,11 @@
+---
+document_role: policy
+topic: architecture
+audience: ai, developers
+scope: repository
+status: active
+---
+
 # Spark Plug – Coding Standards
 
 These rules apply to all runtime and editor code.

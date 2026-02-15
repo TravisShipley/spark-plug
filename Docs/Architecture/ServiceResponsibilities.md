@@ -1,5 +1,6 @@
 ---
 document_role: design
+topic: architecture
 audience: ai, developers
 scope: architecture
 status: active

@@ -1,8 +1,8 @@
 ---
 document_role: policy
+topic: ai
 audience: ai
 scope: repository
-priority: high
 status: active
 ---
 

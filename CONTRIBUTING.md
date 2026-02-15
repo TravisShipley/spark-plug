@@ -1,3 +1,11 @@
+---
+document_role: policy
+topic: workflow
+audience: ai, developers
+scope: repository
+status: active
+---
+
 # Contributing to Spark Plug
 
 This project follows strict architectural and structural rules.  

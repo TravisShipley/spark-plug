@@ -1,5 +1,6 @@
 ---
 document_role: policy
+topic: workflow
 audience: ai, developers
 scope: repository
 status: active

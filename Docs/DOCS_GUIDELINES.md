@@ -1,5 +1,6 @@
 ---
 document_role: policy
+topic: documentation
 audience: ai, developers
 scope: repository
 status: active
@@ -147,15 +148,35 @@ Documentation should not be scattered across feature folders unless it is tightl
 
 Use this guide when creating a new document.
 
-Every document should declare its role in frontmatter:
+Every document should declare standard frontmatter using this template:
 
-```
+```md
 ---
 document_role: policy | design | reference | process
+topic: documentation | ai | architecture | data | content | workflow
+audience: developers | ai | designers | content
+scope: repository | engine | system:<name>
+status: active | draft | deprecated
 ---
+
+# Title
 ```
 
-This decision tree helps you choose the correct role.
+Field notes:
+
+- `document_role` declares the document type and authority semantics.
+- `topic` declares the subject area owned by the document.
+- `audience` declares who the document is primarily for.
+- `scope` declares the boundary of applicability.
+- `status` controls whether the document is authoritative.
+
+This decision tree helps you choose the correct role and metadata values.
+
+### README Exception
+
+`README.md` files are exempt from frontmatter requirements.
+
+Use plain markdown for README files to keep entry points lightweight and portable across tools.
 
 ---
 

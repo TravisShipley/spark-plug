@@ -1,5 +1,6 @@
 ---
 document_role: policy
+topic: architecture
 audience: ai, developers
 scope: architecture
 status: active

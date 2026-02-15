@@ -1,10 +1,3 @@
----
-document_role: policy
-audience: ai, developers
-scope: repository
-status: active
----
-
 # AI Policy Index
 
 This folder defines AI behavior. Each file has a single purpose.

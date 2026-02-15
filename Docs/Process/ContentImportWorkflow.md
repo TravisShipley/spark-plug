@@ -1,5 +1,6 @@
 ---
 document_role: process
+topic: workflow
 audience: ai, developers
 scope: content
 status: active
