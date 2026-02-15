@@ -4,10 +4,6 @@ public class WalletViewModel
 {
     private readonly WalletService walletService;
 
-    // Expose the service properties directly so UI can bind to them
-    public ReactiveProperty<double> CashBalance => walletService.CashBalance;
-    public ReactiveProperty<double> GoldBalance => walletService.GoldBalance;
-
     private CompositeDisposable disposables = new CompositeDisposable();
 
     public WalletViewModel(WalletService walletService)
@@ -18,10 +14,19 @@ public class WalletViewModel
         // The WalletService already handles persistence & event subscriptions.
     }
 
-    // Forwarding method so views/controllers can change balances via the VM
-    public void IncrementBalance(CurrencyType currency, double amount)
+    public IReadOnlyReactiveProperty<double> Balance(string resourceId)
     {
-        walletService.IncrementBalance(currency, amount);
+        return walletService.GetBalanceProperty(resourceId);
+    }
+
+    public double GetBalance(string resourceId)
+    {
+        return walletService.GetBalance(resourceId);
+    }
+
+    public void Add(string resourceId, double amount)
+    {
+        walletService.Add(resourceId, amount);
     }
 
     public void Dispose()

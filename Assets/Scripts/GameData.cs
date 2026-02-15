@@ -4,8 +4,12 @@ using System.Collections.Generic;
 [System.Serializable]
 public class GameData
 {
-    public double CashAmount;
-    public double GoldAmount;
+    [Serializable]
+    public class ResourceBalanceData
+    {
+        public string ResourceId;
+        public double Amount;
+    }
 
     public double globalIncomeMultiplier = 1.0;
 
@@ -30,4 +34,5 @@ public class GameData
 
     public List<GeneratorStateData> Generators = new();
     public List<UpgradeStateData> Upgrades = new();
+    public List<ResourceBalanceData> Resources = new();
 }

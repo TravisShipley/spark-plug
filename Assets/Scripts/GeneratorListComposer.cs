@@ -181,17 +181,31 @@ public class GeneratorListComposer
         var payout = output?.basePayout ?? 0.0;
         var perSecond = output?.basePerSecond ?? 0.0;
         definition.BaseOutputPerCycle = payout > 0 ? payout : perSecond * definition.BaseCycleDurationSeconds;
+        definition.OutputResourceId = (output?.resource ?? string.Empty).Trim();
+        definition.LevelCostResourceId = (nodeDef?.leveling?.levelResource ?? string.Empty).Trim();
 
         definition.BaseLevelCost = Math.Max(0.0, nodeDef?.leveling?.priceCurve?.basePrice ?? 0.0);
         definition.LevelCostGrowth = Math.Max(1.0, nodeDef?.leveling?.priceCurve?.growth ?? 1.0);
 
-        definition.AutomationCost = ResolveAutomationCostForNode(nodeDef?.id, definition.AutomationCost);
+        definition.AutomationCost = ResolveAutomationCostForNode(
+            nodeDef?.id,
+            definition.AutomationCost,
+            definition.LevelCostResourceId,
+            out var automationCostResourceId
+        );
+        definition.AutomationCostResourceId = automationCostResourceId;
 
         return definition;
     }
 
-    private double ResolveAutomationCostForNode(string nodeId, double fallback)
+    private double ResolveAutomationCostForNode(
+        string nodeId,
+        double fallback,
+        string fallbackResourceId,
+        out string costResourceId
+    )
     {
+        costResourceId = (fallbackResourceId ?? string.Empty).Trim();
         var normalizedNodeId = (nodeId ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(normalizedNodeId))
             return Math.Max(0.0, fallback);
@@ -231,8 +245,11 @@ public class GeneratorListComposer
                 )
                     continue;
 
-                if (TryGetUpgradeCost(upgrade, out var cost))
+                if (TryGetUpgradeCost(upgrade, out var cost, out var resourceId))
+                {
+                    costResourceId = resourceId;
                     return Math.Max(0.0, cost);
+                }
             }
         }
 
@@ -315,9 +332,10 @@ public class GeneratorListComposer
         return null;
     }
 
-    private static bool TryGetUpgradeCost(UpgradeEntry upgrade, out double cost)
+    private static bool TryGetUpgradeCost(UpgradeEntry upgrade, out double cost, out string resourceId)
     {
         cost = 0.0;
+        resourceId = "currencySoft";
         if (upgrade == null)
             return false;
 
@@ -330,6 +348,7 @@ public class GeneratorListComposer
         if (upgrade.cost == null || upgrade.cost.Length == 0 || upgrade.cost[0] == null)
             return false;
 
+        resourceId = (upgrade.cost[0].resource ?? string.Empty).Trim();
         var amount = (upgrade.cost[0].amount ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(amount))
             return false;

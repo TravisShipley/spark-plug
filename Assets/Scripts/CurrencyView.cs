@@ -1,12 +1,15 @@
 using System;
-using UnityEngine;
 using TMPro;
 using UniRx;
+using UnityEngine;
 
 public class CurrencyView : MonoBehaviour
 {
-    [SerializeField] private CurrencyType currency;
-    [SerializeField] private TextMeshProUGUI value;
+    [SerializeField]
+    private string resourceId = "currencySoft";
+
+    [SerializeField]
+    private TextMeshProUGUI value;
     private WalletViewModel walletViewModel;
 
     public void Initialize(WalletViewModel viewModel)
@@ -25,12 +28,15 @@ public class CurrencyView : MonoBehaviour
             return;
         }
 
-        var source = currency == CurrencyType.Cash
-            ? (IObservable<double>)walletViewModel.CashBalance
-            : walletViewModel.GoldBalance;
+        if (string.IsNullOrWhiteSpace(resourceId))
+        {
+            Debug.LogError("CurrencyView: resourceId is empty.", this);
+            return;
+        }
+
+        var source = (IObservable<double>)walletViewModel.Balance(resourceId);
 
         // Subscribe and update label (ReactiveProperty emits current value on subscribe)
-        source.Subscribe(count => value.text = $"{Format.Currency(count)}")
-            .AddTo(this);
+        source.Subscribe(count => value.text = $"{Format.Currency(count)}").AddTo(this);
     }
 }

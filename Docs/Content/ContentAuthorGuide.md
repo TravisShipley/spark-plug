@@ -49,7 +49,7 @@ If a value is missing:
 Columns ending in `_json` contain structured data.
 
 Example:  
-`[{“resource”:“cash”,“amount”:“100”}]`
+`[{“resource”:currencySoft,“amount”:“100”}]`
 
 ---
 

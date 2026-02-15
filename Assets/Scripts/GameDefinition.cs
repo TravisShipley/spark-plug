@@ -5,10 +5,27 @@ using UnityEngine;
 [Serializable]
 public sealed class GameDefinition
 {
+    public List<ResourceDefinition> resources = new List<ResourceDefinition>();
     public List<NodeDefinition> nodes = new List<NodeDefinition>();
     public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
     public List<ModifierEntry> modifiers = new List<ModifierEntry>();
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
+}
+
+[Serializable]
+public sealed class ResourceDefinition
+{
+    public string id;
+    public string displayName;
+    public string kind;
+    public ResourceFormat format;
+}
+
+[Serializable]
+public sealed class ResourceFormat
+{
+    public string style;
+    public string symbol;
 }
 
 [Serializable]

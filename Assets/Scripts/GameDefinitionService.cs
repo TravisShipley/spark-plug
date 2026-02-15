@@ -7,6 +7,7 @@ public sealed class GameDefinitionService
     public const string DefaultPath = "Assets/Data/game_definition.json";
     private readonly string path;
     private GameDefinition definition;
+    private ResourceCatalog resourceCatalog;
     private NodeCatalog nodeCatalog;
     private NodeInstanceCatalog nodeInstanceCatalog;
     private UpgradeCatalog upgradeCatalog;
@@ -20,12 +21,15 @@ public sealed class GameDefinitionService
     public void Reload()
     {
         definition = GameDefinitionLoader.LoadFromFile(path);
+        resourceCatalog = new ResourceCatalog(definition?.resources);
         nodeCatalog = new NodeCatalog(definition?.nodes);
         nodeInstanceCatalog = new NodeInstanceCatalog(definition?.nodeInstances);
         NormalizeUpgradeLegacyFields();
         upgradeCatalog = new UpgradeCatalog(definition?.upgrades);
     }
 
+    public IReadOnlyList<ResourceDefinition> Resources =>
+        resourceCatalog?.Resources ?? new List<ResourceDefinition>();
     public IReadOnlyList<NodeDefinition> Nodes => nodeCatalog?.Nodes ?? new List<NodeDefinition>();
     public IReadOnlyList<NodeInstanceDefinition> NodeInstances =>
         nodeInstanceCatalog?.NodeInstances ?? new List<NodeInstanceDefinition>();
@@ -69,6 +73,7 @@ public sealed class GameDefinitionService
 
     public NodeCatalog NodeCatalog => nodeCatalog;
     public NodeInstanceCatalog NodeInstanceCatalog => nodeInstanceCatalog;
+    public ResourceCatalog ResourceCatalog => resourceCatalog;
     public UpgradeCatalog UpgradeCatalog => upgradeCatalog;
     public UpgradeCatalog Catalog => upgradeCatalog;
 

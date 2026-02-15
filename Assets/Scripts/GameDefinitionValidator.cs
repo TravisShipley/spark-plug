@@ -20,6 +20,34 @@ public static class GameDefinitionValidator
 
         var errors = new List<string>();
 
+        // ---- Resources
+        var resourceIds = new HashSet<string>(StringComparer.Ordinal);
+        if (gd.resources == null || gd.resources.Count == 0)
+        {
+            errors.Add("resources is empty.");
+        }
+        else
+        {
+            for (int i = 0; i < gd.resources.Count; i++)
+            {
+                var resource = gd.resources[i];
+                if (resource == null)
+                {
+                    errors.Add($"resources[{i}] is null.");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(resource.id))
+                {
+                    errors.Add($"resources[{i}].id is empty.");
+                    continue;
+                }
+
+                if (!resourceIds.Add(resource.id))
+                    errors.Add($"Duplicate resource id '{resource.id}'.");
+            }
+        }
+
         // ---- Nodes
         var nodeIds = new HashSet<string>(StringComparer.Ordinal);
         for (int i = 0; i < gd.nodes.Count; i++)
@@ -39,6 +67,8 @@ public static class GameDefinitionValidator
 
             if (!nodeIds.Add(n.id))
                 errors.Add($"Duplicate node id '{n.id}'.");
+
+            ValidateNodeResourceReferences(n, i, resourceIds, errors);
         }
 
         // ---- NodeInstances -> Nodes
@@ -111,6 +141,7 @@ public static class GameDefinitionValidator
                     errors.Add($"Duplicate upgrade id '{u.id}'.");
 
                 ValidateUpgradeEffectsReferences(u, i, modifierIds, errors);
+                ValidateUpgradeCostResources(u, i, resourceIds, errors);
             }
 
             // Optional reference check: when modifier.source is set, it should point to an existing upgrade id.
@@ -174,6 +205,85 @@ public static class GameDefinitionValidator
                     $"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId '{modifierId}' references missing modifiers.id."
                 );
             }
+        }
+    }
+
+    private static void ValidateNodeResourceReferences(
+        NodeDefinition node,
+        int nodeIndex,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        var levelResource = (node?.leveling?.levelResource ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(levelResource))
+        {
+            errors.Add($"nodes[{nodeIndex}] ('{node?.id}') leveling.levelResource is empty.");
+        }
+        else if (!resourceIds.Contains(levelResource))
+        {
+            errors.Add(
+                $"nodes[{nodeIndex}] ('{node?.id}') leveling.levelResource '{levelResource}' references missing resources.id."
+            );
+        }
+
+        if (node?.outputs == null)
+            return;
+
+        for (int i = 0; i < node.outputs.Count; i++)
+        {
+            var output = node.outputs[i];
+            if (output == null)
+            {
+                errors.Add($"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}] is null.");
+                continue;
+            }
+
+            var outputResource = (output.resource ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(outputResource))
+            {
+                errors.Add($"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}].resource is empty.");
+            }
+            else if (!resourceIds.Contains(outputResource))
+            {
+                errors.Add(
+                    $"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}].resource '{outputResource}' references missing resources.id."
+                );
+            }
+        }
+    }
+
+    private static void ValidateUpgradeCostResources(
+        UpgradeEntry upgrade,
+        int upgradeIndex,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        if (upgrade?.cost == null || upgrade.cost.Length == 0)
+            return;
+
+        for (int i = 0; i < upgrade.cost.Length; i++)
+        {
+            var cost = upgrade.cost[i];
+            if (cost == null)
+            {
+                errors.Add($"upgrades[{upgradeIndex}] ('{upgrade.id}') cost[{i}] is null.");
+                continue;
+            }
+
+            var resourceId = (cost.resource ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(resourceId))
+            {
+                errors.Add($"upgrades[{upgradeIndex}] ('{upgrade.id}') cost[{i}].resource is empty.");
+            }
+            else if (!resourceIds.Contains(resourceId))
+            {
+                errors.Add(
+                    $"upgrades[{upgradeIndex}] ('{upgrade.id}') cost[{i}].resource '{resourceId}' references missing resources.id."
+                );
+            }
+
         }
     }
 

@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -72,7 +74,8 @@ public sealed class UpgradeEntryView : MonoBehaviour
         {
             string effectText = upgrade.effectType switch
             {
-                UpgradeEffectType.OutputMultiplier => $"profits x{Format.Abbreviated(upgrade.value)}",
+                UpgradeEffectType.OutputMultiplier =>
+                    $"profits x{Format.Abbreviated(upgrade.value)}",
                 UpgradeEffectType.SpeedMultiplier => $"speed x{Format.Abbreviated(upgrade.value)}",
                 UpgradeEffectType.AutomationPolicy => "automation enabled",
                 _ => upgrade.effectType.ToString(),
@@ -81,24 +84,48 @@ public sealed class UpgradeEntryView : MonoBehaviour
             infoText.text = $"{generator.DisplayName} {effectText}";
         }
 
-        double cost = upgrade.costSimple;
-        if (cost <= 0 && upgrade.cost != null && upgrade.cost.Length > 0)
+        if (upgrade.cost == null || upgrade.cost.Length == 0 || upgrade.cost[0] == null)
+            throw new InvalidOperationException(
+                $"UpgradeEntryView: Upgrade '{upgrade.id}' is missing cost[0]."
+            );
+
+        string costResourceId = (upgrade.cost[0].resource ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(costResourceId))
         {
-            // Try to parse first cost item's amount as a fallback.
-            if (!double.TryParse(upgrade.cost[0].amount, out cost))
-                cost = 0;
+            throw new InvalidOperationException(
+                $"UpgradeEntryView: Upgrade '{upgrade.id}' has empty cost[0].resource."
+            );
+        }
+
+        if (
+            !double.TryParse(
+                upgrade.cost[0].amount,
+                NumberStyles.Float | NumberStyles.AllowThousands,
+                CultureInfo.InvariantCulture,
+                out var cost
+            )
+        )
+        {
+            throw new InvalidOperationException(
+                $"UpgradeEntryView: Upgrade '{upgrade.id}' has invalid cost[0].amount '{upgrade.cost[0].amount}'."
+            );
         }
 
         if (costText != null)
             costText.text = Format.Currency(cost);
 
         var canAfford = upgradeService
-            .Wallet.CashBalance.DistinctUntilChanged()
-            .Select(cash => cash >= cost)
+            .Wallet.GetBalanceProperty(costResourceId)
+            .DistinctUntilChanged()
+            .Select(balance => balance >= cost)
             .DistinctUntilChanged();
 
         var interactable = Observable
-            .CombineLatest(canAfford, isMaxed, (afford, maxed) => upgrade.enabled && afford && !maxed)
+            .CombineLatest(
+                canAfford,
+                isMaxed,
+                (afford, maxed) => upgrade.enabled && afford && !maxed
+            )
             .DistinctUntilChanged();
 
         var buyVisible = isMaxed.Select(maxed => upgrade.enabled && !maxed).DistinctUntilChanged();

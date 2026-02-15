@@ -3,5 +3,6 @@ using UniRx;
 
 public static class EventSystem
 {
-    public static readonly Subject<(CurrencyType type, double amount)> OnIncrementBalance = new Subject<(CurrencyType, double)>();
+    public static readonly Subject<(string resourceId, double amount)> OnIncrementBalance =
+        new Subject<(string resourceId, double amount)>();
 }

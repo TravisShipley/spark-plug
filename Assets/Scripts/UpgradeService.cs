@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UniRx;
 
 public interface IGeneratorResolver
@@ -64,8 +65,7 @@ public sealed class UpgradeService : IDisposable
     public bool CanAfford(string upgradeId)
     {
         var def = catalog.GetRequired(upgradeId);
-        double cost = GetCost(def);
-        return wallet.CashBalance.Value >= cost;
+        return CanAffordCost(GetRequiredCost(def));
     }
 
     public bool CanPurchase(string upgradeId)
@@ -85,8 +85,7 @@ public sealed class UpgradeService : IDisposable
         if (!generatorResolver.TryGetGenerator(generatorId, out var generator) || generator == null)
             return false;
 
-        double cost = GetCost(def);
-        return wallet.CashBalance.Value >= cost;
+        return CanAffordCost(GetRequiredCost(def));
     }
 
     public bool TryPurchase(string upgradeId)
@@ -107,12 +106,8 @@ public sealed class UpgradeService : IDisposable
         if (!generatorResolver.TryGetGenerator(generatorId, out var generator) || generator == null)
             return false;
 
-        double cost = GetCost(def);
-        if (wallet.CashBalance.Value < cost)
+        if (!wallet.TrySpend(GetRequiredCost(def)))
             return false;
-
-        // Spend
-        wallet.IncrementBalance(CurrencyType.Cash, -cost);
 
         // Apply effect once (repeatable purchases are simply multiple applications)
         generator.ApplyUpgrade(def);
@@ -190,22 +185,44 @@ public sealed class UpgradeService : IDisposable
         }
     }
 
-    private static double GetCost(UpgradeEntry def)
+    private bool CanAffordCost(CostItem[] cost)
     {
-        if (def == null)
-            return 0;
-        // Prefer explicit simple cost
-        if (def.costSimple > 0)
-            return def.costSimple;
+        if (cost == null || cost.Length == 0)
+            return true;
 
-        // Fallback: try parse first cost item
-        if (def.cost != null && def.cost.Length > 0)
+        for (int i = 0; i < cost.Length; i++)
         {
-            if (double.TryParse(def.cost[0].amount, out var v))
-                return v;
+            var item = cost[i];
+            if (item == null)
+                return false;
+
+            if (
+                !double.TryParse(
+                    item.amount,
+                    NumberStyles.Float | NumberStyles.AllowThousands,
+                    CultureInfo.InvariantCulture,
+                    out var amount
+                )
+            )
+                return false;
+
+            if (wallet.GetBalance(item.resource) < amount)
+                return false;
         }
 
-        return 0;
+        return true;
+    }
+
+    private static CostItem[] GetRequiredCost(UpgradeEntry def)
+    {
+        if (def?.cost == null || def.cost.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"UpgradeService: Upgrade '{def?.id}' is missing cost entries."
+            );
+        }
+
+        return def.cost;
     }
 
     private static int GetMaxPurchases(UpgradeEntry def)

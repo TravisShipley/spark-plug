@@ -9,6 +9,7 @@ public class GeneratorViewModel : IDisposable
     private readonly CompositeDisposable disposables = new();
 
     public string DisplayName => definition.DisplayName;
+    public string LevelCostResourceId => definition.LevelCostResourceId;
     public IReadOnlyReactiveProperty<int> Level => generatorService.Level;
     public IReadOnlyReactiveProperty<bool> IsOwned => generatorService.IsOwned;
     public IReadOnlyReactiveProperty<bool> IsAutomated => generatorService.IsAutomated;

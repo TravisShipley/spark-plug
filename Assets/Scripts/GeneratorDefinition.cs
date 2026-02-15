@@ -9,10 +9,13 @@ public class GeneratorDefinition : ScriptableObject
     [Header("Production")]
     public double BaseOutputPerCycle = 1.0;
     public double BaseCycleDurationSeconds = 2.0;
+    public string OutputResourceId = "currencySoft";
 
     [Header("Costs")]
     public double BaseLevelCost = 10.0;
+    public string LevelCostResourceId = "currencySoft";
     public double AutomationCost = 123.0;
+    public string AutomationCostResourceId = "currencySoft";
 
     [Header("Growth Values")]
     public double LevelCostGrowth = 1.15;

@@ -118,7 +118,10 @@ public class GameCompositionRoot : MonoBehaviour
                 "GameCompositionRoot: SaveService must be created and loaded before InitializeCoreServices."
             );
 
-        walletService = new WalletService(saveService);
+        // Load content-driven definitions and build catalogs first.
+        gameDefinitionService = new GameDefinitionService();
+
+        walletService = new WalletService(saveService, gameDefinitionService.ResourceCatalog);
         walletViewModel = new WalletViewModel(walletService);
 
         // Time source for simulation
@@ -137,9 +140,6 @@ public class GameCompositionRoot : MonoBehaviour
             modalService = null;
             return;
         }
-
-        // Load content-driven definitions and build an in-memory catalog
-        gameDefinitionService = new GameDefinitionService();
 
         // Construct UpgradeService with the authoritative UpgradeCatalog
         upgradeService = new UpgradeService(

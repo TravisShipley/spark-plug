@@ -32,6 +32,7 @@ public sealed class SaveService : IDisposable
         Data = SaveSystem.LoadGame() ?? new GameData();
         Data.Generators ??= new List<GameData.GeneratorStateData>();
         Data.Upgrades ??= new List<GameData.UpgradeStateData>();
+        Data.Resources ??= new List<GameData.ResourceBalanceData>();
     }
 
     public void RequestSave()
@@ -77,6 +78,7 @@ public sealed class SaveService : IDisposable
         Data = new GameData();
         Data.Generators ??= new List<GameData.GeneratorStateData>();
         Data.Upgrades ??= new List<GameData.UpgradeStateData>();
+        Data.Resources ??= new List<GameData.ResourceBalanceData>();
     }
 
     public void Dispose()

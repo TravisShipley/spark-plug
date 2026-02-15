@@ -1,33 +1,208 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using UniRx;
+using UnityEngine;
 
 public class WalletService : IDisposable
 {
-    public ReactiveProperty<double> CashBalance { get; } = new ReactiveProperty<double>(0);
-    public ReactiveProperty<double> GoldBalance { get; } = new ReactiveProperty<double>(0);
-
     private readonly CompositeDisposable disposables = new();
     private readonly SaveService saveService;
+    private readonly ResourceCatalog resourceCatalog;
+    private readonly Dictionary<string, ReactiveProperty<double>> balancesByResourceId = new(
+        StringComparer.Ordinal
+    );
 
-    public WalletService(SaveService saveService)
+    public WalletService(SaveService saveService, ResourceCatalog resourceCatalog)
     {
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
+        this.resourceCatalog =
+            resourceCatalog ?? throw new ArgumentNullException(nameof(resourceCatalog));
 
-        var data = this.saveService.Data;
-        if (data != null)
-        {
-            CashBalance.Value = data.CashAmount;
-            GoldBalance.Value = data.GoldAmount;
-        }
-
-        Observable
-            .Merge(CashBalance.Skip(1).AsUnitObservable(), GoldBalance.Skip(1).AsUnitObservable())
-            .Subscribe(_ => PersistToSave())
-            .AddTo(disposables);
+        InitializeBalances();
+        LoadFromSave();
+        WirePersistence();
 
         EventSystem
-            .OnIncrementBalance.Subscribe(tuple => IncrementBalance(tuple.type, tuple.amount))
+            .OnIncrementBalance.Subscribe(tuple => Add(tuple.resourceId, tuple.amount))
             .AddTo(disposables);
+    }
+
+    public double GetBalance(string resourceId)
+    {
+        return GetBalanceProperty(resourceId).Value;
+    }
+
+    public IReadOnlyReactiveProperty<double> GetBalanceProperty(string resourceId)
+    {
+        return GetBalancePropertyInternal(resourceId);
+    }
+
+    public void Add(string resourceId, double amount)
+    {
+        if (double.IsNaN(amount) || double.IsInfinity(amount))
+            throw new InvalidOperationException(
+                $"WalletService.Add: Invalid amount '{amount}' for resource '{resourceId}'."
+            );
+
+        if (Math.Abs(amount) < double.Epsilon)
+            return;
+
+        var balance = GetBalancePropertyInternal(resourceId);
+        balance.Value += amount;
+    }
+
+    public bool TrySpend(CostItem[] cost)
+    {
+        if (cost == null || cost.Length == 0)
+            return true;
+
+        for (int i = 0; i < cost.Length; i++)
+        {
+            var item = cost[i];
+            if (item == null)
+                throw new InvalidOperationException(
+                    $"WalletService.TrySpend: Null cost at index {i}."
+                );
+
+            var amount = ParseRequiredAmount(item);
+            if (amount < 0)
+            {
+                throw new InvalidOperationException(
+                    $"WalletService.TrySpend: Negative cost amount '{amount}' for resource '{item.resource}'."
+                );
+            }
+
+            var balance = GetBalance(item.resource);
+            if (balance < amount)
+                return false;
+        }
+
+        for (int i = 0; i < cost.Length; i++)
+        {
+            var item = cost[i];
+            var amount = ParseRequiredAmount(item);
+            if (amount <= 0)
+                continue;
+
+            var balance = GetBalancePropertyInternal(item.resource);
+            balance.Value -= amount;
+        }
+        return true;
+    }
+
+    private ReactiveProperty<double> GetBalancePropertyInternal(string resourceId)
+    {
+        var normalized = NormalizeResourceId(resourceId);
+        if (!balancesByResourceId.TryGetValue(normalized, out var balance) || balance == null)
+        {
+            throw new InvalidOperationException(
+                $"WalletService: Unknown resource '{normalized}'. Validate game content and callers."
+            );
+        }
+
+        return balance;
+    }
+
+    private string NormalizeResourceId(string resourceId)
+    {
+        var normalized = (resourceId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(normalized))
+            throw new InvalidOperationException("WalletService: resourceId cannot be empty.");
+
+        return normalized;
+    }
+
+    private static double ParseRequiredAmount(CostItem item)
+    {
+        if (item == null)
+            throw new InvalidOperationException("WalletService: cost item cannot be null.");
+
+        if (
+            !double.TryParse(
+                item.amount,
+                NumberStyles.Float | NumberStyles.AllowThousands,
+                CultureInfo.InvariantCulture,
+                out var amount
+            )
+        )
+        {
+            throw new InvalidOperationException(
+                $"WalletService: Unable to parse cost amount '{item.amount}' for resource '{item.resource}'."
+            );
+        }
+
+        return amount;
+    }
+
+    private void InitializeBalances()
+    {
+        var resources = resourceCatalog.Resources;
+        if (resources == null || resources.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "WalletService: ResourceCatalog is empty. game_definition.json must define at least one resource."
+            );
+        }
+
+        for (int i = 0; i < resources.Count; i++)
+        {
+            var definition = resources[i];
+            var id = (definition?.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(id))
+            {
+                throw new InvalidOperationException(
+                    $"WalletService: Resource definition at index {i} is missing id."
+                );
+            }
+
+            if (balancesByResourceId.ContainsKey(id))
+            {
+                throw new InvalidOperationException(
+                    $"WalletService: Duplicate resource id '{id}'."
+                );
+            }
+
+            var balance = new ReactiveProperty<double>(0);
+            balancesByResourceId[id] = balance;
+        }
+    }
+
+    private void WirePersistence()
+    {
+        foreach (var kv in balancesByResourceId)
+        {
+            kv.Value?.Skip(1).Subscribe(_ => PersistToSave()).AddTo(disposables);
+        }
+    }
+
+    private void LoadFromSave()
+    {
+        var data = saveService.Data;
+        if (data == null)
+            return;
+
+        data.Resources ??= new List<GameData.ResourceBalanceData>();
+        for (int i = 0; i < data.Resources.Count; i++)
+        {
+            var entry = data.Resources[i];
+            if (entry == null)
+                continue;
+
+            var id = (entry.ResourceId ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(id))
+                continue;
+
+            if (!balancesByResourceId.TryGetValue(id, out var balance) || balance == null)
+            {
+                Debug.LogError(
+                    $"WalletService: Save references unknown resource '{id}'. Check game_definition.json."
+                );
+                continue;
+            }
+
+            balance.Value = entry.Amount;
+        }
     }
 
     private void PersistToSave()
@@ -36,23 +211,29 @@ public class WalletService : IDisposable
         if (data == null)
             return;
 
-        data.CashAmount = CashBalance.Value;
-        data.GoldAmount = GoldBalance.Value;
+        data.Resources ??= new List<GameData.ResourceBalanceData>();
+        data.Resources.Clear();
+
+        foreach (var kv in balancesByResourceId)
+        {
+            data.Resources.Add(
+                new GameData.ResourceBalanceData
+                {
+                    ResourceId = kv.Key,
+                    Amount = kv.Value?.Value ?? 0,
+                }
+            );
+        }
 
         saveService.RequestSave();
     }
 
-    public void IncrementBalance(CurrencyType currency, double amount)
-    {
-        var prop = GetCurrency(currency);
-        prop.Value += amount;
-    }
-
-    private ReactiveProperty<double> GetCurrency(CurrencyType currency) =>
-        currency == CurrencyType.Cash ? CashBalance : GoldBalance;
-
     public void Dispose()
     {
+        foreach (var kv in balancesByResourceId)
+            kv.Value?.Dispose();
+        balancesByResourceId.Clear();
+
         disposables.Dispose();
     }
 }

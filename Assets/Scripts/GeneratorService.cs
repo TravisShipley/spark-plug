@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using UniRx;
 using UnityEngine;
 
@@ -156,7 +157,7 @@ public class GeneratorService : IDisposable
     public void Collect()
     {
         double amount = CalculateOutput();
-        wallet.IncrementBalance(CurrencyType.Cash, amount);
+        wallet.Add(definition.OutputResourceId, amount);
         cycleCompleted.OnNext(Unit.Default);
     }
 
@@ -210,10 +211,8 @@ public class GeneratorService : IDisposable
         if (model.IsAutomated)
             return false;
 
-        if (wallet.CashBalance.Value < AutomationCost)
+        if (!wallet.TrySpend(CreateCost(definition.AutomationCostResourceId, AutomationCost)))
             return false;
-
-        wallet.IncrementBalance(CurrencyType.Cash, -AutomationCost);
         model.IsAutomated = true;
         isAutomated.Value = true;
 
@@ -240,10 +239,8 @@ public class GeneratorService : IDisposable
     {
         double cost = NextLevelCost;
 
-        if (wallet.CashBalance.Value < cost)
+        if (!wallet.TrySpend(CreateCost(definition.LevelCostResourceId, cost)))
             return false;
-
-        wallet.IncrementBalance(CurrencyType.Cash, -cost);
         model.Level = model.Level + 1;
         level.Value = model.Level;
 
@@ -311,5 +308,17 @@ public class GeneratorService : IDisposable
         cycleDurationSeconds.Dispose();
 
         disposables.Dispose();
+    }
+
+    private static CostItem[] CreateCost(string resourceId, double amount)
+    {
+        return new[]
+        {
+            new CostItem
+            {
+                resource = resourceId,
+                amount = amount.ToString(CultureInfo.InvariantCulture)
+            }
+        };
     }
 }

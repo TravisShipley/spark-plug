@@ -82,9 +82,9 @@ public class GeneratorView : MonoBehaviour
 
         var canAffordLevel = Observable
             .CombineLatest(
-                walletViewModel.CashBalance.DistinctUntilChanged(),
+                walletViewModel.Balance(vm.LevelCostResourceId).DistinctUntilChanged(),
                 nextLevelCost,
-                (cash, cost) => cash >= cost
+                (balance, cost) => balance >= cost
             )
             .DistinctUntilChanged();
 
@@ -141,7 +141,7 @@ public class GeneratorView : MonoBehaviour
 
         if (buildButtonView != null)
         {
-            var label = nextLevelCost.Select(cost => $"Build\n${cost:0.00}");
+            var label = nextLevelCost.Select(cost => $"Build\n{Format.Currency(cost)}");
 
             buildButtonView.Bind(
                 labelText: label,
@@ -159,7 +159,7 @@ public class GeneratorView : MonoBehaviour
 
         if (levelUpButtonView != null)
         {
-            var label = nextLevelCost.Select(cost => $"Level Up\n${cost:0.00}");
+            var label = nextLevelCost.Select(cost => $"Level Up\n{Format.Currency(cost)}");
 
             levelUpButtonView.Bind(
                 labelText: label,
