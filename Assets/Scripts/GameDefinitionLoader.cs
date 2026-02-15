@@ -43,10 +43,20 @@ public static class GameDefinitionLoader
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
-                "Failed to parse game definition JSON: " + ex.Message,
+            var wrapped = new InvalidOperationException(
+                "Failed to parse/validate game definition JSON: " + ex.Message,
                 ex
             );
+
+            Debug.LogError(wrapped.Message);
+
+#if UNITY_EDITOR
+            // Fail loud while iterating on content: stop entering play mode on invalid packs.
+            if (UnityEditor.EditorApplication.isPlaying)
+                UnityEditor.EditorApplication.isPlaying = false;
+#endif
+
+            throw wrapped;
         }
     }
 }

@@ -1,64 +1,308 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using UnityEngine;
 
 public static class GameDefinitionValidator
 {
+    private static readonly string[] SupportedModifierScopeKinds = { "node" };
+    private static readonly string[] SupportedModifierSourceDomains =
+    {
+        "upgrade",
+        "milestone",
+        "project",
+        "buff",
+    };
+
     public static void Validate(GameDefinition gd)
     {
         if (gd == null)
             throw new ArgumentNullException(nameof(gd));
 
+        var errors = new List<string>();
+
         // ---- Nodes
-        var nodeIds = new HashSet<string>();
-        foreach (var n in gd.nodes)
+        var nodeIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < gd.nodes.Count; i++)
         {
+            var n = gd.nodes[i];
+            if (n == null)
+            {
+                errors.Add($"nodes[{i}] is null.");
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(n.id))
-                throw new InvalidOperationException("Node with empty id.");
+            {
+                errors.Add($"nodes[{i}].id is empty.");
+                continue;
+            }
+
             if (!nodeIds.Add(n.id))
-                throw new InvalidOperationException($"Duplicate node id: {n.id}");
+                errors.Add($"Duplicate node id '{n.id}'.");
         }
 
         // ---- NodeInstances -> Nodes
-        var instanceIds = new HashSet<string>();
-        foreach (var i in gd.nodeInstances)
+        var instanceIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < gd.nodeInstances.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(i.id))
-                throw new InvalidOperationException("NodeInstance with empty id.");
-            if (!instanceIds.Add(i.id))
-                throw new InvalidOperationException($"Duplicate nodeInstance id: {i.id}");
+            var instance = gd.nodeInstances[i];
+            if (instance == null)
+            {
+                errors.Add($"nodeInstances[{i}] is null.");
+                continue;
+            }
 
-            if (!nodeIds.Contains(i.nodeId))
-                throw new InvalidOperationException(
-                    $"NodeInstance '{i.id}' references missing node '{i.nodeId}'."
+            if (string.IsNullOrWhiteSpace(instance.id))
+                errors.Add($"nodeInstances[{i}].id is empty.");
+            else if (!instanceIds.Add(instance.id))
+                errors.Add($"Duplicate nodeInstance id '{instance.id}'.");
+
+            if (string.IsNullOrWhiteSpace(instance.nodeId))
+            {
+                errors.Add($"nodeInstances[{i}].nodeId is empty.");
+            }
+            else if (!nodeIds.Contains(instance.nodeId))
+            {
+                var instanceId = string.IsNullOrWhiteSpace(instance.id) ? $"index {i}" : instance.id;
+                errors.Add(
+                    $"nodeInstances[{i}] ('{instanceId}') references missing node '{instance.nodeId}'."
                 );
+            }
         }
 
-        // ---- Modifiers -> Nodes (if scoped)
+        // ---- Modifiers
+        var modifierIds = new HashSet<string>(StringComparer.Ordinal);
         if (gd.modifiers != null)
         {
-            foreach (var m in gd.modifiers)
+            for (int i = 0; i < gd.modifiers.Count; i++)
             {
-                if (!string.IsNullOrEmpty(m.scope?.nodeId) && !nodeIds.Contains(m.scope.nodeId))
+                var m = gd.modifiers[i];
+                if (m == null)
                 {
-                    throw new InvalidOperationException(
-                        $"Modifier '{m.id}' references missing node '{m.scope.nodeId}'."
-                    );
+                    errors.Add($"modifiers[{i}] is null.");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(m.id))
+                    errors.Add($"modifiers[{i}].id is empty.");
+                else if (!modifierIds.Add(m.id))
+                    errors.Add($"Duplicate modifier id '{m.id}'.");
+
+                ValidateModifierVerticalSlice(m, i, nodeIds, errors);
+            }
+        }
+
+        // ---- Upgrades basic integrity + effects references
+        if (gd.upgrades != null)
+        {
+            var upgradeIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < gd.upgrades.Count; i++)
+            {
+                var u = gd.upgrades[i];
+                if (u == null)
+                {
+                    errors.Add($"upgrades[{i}] is null.");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(u.id))
+                    errors.Add($"upgrades[{i}].id is empty.");
+                else if (!upgradeIds.Add(u.id))
+                    errors.Add($"Duplicate upgrade id '{u.id}'.");
+
+                ValidateUpgradeEffectsReferences(u, i, modifierIds, errors);
+            }
+
+            // Optional reference check: when modifier.source is set, it should point to an existing upgrade id.
+            if (gd.modifiers != null)
+            {
+                for (int i = 0; i < gd.modifiers.Count; i++)
+                {
+                    var modifier = gd.modifiers[i];
+                    if (modifier == null)
+                        continue;
+
+                    var source = (modifier.source ?? string.Empty).Trim();
+                    if (!string.IsNullOrEmpty(source))
+                    {
+                        ValidateModifierSource(source, modifier, i, upgradeIds, errors);
+                    }
                 }
             }
         }
 
-        // ---- Upgrades basic integrity
-        if (gd.upgrades != null)
+        if (errors.Count > 0)
         {
-            var upgradeIds = new HashSet<string>();
-            foreach (var u in gd.upgrades)
+            for (int i = 0; i < errors.Count; i++)
+                Debug.LogError($"GameDefinition validation error: {errors[i]}");
+
+            throw new InvalidOperationException(
+                $"GameDefinition validation failed with {errors.Count} error(s). See console for details."
+            );
+        }
+    }
+
+    private static void ValidateUpgradeEffectsReferences(
+        UpgradeEntry upgrade,
+        int upgradeIndex,
+        HashSet<string> modifierIds,
+        List<string> errors
+    )
+    {
+        if (upgrade.effects == null || upgrade.effects.Length == 0)
+            return;
+
+        for (int i = 0; i < upgrade.effects.Length; i++)
+        {
+            var effect = upgrade.effects[i];
+            if (effect == null)
             {
-                if (string.IsNullOrWhiteSpace(u.id))
-                    throw new InvalidOperationException("Upgrade with empty id.");
-                if (!upgradeIds.Add(u.id))
-                    throw new InvalidOperationException($"Duplicate upgrade id: {u.id}");
+                errors.Add($"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}] is null.");
+                continue;
             }
+
+            var modifierId = (effect.modifierId ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(modifierId))
+            {
+                errors.Add($"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId is empty.");
+                continue;
+            }
+
+            if (!modifierIds.Contains(modifierId))
+            {
+                errors.Add(
+                    $"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId '{modifierId}' references missing modifiers.id."
+                );
+            }
+        }
+    }
+
+    private static void ValidateModifierVerticalSlice(
+        ModifierEntry modifier,
+        int modifierIndex,
+        HashSet<string> nodeIds,
+        List<string> errors
+    )
+    {
+        var scopeKind = (modifier.scope?.kind ?? string.Empty).Trim();
+        var scopeNodeId = (modifier.scope?.nodeId ?? string.Empty).Trim();
+        var operation = (modifier.operation ?? string.Empty).Trim();
+        var target = (modifier.target ?? string.Empty).Trim();
+
+        if (string.IsNullOrEmpty(scopeKind))
+        {
+            errors.Add($"modifiers[{modifierIndex}] ('{modifier.id}') scope.kind is empty.");
+        }
+        else if (!ContainsIgnoreCase(SupportedModifierScopeKinds, scopeKind))
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') scope.kind '{scopeKind}' is unsupported for current vertical slice."
+            );
+        }
+
+        if (string.IsNullOrEmpty(scopeNodeId))
+        {
+            errors.Add($"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeId is empty.");
+        }
+        else if (!nodeIds.Contains(scopeNodeId))
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeId '{scopeNodeId}' references missing nodes.id."
+            );
+        }
+
+        if (string.IsNullOrEmpty(target))
+        {
+            errors.Add($"modifiers[{modifierIndex}] ('{modifier.id}') target is empty.");
+            return;
+        }
+
+        if (
+            !target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
+            && !target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') target '{target}' is unsupported for current vertical slice."
+            );
+            return;
+        }
+
+        if (
+            target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
+            || target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            if (!string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') operation '{operation}' is unsupported for target '{target}'. Expected 'multiply'."
+                );
+            }
+
+            return;
+        }
+
+        if (string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.Equals(operation, "set", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') operation '{operation}' is unsupported for target '{target}'. Expected 'set'."
+                );
+            }
+        }
+    }
+
+    private static bool ContainsIgnoreCase(IEnumerable<string> values, string value)
+    {
+        foreach (var v in values)
+        {
+            if (string.Equals(v, value, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void ValidateModifierSource(
+        string source,
+        ModifierEntry modifier,
+        int modifierIndex,
+        HashSet<string> upgradeIds,
+        List<string> errors
+    )
+    {
+        var dot = source.IndexOf('.');
+        if (dot <= 0 || dot == source.Length - 1)
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') source '{source}' is invalid. "
+                    + "Expected a domain-prefixed id like 'upgrade.*', 'milestone.*', 'project.*', or 'buff.*'."
+            );
+            return;
+        }
+
+        var domain = source.Substring(0, dot).Trim();
+        if (!ContainsIgnoreCase(SupportedModifierSourceDomains, domain))
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') source domain '{domain}' is unsupported. "
+                    + "Allowed: upgrade, milestone, project, buff."
+            );
+            return;
+        }
+
+        // For upgrades we can validate exact existence in current content.
+        if (
+            string.Equals(domain, "upgrade", StringComparison.OrdinalIgnoreCase)
+            && !upgradeIds.Contains(source)
+        )
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') source '{source}' does not match any upgrades.id."
+            );
         }
     }
 }
