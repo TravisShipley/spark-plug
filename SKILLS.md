@@ -1,3 +1,11 @@
+---
+document_role: policy
+audience: ai
+scope: repository
+priority: high
+status: active
+---
+
 # Spark Plug – AI Skills Profile
 
 This file defines the **domain expertise and priorities** an AI assistant should apply when working in this repository.
@@ -23,6 +31,19 @@ Core characteristics:
 - Long-term engine reuse across multiple games
 
 The assistant should prioritize **engine-quality solutions**, not one-off game hacks.
+
+## 1.1 Primary Optimization Goals
+
+When proposing solutions, prioritize (in order):
+
+1. Simulation correctness
+2. Architectural clarity
+3. Data-driven extensibility
+4. Runtime performance
+5. Minimal surface area of change
+6. Developer readability
+
+If tradeoffs are required, preserve higher-priority goals.
 
 ---
 
@@ -115,7 +136,7 @@ Google Sheets
     ↓
 Importer (Editor)
     ↓
-pack_v0_2.json
+Content JSON (imported from Google Sheets)
     ↓
 Runtime (read-only)
 ```
@@ -128,6 +149,14 @@ Expectations:
 - Unknown data should produce warnings or errors
 
 The assistant should prefer **data solutions over hardcoded logic**.
+
+Content is authoritative.
+
+The assistant must not:
+
+- Hardcode content values
+- Special-case specific IDs
+- Add gameplay behavior outside data-driven systems
 
 ---
 
@@ -228,3 +257,74 @@ Default to:
 - Keeping UI dumb
 - Keeping data authoritative
 - Asking for clarification rather than introducing architectural changes
+
+---
+
+## 13. Editing Bias
+
+When modifying code:
+
+- Prefer minimal, surgical changes
+- Do not rename types or files unless requested
+- Do not introduce new abstractions unless necessary
+- Preserve existing architecture patterns
+- Avoid broad refactors
+- Avoid changing public interfaces without justification
+
+If a larger change seems required, explain before modifying.
+
+---
+
+## 14. Avoid Introducing
+
+Unless explicitly requested, do not introduce:
+
+- Dependency injection frameworks
+- Third-party libraries
+- ECS/DOTS conversions
+- New architectural layers
+- ScriptableObject-based runtime state
+- Global singletons
+
+---
+
+## 15. Development Phase Awareness
+
+Current focus: vertical slice.
+
+Prefer:
+
+- Implementing minimal working behavior
+- Supporting a small content set
+- Avoiding premature generalization
+- Enabling fast iteration through data
+
+Defer scalability improvements unless requested.
+
+---
+
+## 16. Rename Safety (Unity)
+
+Unity relies on type names, file names, and serialized field names.
+
+Renaming can break:
+
+- Scene references
+- Prefab bindings
+- Serialized data
+- Inspector assignments
+- Script–file relationships
+
+The assistant must:
+
+- **Never rename classes, files, or namespaces unless explicitly requested**
+- **Never rename serialized fields**
+- **Never change public member names without strong justification**
+- Assume renames are **high-risk operations**
+
+If a rename would improve clarity:
+
+- Suggest it first
+- Do not apply it automatically
+
+Prefer additive changes over renaming.
