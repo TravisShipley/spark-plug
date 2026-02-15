@@ -1,4 +1,3 @@
-````
 ---
 document_role: policy
 audience: ai, developers
@@ -6,6 +5,7 @@ scope: repository
 status: active
 ---
 
+````
 # Spark Plug – AI Style Contract
 
 This document defines how AI assistants (Cursor, Codex, ChatGPT, etc.) should generate and modify code in this repository.

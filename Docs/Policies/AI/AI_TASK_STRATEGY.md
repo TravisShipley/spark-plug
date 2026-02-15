@@ -1,4 +1,3 @@
-````
 ---
 document_role: policy
 audience: ai, developers
@@ -6,6 +5,7 @@ scope: repository
 status: active
 ---
 
+````
 # Spark Plug – AI Task Strategy
 
 This document defines how AI assistants should approach implementing work in this repository.
