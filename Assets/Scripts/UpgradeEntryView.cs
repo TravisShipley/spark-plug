@@ -54,10 +54,14 @@ public sealed class UpgradeEntryView : MonoBehaviour
             return;
         }
 
-        var isPurchased = purchasedCount.Select(c => c > 0).DistinctUntilChanged();
+        int maxPurchases = upgrade.repeatable
+            ? (upgrade.maxRank > 0 ? upgrade.maxRank : int.MaxValue)
+            : 1;
+
+        var isMaxed = purchasedCount.Select(c => c >= maxPurchases).DistinctUntilChanged();
 
         if (checkmark != null)
-            checkmark.SetActive(purchasedCount.Value > 0);
+            checkmark.SetActive(purchasedCount.Value >= maxPurchases);
 
         if (nameText != null)
             nameText.text = string.IsNullOrEmpty(upgrade.displayName)
@@ -94,24 +98,23 @@ public sealed class UpgradeEntryView : MonoBehaviour
             .DistinctUntilChanged();
 
         var interactable = Observable
-            .CombineLatest(canAfford, isPurchased, (afford, purchased) => afford && !purchased)
+            .CombineLatest(canAfford, isMaxed, (afford, maxed) => upgrade.enabled && afford && !maxed)
             .DistinctUntilChanged();
 
-        isPurchased
-            .Subscribe(purchased =>
+        var buyVisible = isMaxed.Select(maxed => upgrade.enabled && !maxed).DistinctUntilChanged();
+
+        isMaxed
+            .Subscribe(maxed =>
             {
                 if (checkmark != null)
-                    checkmark.SetActive(purchased);
-
-                if (buyButton != null)
-                    buyButton.gameObject.SetActive(!purchased);
+                    checkmark.SetActive(maxed);
             })
             .AddTo(disposables);
 
         buyButton.Bind(
             labelText: Observable.Return($"Buy\n{Format.Currency(cost)}"),
             interactable: interactable,
-            visible: Observable.Return(true),
+            visible: buyVisible,
             onClick: () => upgradeService.TryPurchase(upgrade.id)
         );
     }

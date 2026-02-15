@@ -17,6 +17,7 @@ public static class SaveSystem
                 data = CreateNewGameData();
 
             data.Generators ??= new List<GameData.GeneratorStateData>();
+            data.Upgrades ??= new List<GameData.UpgradeStateData>();
 
             string json = JsonUtility.ToJson(data, true);
 
@@ -54,6 +55,7 @@ public static class SaveSystem
                     return CreateNewGameData();
 
                 data.Generators ??= new List<GameData.GeneratorStateData>();
+                data.Upgrades ??= new List<GameData.UpgradeStateData>();
 
                 return data;
             }
@@ -100,7 +102,8 @@ public static class SaveSystem
     {
         return new GameData
         {
-            Generators = new List<GameData.GeneratorStateData>()
+            Generators = new List<GameData.GeneratorStateData>(),
+            Upgrades = new List<GameData.UpgradeStateData>()
         };
     }
 }

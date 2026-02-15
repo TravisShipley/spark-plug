@@ -145,6 +145,7 @@ public class GameCompositionRoot : MonoBehaviour
         upgradeService = new UpgradeService(
             gameDefinitionService.Catalog,
             walletService,
+            saveService,
             generatorResolver
         );
 

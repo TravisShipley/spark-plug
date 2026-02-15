@@ -6,7 +6,8 @@ public static class GameDefinitionValidator
 {
     public static void Validate(GameDefinition gd)
     {
-        if (gd == null) throw new ArgumentNullException(nameof(gd));
+        if (gd == null)
+            throw new ArgumentNullException(nameof(gd));
 
         // ---- Nodes
         var nodeIds = new HashSet<string>();
@@ -38,8 +39,7 @@ public static class GameDefinitionValidator
         {
             foreach (var m in gd.modifiers)
             {
-                if (!string.IsNullOrEmpty(m.scope?.nodeId) &&
-                    !nodeIds.Contains(m.scope.nodeId))
+                if (!string.IsNullOrEmpty(m.scope?.nodeId) && !nodeIds.Contains(m.scope.nodeId))
                 {
                     throw new InvalidOperationException(
                         $"Modifier '{m.id}' references missing node '{m.scope.nodeId}'."
