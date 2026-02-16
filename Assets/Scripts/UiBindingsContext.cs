@@ -11,7 +11,8 @@ public readonly struct UiBindingsContext
         UiServiceRegistry uiServices,
         UpgradeService upgradeService,
         WalletService walletService,
-        WalletViewModel walletViewModel)
+        WalletViewModel walletViewModel
+    )
     {
         UiScreenService = uiScreenService;
         UiServices = uiServices;

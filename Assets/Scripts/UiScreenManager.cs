@@ -195,7 +195,9 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
         id = id.Trim();
 
         if (!modalById.TryGetValue(id, out var prefab) || prefab == null)
-            throw new KeyNotFoundException($"UiScreenManager: No screen registered with id '{id}'.");
+            throw new KeyNotFoundException(
+                $"UiScreenManager: No screen registered with id '{id}'."
+            );
 
         return Show(prefab, payload);
     }

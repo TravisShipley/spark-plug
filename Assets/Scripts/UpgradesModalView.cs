@@ -112,7 +112,10 @@ public sealed class UpgradesModalView : UiScreenView
         }
     }
 
-    private static string BuildUpgradeTargetSummary(GameDefinitionService gameDefService, UpgradeEntry upgrade)
+    private static string BuildUpgradeTargetSummary(
+        GameDefinitionService gameDefService,
+        UpgradeEntry upgrade
+    )
     {
         if (upgrade == null)
             return "modifier-driven";
@@ -137,28 +140,53 @@ public sealed class UpgradesModalView : UiScreenView
             var scopeResource = (modifier.scope?.resource ?? string.Empty).Trim();
 
             string where = "Global";
-            if (!string.IsNullOrEmpty(scopeNodeId) && gameDefService.TryGetNode(scopeNodeId, out var node) && node != null)
-                where = string.IsNullOrWhiteSpace(node.displayName) ? scopeNodeId : node.displayName;
+            if (
+                !string.IsNullOrEmpty(scopeNodeId)
+                && gameDefService.TryGetNode(scopeNodeId, out var node)
+                && node != null
+            )
+                where = string.IsNullOrWhiteSpace(node.displayName)
+                    ? scopeNodeId
+                    : node.displayName;
             else if (!string.IsNullOrEmpty(scopeNodeId))
                 where = scopeNodeId;
             else if (!string.IsNullOrEmpty(scopeNodeTag))
                 where = $"Tag:{scopeNodeTag}";
-            else if (string.Equals(scopeKind, "resource", System.StringComparison.OrdinalIgnoreCase))
+            else if (
+                string.Equals(scopeKind, "resource", System.StringComparison.OrdinalIgnoreCase)
+            )
                 where = $"Resource:{scopeResource}";
 
             string effect = "modifier";
             if (
                 target.StartsWith("nodeSpeedMultiplier", System.StringComparison.OrdinalIgnoreCase)
-                || string.Equals(target, "node.speedMultiplier", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    target,
+                    "node.speedMultiplier",
+                    System.StringComparison.OrdinalIgnoreCase
+                )
             )
                 effect = $"speed x{Format.Abbreviated(modifier.value)}";
             else if (
                 target.StartsWith("nodeOutput", System.StringComparison.OrdinalIgnoreCase)
-                || string.Equals(target, "node.outputMultiplier", System.StringComparison.OrdinalIgnoreCase)
-                || target.StartsWith("node.outputMultiplier.", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    target,
+                    "node.outputMultiplier",
+                    System.StringComparison.OrdinalIgnoreCase
+                )
+                || target.StartsWith(
+                    "node.outputMultiplier.",
+                    System.StringComparison.OrdinalIgnoreCase
+                )
             )
                 effect = $"output x{Format.Abbreviated(modifier.value)}";
-            else if (string.Equals(target, "automation.policy", System.StringComparison.OrdinalIgnoreCase))
+            else if (
+                string.Equals(
+                    target,
+                    "automation.policy",
+                    System.StringComparison.OrdinalIgnoreCase
+                )
+            )
                 effect = "automation enabled";
             else if (target.StartsWith("resourceGain", System.StringComparison.OrdinalIgnoreCase))
                 effect = $"resource gain x{Format.Abbreviated(modifier.value)}";
