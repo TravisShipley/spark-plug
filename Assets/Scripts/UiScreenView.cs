@@ -4,7 +4,7 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Canvas))]
 [RequireComponent(typeof(CanvasGroup))]
 [RequireComponent(typeof(GraphicRaycaster))]
-public class ModalView : MonoBehaviour
+public abstract class UiScreenView : MonoBehaviour
 {
     [SerializeField] private bool dismissible = true;
     [SerializeField] private bool closeOnBackdrop = true;
@@ -20,7 +20,7 @@ public class ModalView : MonoBehaviour
 
     public Canvas Canvas => canvas;
     public CanvasGroup CanvasGroup => canvasGroup;
-    public ModalManager Manager { get; internal set; }
+    public UiScreenManager Manager { get; internal set; }
 
     private void Awake()
     {
@@ -34,7 +34,10 @@ public class ModalView : MonoBehaviour
 
         if (Manager == null)
         {
-            Debug.LogError("ModalView: Manager is not set; cannot close modal. Ensure this modal was shown via ModalManager.", this);
+            Debug.LogError(
+                "UiScreenView: Manager is not set; cannot close screen. Ensure this screen was shown via UiScreenManager.",
+                this
+            );
             return;
         }
 
@@ -45,7 +48,7 @@ public class ModalView : MonoBehaviour
     {
         if (Manager == null)
         {
-            Debug.LogError("ModalView: Manager is not set; cannot ShowById.", this);
+            Debug.LogError("UiScreenView: Manager is not set; cannot ShowById.", this);
             return;
         }
         Manager.ShowById(id);

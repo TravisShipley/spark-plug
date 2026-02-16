@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
+public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 {
     // Inspector helper for modal registry
     [Serializable]
     private sealed class ModalEntry
     {
         public string Id;
-        public ModalView Prefab;
+        public UiScreenView Prefab;
     }
 
     [Header("Services")]
@@ -48,8 +48,8 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
     [SerializeField]
     private List<ModalEntry> modalPrefabs = new();
 
-    private readonly Stack<ModalView> stack = new();
-    private Dictionary<string, ModalView> modalById;
+    private readonly Stack<UiScreenView> stack = new();
+    private Dictionary<string, UiScreenView> modalById;
 
     public UpgradeService UpgradeService { get; private set; }
     public UpgradeCatalog UpgradeCatalog { get; set; }
@@ -74,7 +74,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
         if (uiServices == null)
         {
             Debug.LogError(
-                "ModalManager: UiServiceRegistry is not assigned. Assign it in the inspector so modals can resolve generators.",
+                "UiScreenManager: UiServiceRegistry is not assigned. Assign it in the inspector so screens can resolve generators.",
                 this
             );
         }
@@ -91,7 +91,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
                 backdropCanvas = backdropButton.GetComponentInParent<Canvas>(true);
         }
 
-        modalById = new Dictionary<string, ModalView>(StringComparer.Ordinal);
+        modalById = new Dictionary<string, UiScreenView>(StringComparer.Ordinal);
 
         foreach (var entry in modalPrefabs)
         {
@@ -102,7 +102,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
             if (string.IsNullOrEmpty(id))
             {
                 Debug.LogWarning(
-                    $"ModalManager: ModalEntry with empty Id on prefab '{entry.Prefab.name}' was ignored.",
+                    $"UiScreenManager: ScreenEntry with empty Id on prefab '{entry.Prefab.name}' was ignored.",
                     this
                 );
                 continue;
@@ -111,7 +111,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
             if (modalById.ContainsKey(id))
             {
                 Debug.LogWarning(
-                    $"ModalManager: Duplicate modal Id '{id}' found. Keeping the first, ignoring '{entry.Prefab.name}'.",
+                    $"UiScreenManager: Duplicate screen Id '{id}' found. Keeping the first, ignoring '{entry.Prefab.name}'.",
                     this
                 );
                 continue;
@@ -150,7 +150,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
             return;
 
         Debug.LogError(
-            "ModalManager: UpgradeService.Wallet is null. Ensure UpgradeService is constructed with a WalletService during bootstrap.",
+            "UiScreenManager: UpgradeService.Wallet is null. Ensure UpgradeService is constructed with a WalletService during bootstrap.",
             this
         );
     }
@@ -163,7 +163,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
     }
 
     public T Show<T>(T modalPrefab, object payload = null)
-        where T : ModalView
+        where T : UiScreenView
     {
         if (modalPrefab == null)
             throw new ArgumentNullException(nameof(modalPrefab));
@@ -184,10 +184,10 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
         return (T)instance;
     }
 
-    public ModalView Show(string id, object payload = null)
+    public UiScreenView Show(string id, object payload = null)
     {
         if (modalById == null)
-            throw new InvalidOperationException("ModalManager has not been initialized.");
+            throw new InvalidOperationException("UiScreenManager has not been initialized.");
 
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentException("Modal id is null or empty.", nameof(id));
@@ -195,7 +195,7 @@ public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
         id = id.Trim();
 
         if (!modalById.TryGetValue(id, out var prefab) || prefab == null)
-            throw new KeyNotFoundException($"ModalManager: No modal registered with id '{id}'.");
+            throw new KeyNotFoundException($"UiScreenManager: No screen registered with id '{id}'.");
 
         return Show(prefab, payload);
     }

@@ -1,7 +1,7 @@
 using UniRx;
 using UnityEngine;
 
-public sealed class UpgradesModalView : ModalView
+public sealed class UpgradesModalView : UiScreenView
 {
     [Header("UI")]
     [SerializeField]
@@ -12,7 +12,7 @@ public sealed class UpgradesModalView : ModalView
 
     [Header("Data")]
     // Upgrades are now driven by the content pack -> UpgradeCatalog.
-    // Resolve the catalog from ModalManager at runtime.
+    // Resolve the catalog from UiScreenManager at runtime.
 
     private UpgradeService upgradeService;
 
@@ -42,8 +42,8 @@ public sealed class UpgradesModalView : ModalView
         if (upgradeCatalog == null)
         {
             Debug.LogError(
-                "UpgradesModalView: Could not resolve upgrades source from ModalManager. "
-                    + "Expose `GameDefinitionService` or `UpgradeCatalog` on ModalManager and assign it during bootstrap.",
+                "UpgradesModalView: Could not resolve upgrades source from UiScreenManager. "
+                    + "Expose `GameDefinitionService` or `UpgradeCatalog` on UiScreenManager and assign it during bootstrap.",
                 this
             );
             return;
@@ -61,13 +61,13 @@ public sealed class UpgradesModalView : ModalView
         if (Manager == null)
         {
             Debug.LogError(
-                "UpgradesModalView: Manager is not set; this modal must be shown via ModalManager.",
+                "UpgradesModalView: Manager is not set; this screen must be shown via UiScreenManager.",
                 this
             );
             return;
         }
 
-        // UpgradeService should be exposed by ModalManager via a public property `UpgradeService`.
+        // UpgradeService should be exposed by UiScreenManager via a public property `UpgradeService`.
         upgradeService = null;
         var prop = Manager.GetType().GetProperty("UpgradeService");
         if (prop != null)
@@ -76,8 +76,8 @@ public sealed class UpgradesModalView : ModalView
         if (upgradeService == null)
         {
             Debug.LogError(
-                "UpgradesModalView: UpgradeService could not be resolved from ModalManager. "
-                    + "Expose a public property `public UpgradeService UpgradeService { get; }` on ModalManager and assign it during bootstrap.",
+                "UpgradesModalView: UpgradeService could not be resolved from UiScreenManager. "
+                    + "Expose a public property `public UpgradeService UpgradeService { get; }` on UiScreenManager and assign it during bootstrap.",
                 this
             );
             return;

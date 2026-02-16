@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.SceneManagement;
 
 public class GameCompositionRoot : MonoBehaviour
@@ -37,8 +38,9 @@ public class GameCompositionRoot : MonoBehaviour
     private UiServiceRegistry uiService;
 
     [Header("Managers")]
+    [FormerlySerializedAs("modalManager")]
     [SerializeField]
-    private ModalManager modalManager;
+    private UiScreenManager uiScreenManager;
 
     [Header("Generator UI")]
     [SerializeField]
@@ -154,15 +156,15 @@ public class GameCompositionRoot : MonoBehaviour
         );
         walletService.SetModifierService(modifierService);
 
-        // ModalManager needs the UpgradeService for modals like Upgrades.
-        modalManager.Initialize(upgradeService);
+        // UiScreenManager needs the UpgradeService for screens like Upgrades.
+        uiScreenManager.Initialize(upgradeService);
         // Provide the content-driven catalog to modals so they can render upgrades.
-        modalManager.UpgradeCatalog = gameDefinitionService.Catalog;
+        uiScreenManager.UpgradeCatalog = gameDefinitionService.Catalog;
         // Also expose the full GameDefinitionService for modals that need richer access.
-        modalManager.GameDefinitionService = gameDefinitionService;
+        uiScreenManager.GameDefinitionService = gameDefinitionService;
 
         // Domain-facing modal API (intent-based)
-        uiScreenService = new UiScreenService(modalManager);
+        uiScreenService = new UiScreenService(uiScreenManager);
     }
 
     private void LoadSaveState()
@@ -218,10 +220,10 @@ public class GameCompositionRoot : MonoBehaviour
             return false;
         }
 
-        if (modalManager == null)
+        if (uiScreenManager == null)
         {
             Debug.LogError(
-                "GameCompositionRoot: ModalManager is not assigned in the inspector.",
+                "GameCompositionRoot: UiScreenManager is not assigned in the inspector.",
                 this
             );
             return false;
