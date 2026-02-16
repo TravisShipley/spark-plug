@@ -76,7 +76,7 @@ public class GameCompositionRoot : MonoBehaviour
         saveService = new SaveService();
         saveService.Load();
 
-        InitializeCoreServices(out var modalService);
+        InitializeCoreServices(out var uiScreenService);
         if (!enabled)
             return;
 
@@ -89,7 +89,7 @@ public class GameCompositionRoot : MonoBehaviour
 
         LoadSaveState();
 
-        BindSceneUi(modalService);
+        BindSceneUi(uiScreenService);
 
         var generatorComposer = new GeneratorListComposer(
             generatorUIRootPrefab,
@@ -122,7 +122,7 @@ public class GameCompositionRoot : MonoBehaviour
         );
     }
 
-    private void InitializeCoreServices(out ModalService modalService)
+    private void InitializeCoreServices(out UiScreenService uiScreenService)
     {
         if (saveService == null)
             throw new InvalidOperationException(
@@ -162,7 +162,7 @@ public class GameCompositionRoot : MonoBehaviour
         modalManager.GameDefinitionService = gameDefinitionService;
 
         // Domain-facing modal API (intent-based)
-        modalService = new ModalService(modalManager);
+        uiScreenService = new UiScreenService(modalManager);
     }
 
     private void LoadSaveState()
@@ -182,10 +182,10 @@ public class GameCompositionRoot : MonoBehaviour
         modifierService.RebuildActiveModifiers();
     }
 
-    private void BindSceneUi(ModalService modalService)
+    private void BindSceneUi(UiScreenService uiScreenService)
     {
         var uiCtx = new UiBindingsContext(
-            modalService,
+            uiScreenService,
             uiService,
             upgradeService,
             walletService,

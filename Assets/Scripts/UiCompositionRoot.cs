@@ -65,9 +65,9 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return false;
         }
 
-        if (ctx.ModalService == null)
+        if (ctx.UiScreenService == null)
         {
-            Debug.LogError("UiCompositionRoot: ModalService is null in UiBindingsContext.", this);
+            Debug.LogError("UiCompositionRoot: UiScreenService is null in UiBindingsContext.", this);
             return false;
         }
 
@@ -90,7 +90,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private void BindBottomBar(in UiBindingsContext ctx)
     {
-        var bottomBarVm = new BottomBarViewModel(ctx.ModalService);
+        var bottomBarVm = new BottomBarViewModel(ctx.UiScreenService);
         bottomBarView.Bind(bottomBarVm);
     }
 }

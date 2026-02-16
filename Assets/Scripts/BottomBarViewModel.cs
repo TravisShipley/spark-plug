@@ -4,10 +4,10 @@ public sealed class BottomBarViewModel
     public UiCommand ShowManagers { get; }
     public UiCommand ShowStore { get; }
 
-    public BottomBarViewModel(ModalService modals)
+    public BottomBarViewModel(UiScreenService uiScreenService)
     {
-        ShowUpgrades = new UiCommand(modals.ShowUpgrades);
-        ShowManagers = new UiCommand(() => modals.ShowById("Managers"));
-        ShowStore = new UiCommand(() => modals.ShowById("Store"));
+        ShowUpgrades = new UiCommand(uiScreenService.ShowUpgrades);
+        ShowManagers = new UiCommand(() => uiScreenService.ShowById("Managers"));
+        ShowStore = new UiCommand(() => uiScreenService.ShowById("Store"));
     }
 }
