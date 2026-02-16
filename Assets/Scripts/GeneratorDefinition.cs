@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 
 [CreateAssetMenu(menuName = "Idle/Generator Definition", fileName = "GeneratorDefinition")]
 public class GeneratorDefinition : ScriptableObject
@@ -19,4 +20,7 @@ public class GeneratorDefinition : ScriptableObject
 
     [Header("Growth Values")]
     public double LevelCostGrowth = 1.15;
+
+    [Header("Derived Milestones")]
+    public int[] MilestoneLevels = Array.Empty<int>();
 }

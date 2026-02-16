@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using UniRx;
+using UnityEngine;
 
 public class GeneratorService : IDisposable
 {
@@ -35,12 +36,16 @@ public class GeneratorService : IDisposable
     private readonly ReactiveProperty<bool> isOwned;
     private readonly ReactiveProperty<bool> isRunning;
     private readonly ReactiveProperty<bool> isAutomated;
+    private readonly ReactiveProperty<int> milestoneRank;
+    private readonly ReactiveProperty<int> nextMilestoneAtLevel;
     private bool modifierAutomationEnabled;
 
     public IReadOnlyReactiveProperty<int> Level => level;
     public IReadOnlyReactiveProperty<bool> IsOwned => isOwned;
     public IReadOnlyReactiveProperty<bool> IsRunning => isRunning;
     public IReadOnlyReactiveProperty<bool> IsAutomated => isAutomated;
+    public IReadOnlyReactiveProperty<int> MilestoneRank => milestoneRank;
+    public IReadOnlyReactiveProperty<int> NextMilestoneAtLevel => nextMilestoneAtLevel;
     public string Id => model.Id;
 
     public string DisplayName => definition.DisplayName;
@@ -66,6 +71,8 @@ public class GeneratorService : IDisposable
         level = new ReactiveProperty<int>(model.Level);
         isOwned = new ReactiveProperty<bool>(model.IsOwned);
         isAutomated = new ReactiveProperty<bool>(model.IsAutomated);
+        milestoneRank = new ReactiveProperty<int>(0);
+        nextMilestoneAtLevel = new ReactiveProperty<int>(0);
 
         // Running rule: owned generators start running immediately; unowned do not run.
         isRunning = new ReactiveProperty<bool>(model.IsOwned);
@@ -76,6 +83,7 @@ public class GeneratorService : IDisposable
         this.modifierService =
             modifierService ?? throw new ArgumentNullException(nameof(modifierService));
 
+        ValidateMilestoneLevels(definition.MilestoneLevels);
         RefreshFromModifiers();
 
         cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
@@ -112,6 +120,9 @@ public class GeneratorService : IDisposable
                 cycleProgress.Value = model.CycleElapsedSeconds / newInterval;
             })
             .AddTo(disposables);
+
+        level.DistinctUntilChanged().Subscribe(RefreshMilestoneProgress).AddTo(disposables);
+        RefreshMilestoneProgress(level.Value);
     }
 
     private void OnTick()
@@ -246,6 +257,8 @@ public class GeneratorService : IDisposable
         level.Dispose();
         isOwned.Dispose();
         isAutomated.Dispose();
+        milestoneRank.Dispose();
+        nextMilestoneAtLevel.Dispose();
         isRunning.Dispose();
         outputMultiplier.Dispose();
         speedMultiplier.Dispose();
@@ -298,5 +311,52 @@ public class GeneratorService : IDisposable
 
         if (!previousAutomation && modifierAutomationEnabled && isOwned.Value)
             isRunning.Value = true;
+    }
+
+    private void RefreshMilestoneProgress(int currentLevel)
+    {
+        var levels = definition.MilestoneLevels;
+        if (levels == null || levels.Length == 0)
+        {
+            milestoneRank.Value = 0;
+            nextMilestoneAtLevel.Value = 0;
+            return;
+        }
+
+        int rank = 0;
+        int next = 0;
+        for (int i = 0; i < levels.Length; i++)
+        {
+            var atLevel = levels[i];
+            if (atLevel <= currentLevel)
+            {
+                rank++;
+            }
+            else
+            {
+                next = atLevel;
+                break;
+            }
+        }
+
+        milestoneRank.Value = rank;
+        nextMilestoneAtLevel.Value = next;
+    }
+
+    private static void ValidateMilestoneLevels(int[] levels)
+    {
+        if (levels == null || levels.Length <= 1)
+            return;
+
+        for (int i = 1; i < levels.Length; i++)
+        {
+            if (levels[i] < levels[i - 1])
+            {
+                Debug.LogWarning(
+                    "GeneratorService: MilestoneLevels should be sorted ascending for deterministic milestone rank."
+                );
+                return;
+            }
+        }
     }
 }

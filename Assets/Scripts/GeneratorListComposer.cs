@@ -205,8 +205,53 @@ public class GeneratorListComposer
             out var automationCostResourceId
         );
         definition.AutomationCostResourceId = automationCostResourceId;
+        definition.MilestoneLevels = ResolveMilestoneLevelsForNode(
+            nodeDef?.id,
+            nodeInstance?.zoneId
+        );
 
         return definition;
+    }
+
+    private int[] ResolveMilestoneLevelsForNode(string nodeId, string zoneId)
+    {
+        var normalizedNodeId = (nodeId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(normalizedNodeId))
+            return Array.Empty<int>();
+
+        var normalizedZoneId = (zoneId ?? string.Empty).Trim();
+        var milestones = gameDefinitionService?.Milestones;
+        if (milestones == null || milestones.Count == 0)
+            return Array.Empty<int>();
+
+        var levels = new List<int>();
+        for (int i = 0; i < milestones.Count; i++)
+        {
+            var milestone = milestones[i];
+            if (milestone == null)
+                continue;
+
+            var milestoneNodeId = (milestone.nodeId ?? string.Empty).Trim();
+            if (!string.Equals(milestoneNodeId, normalizedNodeId, StringComparison.Ordinal))
+                continue;
+
+            var milestoneZoneId = (milestone.zoneId ?? string.Empty).Trim();
+            if (
+                !string.IsNullOrEmpty(milestoneZoneId)
+                && !string.Equals(milestoneZoneId, normalizedZoneId, StringComparison.Ordinal)
+            )
+            {
+                continue;
+            }
+
+            if (milestone.atLevel <= 0)
+                continue;
+
+            levels.Add(milestone.atLevel);
+        }
+
+        levels.Sort();
+        return levels.ToArray();
     }
 
     private double ResolveAutomationCostForNode(

@@ -13,10 +13,13 @@ public class GeneratorView : MonoBehaviour
     private TextMeshProUGUI nameText;
 
     [SerializeField]
+    private TextMeshProUGUI outputText;
+
+    [SerializeField]
     private TextMeshProUGUI levelText;
 
     [SerializeField]
-    private TextMeshProUGUI outputText;
+    private TextMeshProUGUI nextMilestoneText;
 
     [SerializeField]
     private GameObject ownedContainer;
@@ -229,12 +232,34 @@ public class GeneratorView : MonoBehaviour
 
         nameText.text = vm.DisplayName;
 
-        vm.Level.Subscribe(level => levelText.text = $"Lv {level}").AddTo(disposables);
-
         // Output: react to BOTH output and duration changes
         vm.OutputPerCycle.DistinctUntilChanged()
             .Subscribe(output => outputText.text = $"{Format.Currency(output)}")
             .AddTo(disposables);
+
+        // levelText displays the MilestoneRank + 1
+        if (levelText != null)
+        {
+            vm.MilestoneRank.DistinctUntilChanged()
+                .Subscribe(rank => levelText.text = $"Lv. {rank + 1}")
+                .AddTo(disposables);
+        }
+
+        if (nextMilestoneText != null)
+        {
+            Observable
+                .CombineLatest(
+                    vm.Level.DistinctUntilChanged(),
+                    vm.NextMilestoneAtLevel.DistinctUntilChanged(),
+                    (currentLevel, nextLevel) => (currentLevel, nextLevel)
+                )
+                .Subscribe(pair =>
+                {
+                    nextMilestoneText.text =
+                        pair.nextLevel > 0 ? $"{pair.currentLevel} / {pair.nextLevel}" : "Max";
+                })
+                .AddTo(disposables);
+        }
 
         vm.IsOwned.DistinctUntilChanged()
             .Subscribe(owned =>

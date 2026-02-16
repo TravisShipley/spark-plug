@@ -13,6 +13,10 @@ public class GeneratorViewModel : IDisposable
     public IReadOnlyReactiveProperty<int> Level => generatorService.Level;
     public IReadOnlyReactiveProperty<bool> IsOwned => generatorService.IsOwned;
     public IReadOnlyReactiveProperty<bool> IsAutomated => generatorService.IsAutomated;
+    public IReadOnlyReactiveProperty<int> MilestoneRank => generatorService.MilestoneRank;
+    public int MilestoneRankValue => generatorService.MilestoneRank.Value;
+    public IReadOnlyReactiveProperty<int> NextMilestoneAtLevel =>
+        generatorService.NextMilestoneAtLevel;
 
     public IReadOnlyReactiveProperty<double> OutputPerCycle { get; }
     public IObservable<Unit> CycleCompleted => generatorService.CycleCompleted;
