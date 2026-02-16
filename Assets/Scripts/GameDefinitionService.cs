@@ -43,6 +43,8 @@ public sealed class GameDefinitionService
         definition?.modifiers ?? new List<ModifierEntry>();
     public IReadOnlyList<UpgradeEntry> Upgrades =>
         upgradeCatalog?.Upgrades ?? new List<UpgradeEntry>();
+    public IReadOnlyList<MilestoneEntry> Milestones =>
+        definition?.milestones ?? new List<MilestoneEntry>();
 
     public bool TryGetNode(string id, out NodeDefinition node)
     {

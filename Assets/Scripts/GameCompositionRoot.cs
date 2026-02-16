@@ -50,6 +50,7 @@ public class GameCompositionRoot : MonoBehaviour
     private WalletService walletService;
     private UpgradeService upgradeService;
     private ModifierService modifierService;
+    private MilestoneService milestoneService;
     private GameDefinitionService gameDefinitionService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
@@ -111,6 +112,14 @@ public class GameCompositionRoot : MonoBehaviour
 
         // Apply any saved upgrades (generators must be registered before this).
         upgradeService.ApplyAllPurchased();
+
+        // Subscribe milestone progression after generators are composed.
+        milestoneService = new MilestoneService(
+            gameDefinitionService,
+            generatorServices,
+            saveService,
+            modifierService
+        );
     }
 
     private void InitializeCoreServices(out ModalService modalService)
@@ -139,7 +148,9 @@ public class GameCompositionRoot : MonoBehaviour
             gameDefinitionService.Catalog,
             gameDefinitionService.NodeCatalog,
             gameDefinitionService.NodeInstanceCatalog,
-            upgradeService
+            upgradeService,
+            saveService,
+            gameDefinitionService.Milestones
         );
         walletService.SetModifierService(modifierService);
 
@@ -256,6 +267,7 @@ public class GameCompositionRoot : MonoBehaviour
         // automationService?.Dispose();
         foreach (var s in generatorServices)
             s?.Dispose();
+        milestoneService?.Dispose();
         modifierService?.Dispose();
 
         // Dispose time source after consumers

@@ -10,11 +10,16 @@ public sealed class ModifierService : IDisposable
     private readonly NodeCatalog nodeCatalog;
     private readonly NodeInstanceCatalog nodeInstanceCatalog;
     private readonly UpgradeService upgradeService;
+    private readonly SaveService saveService;
 
     private readonly Dictionary<string, ModifierEntry> modifiersById = new(StringComparer.Ordinal);
     private readonly List<ModifierEntry> modifiers = new();
+    private readonly Dictionary<string, MilestoneEntry> milestonesById = new(StringComparer.Ordinal);
 
     private readonly Dictionary<string, List<ModifierEntry>> resolvedModifiersByUpgradeId = new(
+        StringComparer.Ordinal
+    );
+    private readonly Dictionary<string, List<ModifierEntry>> resolvedModifiersByMilestoneId = new(
         StringComparer.Ordinal
     );
 
@@ -41,7 +46,9 @@ public sealed class ModifierService : IDisposable
         UpgradeCatalog upgradeCatalog,
         NodeCatalog nodeCatalog,
         NodeInstanceCatalog nodeInstanceCatalog,
-        UpgradeService upgradeService
+        UpgradeService upgradeService,
+        SaveService saveService,
+        IReadOnlyList<MilestoneEntry> milestones
     )
     {
         this.upgradeCatalog =
@@ -51,6 +58,7 @@ public sealed class ModifierService : IDisposable
             nodeInstanceCatalog ?? throw new ArgumentNullException(nameof(nodeInstanceCatalog));
         this.upgradeService =
             upgradeService ?? throw new ArgumentNullException(nameof(upgradeService));
+        this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
 
         if (modifiers != null)
         {
@@ -79,6 +87,24 @@ public sealed class ModifierService : IDisposable
                     StringComparison.Ordinal
                 )
         );
+
+        if (milestones != null)
+        {
+            for (int i = 0; i < milestones.Count; i++)
+            {
+                var milestone = milestones[i];
+                if (milestone == null)
+                    continue;
+
+                var id = (milestone.id ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(id))
+                    continue;
+                if (milestonesById.ContainsKey(id))
+                    continue;
+
+                milestonesById[id] = milestone;
+            }
+        }
 
         upgradeService
             .PurchasedStateChangedAsObservable()
@@ -332,34 +358,55 @@ public sealed class ModifierService : IDisposable
     {
         var active = new List<ActiveModifier>();
         var purchased = upgradeService.GetPurchasedCountsSnapshot();
-        if (purchased == null || purchased.Count == 0)
+        if (purchased != null && purchased.Count > 0)
+        {
+            var upgradesOrdered = purchased.Keys.OrderBy(id => id, StringComparer.Ordinal);
+            foreach (var upgradeId in upgradesOrdered)
+            {
+                if (!purchased.TryGetValue(upgradeId, out var count) || count <= 0)
+                    continue;
+
+                UpgradeEntry upgrade;
+                try
+                {
+                    upgrade = upgradeCatalog.GetRequired(upgradeId);
+                }
+                catch
+                {
+                    WarnOnce(
+                        $"upgrade.missing:{upgradeId}",
+                        $"[ModifierService] Purchased upgrade '{upgradeId}' not found in UpgradeCatalog."
+                    );
+                    continue;
+                }
+
+                var resolved = ResolveModifiersForUpgrade(upgrade);
+                for (int i = 0; i < resolved.Count; i++)
+                {
+                    active.Add(new ActiveModifier { Modifier = resolved[i], PurchaseCount = count });
+                }
+            }
+        }
+
+        var firedMilestones = saveService.Data?.FiredMilestoneIds;
+        if (firedMilestones == null || firedMilestones.Count == 0)
             return active;
 
-        var upgradesOrdered = purchased.Keys.OrderBy(id => id, StringComparer.Ordinal);
-        foreach (var upgradeId in upgradesOrdered)
+        var milestonesOrdered = firedMilestones.OrderBy(id => id, StringComparer.Ordinal);
+        foreach (var milestoneId in milestonesOrdered)
         {
-            if (!purchased.TryGetValue(upgradeId, out var count) || count <= 0)
-                continue;
-
-            UpgradeEntry upgrade;
-            try
-            {
-                upgrade = upgradeCatalog.GetRequired(upgradeId);
-            }
-            catch
+            if (!milestonesById.TryGetValue(milestoneId, out var milestone) || milestone == null)
             {
                 WarnOnce(
-                    $"upgrade.missing:{upgradeId}",
-                    $"[ModifierService] Purchased upgrade '{upgradeId}' not found in UpgradeCatalog."
+                    $"milestone.missing:{milestoneId}",
+                    $"[ModifierService] Fired milestone '{milestoneId}' not found in GameDefinition milestones."
                 );
                 continue;
             }
 
-            var resolved = ResolveModifiersForUpgrade(upgrade);
+            var resolved = ResolveModifiersForMilestone(milestone);
             for (int i = 0; i < resolved.Count; i++)
-            {
-                active.Add(new ActiveModifier { Modifier = resolved[i], PurchaseCount = count });
-            }
+                active.Add(new ActiveModifier { Modifier = resolved[i], PurchaseCount = 1 });
         }
 
         return active;
@@ -432,6 +479,77 @@ public sealed class ModifierService : IDisposable
 
         if (!string.IsNullOrEmpty(upgradeId))
             resolvedModifiersByUpgradeId[upgradeId] = resolved;
+
+        return resolved;
+    }
+
+    private List<ModifierEntry> ResolveModifiersForMilestone(MilestoneEntry milestone)
+    {
+        var resolved = new List<ModifierEntry>();
+        if (milestone == null)
+            return resolved;
+
+        var milestoneId = (milestone.id ?? string.Empty).Trim();
+        if (
+            !string.IsNullOrEmpty(milestoneId)
+            && resolvedModifiersByMilestoneId.TryGetValue(milestoneId, out var cached)
+        )
+            return cached;
+
+        if (milestone.grantEffects != null && milestone.grantEffects.Length > 0)
+        {
+            for (int i = 0; i < milestone.grantEffects.Length; i++)
+            {
+                var modifierId = (milestone.grantEffects[i]?.modifierId ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(modifierId))
+                    continue;
+
+                if (modifiersById.TryGetValue(modifierId, out var modifier) && modifier != null)
+                    resolved.Add(modifier);
+            }
+        }
+
+        if (resolved.Count == 0)
+        {
+            var source = (milestone.id ?? string.Empty).Trim();
+            if (!string.IsNullOrEmpty(source))
+            {
+                for (int i = 0; i < modifiers.Count; i++)
+                {
+                    var modifier = modifiers[i];
+                    if (
+                        string.Equals(
+                            (modifier.source ?? string.Empty).Trim(),
+                            source,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        resolved.Add(modifier);
+                    }
+                }
+            }
+        }
+
+        resolved.Sort(
+            (a, b) =>
+                string.Compare(
+                    (a?.id ?? string.Empty).Trim(),
+                    (b?.id ?? string.Empty).Trim(),
+                    StringComparison.Ordinal
+                )
+        );
+
+        if (resolved.Count == 0)
+        {
+            WarnOnce(
+                $"milestone.no_modifiers:{milestone.id}",
+                $"[ModifierService] Fired milestone '{milestone.id}' has no resolvable modifiers."
+            );
+        }
+
+        if (!string.IsNullOrEmpty(milestoneId))
+            resolvedModifiersByMilestoneId[milestoneId] = resolved;
 
         return resolved;
     }

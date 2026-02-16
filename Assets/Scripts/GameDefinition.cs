@@ -11,6 +11,7 @@ public sealed class GameDefinition
     public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
     public List<ModifierEntry> modifiers = new List<ModifierEntry>();
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
+    public List<MilestoneEntry> milestones = new List<MilestoneEntry>();
 }
 
 [Serializable]
@@ -117,4 +118,14 @@ public sealed class ModifierScope
     public string nodeId;
     public string nodeTag;
     public string resource;
+}
+
+[Serializable]
+public sealed class MilestoneEntry
+{
+    public string id;
+    public string nodeId;
+    public string zoneId;
+    public int atLevel;
+    public EffectItem[] grantEffects;
 }

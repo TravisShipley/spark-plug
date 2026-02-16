@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 [System.Serializable]
-public class GameData
+public class GameData : ISerializationCallbackReceiver
 {
     [Serializable]
     public class ResourceBalanceData
@@ -35,4 +36,63 @@ public class GameData
     public List<GeneratorStateData> Generators = new();
     public List<UpgradeStateData> Upgrades = new();
     public List<ResourceBalanceData> Resources = new();
+
+    // Runtime lookup of one-time milestones that have already fired.
+    [NonSerialized]
+    public HashSet<string> FiredMilestoneIds = new(StringComparer.Ordinal);
+
+    // Serialized bridge for JsonUtility (HashSet is not serialized directly).
+    [SerializeField]
+    private List<string> firedMilestoneIds = new();
+
+    public void EnsureInitialized()
+    {
+        Generators ??= new List<GeneratorStateData>();
+        Upgrades ??= new List<UpgradeStateData>();
+        Resources ??= new List<ResourceBalanceData>();
+        FiredMilestoneIds ??= new HashSet<string>(StringComparer.Ordinal);
+        firedMilestoneIds ??= new List<string>();
+
+        if (FiredMilestoneIds.Count == 0 && firedMilestoneIds.Count > 0)
+        {
+            for (int i = 0; i < firedMilestoneIds.Count; i++)
+            {
+                var normalized = (firedMilestoneIds[i] ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(normalized))
+                    FiredMilestoneIds.Add(normalized);
+            }
+        }
+    }
+
+    public void OnBeforeSerialize()
+    {
+        EnsureInitialized();
+        firedMilestoneIds.Clear();
+
+        foreach (var id in FiredMilestoneIds)
+        {
+            var normalized = (id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized))
+                continue;
+
+            firedMilestoneIds.Add(normalized);
+        }
+
+        firedMilestoneIds.Sort(StringComparer.Ordinal);
+    }
+
+    public void OnAfterDeserialize()
+    {
+        EnsureInitialized();
+        FiredMilestoneIds.Clear();
+
+        for (int i = 0; i < firedMilestoneIds.Count; i++)
+        {
+            var normalized = (firedMilestoneIds[i] ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized))
+                continue;
+
+            FiredMilestoneIds.Add(normalized);
+        }
+    }
 }

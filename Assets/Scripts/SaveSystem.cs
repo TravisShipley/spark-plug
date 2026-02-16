@@ -16,9 +16,7 @@ public static class SaveSystem
             if (data == null)
                 data = CreateNewGameData();
 
-            data.Generators ??= new List<GameData.GeneratorStateData>();
-            data.Upgrades ??= new List<GameData.UpgradeStateData>();
-            data.Resources ??= new List<GameData.ResourceBalanceData>();
+            data.EnsureInitialized();
 
             string json = JsonUtility.ToJson(data, true);
 
@@ -55,9 +53,7 @@ public static class SaveSystem
                 if (data == null)
                     return CreateNewGameData();
 
-                data.Generators ??= new List<GameData.GeneratorStateData>();
-                data.Upgrades ??= new List<GameData.UpgradeStateData>();
-                data.Resources ??= new List<GameData.ResourceBalanceData>();
+                data.EnsureInitialized();
 
                 return data;
             }
@@ -102,11 +98,13 @@ public static class SaveSystem
 
     private static GameData CreateNewGameData()
     {
-        return new GameData
+        var data = new GameData
         {
             Generators = new List<GameData.GeneratorStateData>(),
             Upgrades = new List<GameData.UpgradeStateData>(),
             Resources = new List<GameData.ResourceBalanceData>()
         };
+        data.EnsureInitialized();
+        return data;
     }
 }

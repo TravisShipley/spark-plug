@@ -30,9 +30,7 @@ public sealed class SaveService : IDisposable
     public void Load()
     {
         Data = SaveSystem.LoadGame() ?? new GameData();
-        Data.Generators ??= new List<GameData.GeneratorStateData>();
-        Data.Upgrades ??= new List<GameData.UpgradeStateData>();
-        Data.Resources ??= new List<GameData.ResourceBalanceData>();
+        Data.EnsureInitialized();
     }
 
     public void RequestSave()
@@ -76,9 +74,7 @@ public sealed class SaveService : IDisposable
     {
         // Reset in-memory snapshot to a clean state.
         Data = new GameData();
-        Data.Generators ??= new List<GameData.GeneratorStateData>();
-        Data.Upgrades ??= new List<GameData.UpgradeStateData>();
-        Data.Resources ??= new List<GameData.ResourceBalanceData>();
+        Data.EnsureInitialized();
     }
 
     public void Dispose()

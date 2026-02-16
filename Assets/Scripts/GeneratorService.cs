@@ -41,6 +41,7 @@ public class GeneratorService : IDisposable
     public IReadOnlyReactiveProperty<bool> IsOwned => isOwned;
     public IReadOnlyReactiveProperty<bool> IsRunning => isRunning;
     public IReadOnlyReactiveProperty<bool> IsAutomated => isAutomated;
+    public string Id => model.Id;
 
     public string DisplayName => definition.DisplayName;
 
