@@ -516,7 +516,7 @@ GameObject:
   - component: {fileID: 5662586484279653124}
   - component: {fileID: 1658580769019928539}
   m_Layer: 5
-  m_Name: Level
+  m_Name: LevelNumber
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -698,15 +698,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   nameText: {fileID: 6345856968438859827}
-  levelText: {fileID: 1658580769019928539}
   outputText: {fileID: 5367236427326456665}
+  levelText: {fileID: 1658580769019928539}
   nextMilestoneText: {fileID: 7084641906482584269}
   ownedContainer: {fileID: 3868922060306876761}
-  progressBar: {fileID: 7556280380556630028}
   buildButtonView: {fileID: 7145942611360081324}
   levelUpButtonView: {fileID: 3635495772463640559}
   collectButtonView: {fileID: 3735389938016155667}
+  progressBar: {fileID: 7556280380556630028}
   progressFill: {fileID: 2698592441231946483}
+  levelProgressFill: {fileID: 1408802814458289828}
 --- !u!114 &4492073440729659432
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -977,7 +978,7 @@ GameObject:
   - component: {fileID: 8038141399932223046}
   - component: {fileID: 8927509817611293432}
   m_Layer: 5
-  m_Name: MilestoneProgress
+  m_Name: LevelProgress
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1231,7 +1232,7 @@ GameObject:
   - component: {fileID: 366883398654595216}
   - component: {fileID: 7084641906482584269}
   m_Layer: 5
-  m_Name: MilestoneInfo
+  m_Name: LevelInfo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1284,7 +1285,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: x/Y
+  m_text: X / Y
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

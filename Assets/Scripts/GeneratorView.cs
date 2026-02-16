@@ -24,9 +24,6 @@ public class GeneratorView : MonoBehaviour
     [SerializeField]
     private GameObject ownedContainer;
 
-    [SerializeField]
-    private GameObject progressBar;
-
     [Header("Buttons")]
     [SerializeField]
     private ReactiveButtonView buildButtonView;
@@ -37,8 +34,15 @@ public class GeneratorView : MonoBehaviour
     [SerializeField]
     private ReactiveButtonView collectButtonView;
 
+    [Header("Progress")]
+    [SerializeField]
+    private GameObject progressBar;
+
     [SerializeField]
     private Image progressFill;
+
+    [SerializeField]
+    private Image levelProgressFill;
 
     private CompositeDisposable disposables = new();
     private GeneratorViewModel viewModel;
@@ -258,6 +262,13 @@ public class GeneratorView : MonoBehaviour
                     nextMilestoneText.text =
                         pair.nextLevel > 0 ? $"{pair.currentLevel} / {pair.nextLevel}" : "Max";
                 })
+                .AddTo(disposables);
+        }
+
+        if (levelProgressFill != null)
+        {
+            vm.MilestoneProgressRatio.DistinctUntilChanged()
+                .Subscribe(fill => levelProgressFill.fillAmount = Mathf.Clamp01(fill))
                 .AddTo(disposables);
         }
 

@@ -37,7 +37,9 @@ public class GeneratorService : IDisposable
     private readonly ReactiveProperty<bool> isRunning;
     private readonly ReactiveProperty<bool> isAutomated;
     private readonly ReactiveProperty<int> milestoneRank;
+    private readonly ReactiveProperty<int> previousMilestoneAtLevel;
     private readonly ReactiveProperty<int> nextMilestoneAtLevel;
+    private readonly ReactiveProperty<float> milestoneProgressRatio;
     private bool modifierAutomationEnabled;
 
     public IReadOnlyReactiveProperty<int> Level => level;
@@ -45,7 +47,9 @@ public class GeneratorService : IDisposable
     public IReadOnlyReactiveProperty<bool> IsRunning => isRunning;
     public IReadOnlyReactiveProperty<bool> IsAutomated => isAutomated;
     public IReadOnlyReactiveProperty<int> MilestoneRank => milestoneRank;
+    public IReadOnlyReactiveProperty<int> PreviousMilestoneAtLevel => previousMilestoneAtLevel;
     public IReadOnlyReactiveProperty<int> NextMilestoneAtLevel => nextMilestoneAtLevel;
+    public IReadOnlyReactiveProperty<float> MilestoneProgressRatio => milestoneProgressRatio;
     public string Id => model.Id;
 
     public string DisplayName => definition.DisplayName;
@@ -72,7 +76,9 @@ public class GeneratorService : IDisposable
         isOwned = new ReactiveProperty<bool>(model.IsOwned);
         isAutomated = new ReactiveProperty<bool>(model.IsAutomated);
         milestoneRank = new ReactiveProperty<int>(0);
+        previousMilestoneAtLevel = new ReactiveProperty<int>(0);
         nextMilestoneAtLevel = new ReactiveProperty<int>(0);
+        milestoneProgressRatio = new ReactiveProperty<float>(0f);
 
         // Running rule: owned generators start running immediately; unowned do not run.
         isRunning = new ReactiveProperty<bool>(model.IsOwned);
@@ -258,7 +264,9 @@ public class GeneratorService : IDisposable
         isOwned.Dispose();
         isAutomated.Dispose();
         milestoneRank.Dispose();
+        previousMilestoneAtLevel.Dispose();
         nextMilestoneAtLevel.Dispose();
+        milestoneProgressRatio.Dispose();
         isRunning.Dispose();
         outputMultiplier.Dispose();
         speedMultiplier.Dispose();
@@ -319,11 +327,14 @@ public class GeneratorService : IDisposable
         if (levels == null || levels.Length == 0)
         {
             milestoneRank.Value = 0;
+            previousMilestoneAtLevel.Value = 0;
             nextMilestoneAtLevel.Value = 0;
+            milestoneProgressRatio.Value = 1f;
             return;
         }
 
         int rank = 0;
+        int previous = 0;
         int next = 0;
         for (int i = 0; i < levels.Length; i++)
         {
@@ -331,6 +342,7 @@ public class GeneratorService : IDisposable
             if (atLevel <= currentLevel)
             {
                 rank++;
+                previous = atLevel;
             }
             else
             {
@@ -340,7 +352,27 @@ public class GeneratorService : IDisposable
         }
 
         milestoneRank.Value = rank;
+        previousMilestoneAtLevel.Value = previous;
         nextMilestoneAtLevel.Value = next;
+
+        if (next > 0)
+        {
+            var span = next - previous;
+            if (span > 0)
+            {
+                milestoneProgressRatio.Value = Mathf.Clamp01(
+                    (float)(currentLevel - previous) / span
+                );
+            }
+            else
+            {
+                milestoneProgressRatio.Value = 1f;
+            }
+        }
+        else
+        {
+            milestoneProgressRatio.Value = 1f;
+        }
     }
 
     private static void ValidateMilestoneLevels(int[] levels)
