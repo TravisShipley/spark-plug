@@ -4,7 +4,7 @@ using UnityEngine;
 
 public static class GameDefinitionValidator
 {
-    private static readonly string[] SupportedModifierScopeKinds = { "node" };
+    private static readonly string[] SupportedModifierScopeKinds = { "global", "node", "nodeTag", "resource" };
     private static readonly string[] SupportedModifierSourceDomains =
     {
         "upgrade",
@@ -50,6 +50,7 @@ public static class GameDefinitionValidator
 
         // ---- Nodes
         var nodeIds = new HashSet<string>(StringComparer.Ordinal);
+        var nodeTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < gd.nodes.Count; i++)
         {
             var n = gd.nodes[i];
@@ -67,6 +68,16 @@ public static class GameDefinitionValidator
 
             if (!nodeIds.Add(n.id))
                 errors.Add($"Duplicate node id '{n.id}'.");
+
+            if (n.tags != null)
+            {
+                for (int t = 0; t < n.tags.Length; t++)
+                {
+                    var tag = (n.tags[t] ?? string.Empty).Trim();
+                    if (!string.IsNullOrEmpty(tag))
+                        nodeTags.Add(tag);
+                }
+            }
 
             ValidateNodeResourceReferences(n, i, resourceIds, errors);
             ValidateNodeLocalInputsReferences(n, i, resourceIds, errors);
@@ -123,7 +134,7 @@ public static class GameDefinitionValidator
                 else if (!modifierIds.Add(m.id))
                     errors.Add($"Duplicate modifier id '{m.id}'.");
 
-                ValidateModifierVerticalSlice(m, i, nodeIds, errors);
+                ValidateModifierVerticalSlice(m, i, nodeIds, nodeTags, resourceIds, errors);
             }
         }
 
@@ -375,11 +386,15 @@ public static class GameDefinitionValidator
         ModifierEntry modifier,
         int modifierIndex,
         HashSet<string> nodeIds,
+        HashSet<string> nodeTags,
+        HashSet<string> resourceIds,
         List<string> errors
     )
     {
         var scopeKind = (modifier.scope?.kind ?? string.Empty).Trim();
         var scopeNodeId = (modifier.scope?.nodeId ?? string.Empty).Trim();
+        var scopeNodeTag = (modifier.scope?.nodeTag ?? string.Empty).Trim();
+        var scopeResourceId = (modifier.scope?.resource ?? string.Empty).Trim();
         var operation = (modifier.operation ?? string.Empty).Trim();
         var target = (modifier.target ?? string.Empty).Trim();
 
@@ -394,15 +409,54 @@ public static class GameDefinitionValidator
             );
         }
 
-        if (string.IsNullOrEmpty(scopeNodeId))
+        if (string.Equals(scopeKind, "node", StringComparison.OrdinalIgnoreCase))
         {
-            errors.Add($"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeId is empty.");
+            if (string.IsNullOrEmpty(scopeNodeId) && string.IsNullOrEmpty(scopeNodeTag))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') node scope requires scope.nodeId or scope.nodeTag."
+                );
+            }
+            else if (!string.IsNullOrEmpty(scopeNodeId) && !nodeIds.Contains(scopeNodeId))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeId '{scopeNodeId}' references missing nodes.id."
+                );
+            }
+            else if (!string.IsNullOrEmpty(scopeNodeTag) && !nodeTags.Contains(scopeNodeTag))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeTag '{scopeNodeTag}' references missing node tags."
+                );
+            }
         }
-        else if (!nodeIds.Contains(scopeNodeId))
+
+        if (string.Equals(scopeKind, "nodeTag", StringComparison.OrdinalIgnoreCase))
         {
-            errors.Add(
-                $"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeId '{scopeNodeId}' references missing nodes.id."
-            );
+            if (string.IsNullOrEmpty(scopeNodeTag))
+            {
+                errors.Add($"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeTag is empty.");
+            }
+            else if (!nodeTags.Contains(scopeNodeTag))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') scope.nodeTag '{scopeNodeTag}' references missing node tags."
+                );
+            }
+        }
+
+        if (string.Equals(scopeKind, "resource", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(scopeResourceId))
+            {
+                errors.Add($"modifiers[{modifierIndex}] ('{modifier.id}') scope.resource is empty.");
+            }
+            else if (!resourceIds.Contains(scopeResourceId))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') scope.resource '{scopeResourceId}' references missing resources.id."
+                );
+            }
         }
 
         if (string.IsNullOrEmpty(target))
@@ -411,11 +465,19 @@ public static class GameDefinitionValidator
             return;
         }
 
-        if (
-            !target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
-            && !target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase)
-        )
+        bool isNodeSpeed = target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(target, "node.speedMultiplier", StringComparison.OrdinalIgnoreCase);
+        bool isNodeOutput = target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
+            || target.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase);
+        bool isAutomation =
+            string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(target, "automation.autoCollect", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(target, "automation.autoRestart", StringComparison.OrdinalIgnoreCase);
+        bool isResourceGain = target.StartsWith("resourceGain.", StringComparison.OrdinalIgnoreCase)
+            || (target.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase) && target.EndsWith("]"));
+
+        if (!isNodeSpeed && !isNodeOutput && !isAutomation && !isResourceGain)
         {
             errors.Add(
                 $"modifiers[{modifierIndex}] ('{modifier.id}') target '{target}' is unsupported for current vertical slice."
@@ -424,29 +486,70 @@ public static class GameDefinitionValidator
         }
 
         if (
-            target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
-            || target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+            !string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(operation, "add", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(operation, "set", StringComparison.OrdinalIgnoreCase)
         )
         {
-            if (!string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase))
-            {
-                errors.Add(
-                    $"modifiers[{modifierIndex}] ('{modifier.id}') operation '{operation}' is unsupported for target '{target}'. Expected 'multiply'."
-                );
-            }
-
-            return;
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') operation '{operation}' is unsupported. Expected one of: multiply, add, set."
+            );
         }
 
-        if (string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase))
+        if (isResourceGain)
         {
-            if (!string.Equals(operation, "set", StringComparison.OrdinalIgnoreCase))
+            var resourceId = ExtractTargetResourceId(target);
+            if (string.IsNullOrEmpty(resourceId))
+                resourceId = scopeResourceId;
+
+            if (string.IsNullOrEmpty(resourceId))
             {
                 errors.Add(
-                    $"modifiers[{modifierIndex}] ('{modifier.id}') operation '{operation}' is unsupported for target '{target}'. Expected 'set'."
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') resourceGain target requires resource id via target or scope.resource."
+                );
+            }
+            else if (!resourceIds.Contains(resourceId))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') resource id '{resourceId}' references missing resources.id."
                 );
             }
         }
+
+        if (isNodeOutput)
+        {
+            var resourceId = ExtractTargetResourceId(target);
+            if (!string.IsNullOrEmpty(resourceId) && !resourceIds.Contains(resourceId))
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') node output resource '{resourceId}' references missing resources.id."
+                );
+            }
+        }
+    }
+
+    private static string ExtractTargetResourceId(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return string.Empty;
+
+        var normalized = target.Trim();
+        if (normalized.StartsWith("nodeOutput.", StringComparison.OrdinalIgnoreCase))
+            return normalized.Substring("nodeOutput.".Length).Trim();
+
+        if (normalized.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase))
+            return normalized.Substring("node.outputMultiplier.".Length).Trim();
+
+        if (normalized.StartsWith("resourceGain.", StringComparison.OrdinalIgnoreCase))
+            return normalized.Substring("resourceGain.".Length).Trim();
+
+        if (normalized.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase) && normalized.EndsWith("]"))
+        {
+            var inner = normalized.Substring("resourceGain[".Length);
+            return inner.Substring(0, inner.Length - 1).Trim();
+        }
+
+        return string.Empty;
     }
 
     private static bool ContainsIgnoreCase(IEnumerable<string> values, string value)

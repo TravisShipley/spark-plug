@@ -13,7 +13,7 @@ public sealed class UpgradeService : IDisposable
     private readonly UpgradeCatalog catalog;
     private readonly WalletService wallet;
     private readonly SaveService saveService;
-    private readonly IGeneratorResolver generatorResolver;
+    private readonly Subject<string> purchasedStateChanged = new();
 
     // UpgradeId -> PurchasedCount (reactive)
     private readonly Dictionary<string, ReactiveProperty<int>> purchasedCountById = new Dictionary<
@@ -31,11 +31,12 @@ public sealed class UpgradeService : IDisposable
         this.catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
-        this.generatorResolver =
-            generatorResolver ?? throw new ArgumentNullException(nameof(generatorResolver));
+        _ = generatorResolver ?? throw new ArgumentNullException(nameof(generatorResolver));
     }
 
     public WalletService Wallet => wallet;
+
+    public IObservable<string> PurchasedStateChangedAsObservable() => purchasedStateChanged;
 
     public IReadOnlyReactiveProperty<int> PurchasedCount(string upgradeId)
     {
@@ -78,13 +79,6 @@ public sealed class UpgradeService : IDisposable
         if (IsAtMaxRank(def, count))
             return false;
 
-        var generatorId = (def.generatorId ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(generatorId))
-            return false;
-
-        if (!generatorResolver.TryGetGenerator(generatorId, out var generator) || generator == null)
-            return false;
-
         return CanAffordCost(GetRequiredCost(def));
     }
 
@@ -98,19 +92,8 @@ public sealed class UpgradeService : IDisposable
         if (IsAtMaxRank(def, count))
             return false;
 
-        // v1: only supports generator-targeted upgrades (global handled later)
-        var generatorId = (def.generatorId ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(generatorId))
-            return false;
-
-        if (!generatorResolver.TryGetGenerator(generatorId, out var generator) || generator == null)
-            return false;
-
         if (!wallet.TrySpend(GetRequiredCost(def)))
             return false;
-
-        // Apply effect once (repeatable purchases are simply multiple applications)
-        generator.ApplyUpgrade(def);
 
         // Update state
         var rp = (ReactiveProperty<int>)PurchasedCount(def.id);
@@ -119,6 +102,7 @@ public sealed class UpgradeService : IDisposable
         // Persist upgrade purchase facts immediately.
         SaveInto(saveService.Data);
         saveService.RequestSave();
+        purchasedStateChanged.OnNext(def.id);
 
         return true;
     }
@@ -144,6 +128,8 @@ public sealed class UpgradeService : IDisposable
             var rp = (ReactiveProperty<int>)PurchasedCount(id);
             rp.Value = count;
         }
+
+        purchasedStateChanged.OnNext("load");
     }
 
     /// <summary>
@@ -151,38 +137,9 @@ public sealed class UpgradeService : IDisposable
     /// </summary>
     public void ApplyAllPurchased()
     {
-        // NOTE: This method assumes generators are in a clean baseline state.
-        // It must only be called once after load to avoid double-applying upgrades.
-        foreach (var kv in purchasedCountById)
-        {
-            var id = kv.Key;
-            var count = kv.Value?.Value ?? 0;
-            if (count <= 0)
-                continue;
-
-            UpgradeEntry def;
-            try
-            {
-                def = catalog.GetRequired(id);
-            }
-            catch
-            {
-                continue;
-            }
-
-            var generatorId = (def.generatorId ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(generatorId))
-                continue;
-
-            if (
-                !generatorResolver.TryGetGenerator(generatorId, out var generator)
-                || generator == null
-            )
-                continue;
-
-            for (int i = 0; i < count; i++)
-                generator.ApplyUpgrade(def);
-        }
+        // Retained as a lifecycle hook for callers that expect this after generators are composed.
+        // Modifiers are now authoritative and consume purchased state directly.
+        purchasedStateChanged.OnNext("apply_all");
     }
 
     private bool CanAffordCost(CostItem[] cost)
@@ -274,9 +231,25 @@ public sealed class UpgradeService : IDisposable
 
     public void Dispose()
     {
+        purchasedStateChanged.OnCompleted();
+        purchasedStateChanged.Dispose();
+
         foreach (var kv in purchasedCountById)
             kv.Value?.Dispose();
 
         purchasedCountById.Clear();
+    }
+
+    public IReadOnlyDictionary<string, int> GetPurchasedCountsSnapshot()
+    {
+        var snapshot = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var kv in purchasedCountById)
+        {
+            var count = kv.Value?.Value ?? 0;
+            if (count > 0)
+                snapshot[kv.Key] = count;
+        }
+
+        return snapshot;
     }
 }

@@ -49,6 +49,7 @@ public class GameCompositionRoot : MonoBehaviour
 
     private WalletService walletService;
     private UpgradeService upgradeService;
+    private ModifierService modifierService;
     private GameDefinitionService gameDefinitionService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
@@ -95,6 +96,7 @@ public class GameCompositionRoot : MonoBehaviour
             walletService,
             walletViewModel,
             tickService,
+            modifierService,
             uiService,
             saveService,
             upgradeService,
@@ -148,6 +150,14 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             generatorResolver
         );
+        modifierService = new ModifierService(
+            gameDefinitionService.Modifiers,
+            gameDefinitionService.Catalog,
+            gameDefinitionService.NodeCatalog,
+            gameDefinitionService.NodeInstanceCatalog,
+            upgradeService
+        );
+        walletService.SetModifierService(modifierService);
 
         // ModalManager needs the UpgradeService for modals like Upgrades.
         modalManager.Initialize(upgradeService);
@@ -174,6 +184,7 @@ public class GameCompositionRoot : MonoBehaviour
 
         // Load saved upgrade purchase facts. (WalletService loads currency from SaveService in its constructor.)
         upgradeService.LoadFrom(saveService.Data);
+        modifierService.RebuildActiveModifiers();
     }
 
     private void BindSceneUi(ModalService modalService)
@@ -261,6 +272,7 @@ public class GameCompositionRoot : MonoBehaviour
         // automationService?.Dispose();
         foreach (var s in generatorServices)
             s?.Dispose();
+        modifierService?.Dispose();
 
         // Dispose time source after consumers
         tickService?.Dispose();

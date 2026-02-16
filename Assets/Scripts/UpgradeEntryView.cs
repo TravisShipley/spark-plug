@@ -38,12 +38,6 @@ public sealed class UpgradeEntryView : MonoBehaviour
             return;
         }
 
-        if (generator == null)
-        {
-            Debug.LogError("UpgradeEntryView: generator is null.", this);
-            return;
-        }
-
         if (upgradeService == null)
         {
             Debug.LogError("UpgradeEntryView: upgradeService is null.", this);
@@ -81,7 +75,10 @@ public sealed class UpgradeEntryView : MonoBehaviour
                 _ => upgrade.effectType.ToString(),
             };
 
-            infoText.text = $"{generator.DisplayName} {effectText}";
+            infoText.text =
+                generator != null
+                    ? $"{generator.DisplayName} {effectText}"
+                    : $"Global {effectText}";
         }
 
         if (upgrade.cost == null || upgrade.cost.Length == 0 || upgrade.cost[0] == null)

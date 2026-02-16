@@ -68,14 +68,7 @@ public sealed class UpgradesModalView : ModalView
         }
 
         // Generator lookup is provided by the ModalManager (delegates to UiServiceRegistry).
-        if (Manager is not IGeneratorResolver generatorResolver)
-        {
-            Debug.LogError(
-                "UpgradesModalView: ModalManager must implement IGeneratorResolver.",
-                this
-            );
-            return;
-        }
+        var generatorResolver = Manager as IGeneratorResolver;
 
         // UpgradeService should be exposed by ModalManager via a public property `UpgradeService`.
         upgradeService = null;
@@ -109,13 +102,15 @@ public sealed class UpgradesModalView : ModalView
                 continue;
 
             string genId = (upgrade.generatorId ?? string.Empty).Trim();
+            GeneratorService generator = null;
+            if (!string.IsNullOrEmpty(genId))
+            {
+                if (generatorResolver == null)
+                    continue;
 
-            // For v1, require a GeneratorId so we can wire it. (Global upgrades can be added later.)
-            if (string.IsNullOrEmpty(genId))
-                continue;
-
-            if (!generatorResolver.TryGetGenerator(genId, out var generator) || generator == null)
-                continue;
+                if (!generatorResolver.TryGetGenerator(genId, out generator) || generator == null)
+                    continue;
+            }
 
             var entry = Instantiate(entryPrefab, listContainer);
             entry.name = $"Upgrade_{upgrade.id}";

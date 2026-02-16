@@ -195,7 +195,10 @@ public sealed class GameDefinitionService
         if (string.IsNullOrEmpty(target))
             return false;
 
-        if (target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase))
+        if (
+            target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(target, "node.speedMultiplier", StringComparison.OrdinalIgnoreCase)
+        )
         {
             if (!string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase))
                 return false;
@@ -204,7 +207,11 @@ public sealed class GameDefinitionService
             return true;
         }
 
-        if (target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase))
+        if (
+            target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
+            || target.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase)
+        )
         {
             if (!string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase))
                 return false;

@@ -12,6 +12,7 @@ public class GeneratorListComposer
     private readonly WalletService walletService;
     private readonly WalletViewModel walletViewModel;
     private readonly TickService tickService;
+    private readonly ModifierService modifierService;
     private readonly UiServiceRegistry uiService;
     private readonly SaveService saveService;
     private readonly UpgradeService upgradeService;
@@ -28,6 +29,7 @@ public class GeneratorListComposer
         WalletService walletService,
         WalletViewModel walletViewModel,
         TickService tickService,
+        ModifierService modifierService,
         UiServiceRegistry uiService,
         SaveService saveService,
         UpgradeService upgradeService,
@@ -43,6 +45,7 @@ public class GeneratorListComposer
         this.walletService = walletService;
         this.walletViewModel = walletViewModel;
         this.tickService = tickService;
+        this.modifierService = modifierService;
         this.uiService = uiService;
         this.saveService = saveService;
         this.upgradeService = upgradeService;
@@ -139,7 +142,13 @@ public class GeneratorListComposer
 
         generatorModels.Add(model);
 
-        var service = new GeneratorService(model, generatorDefinition, walletService, tickService);
+        var service = new GeneratorService(
+            model,
+            generatorDefinition,
+            walletService,
+            tickService,
+            modifierService
+        );
 
         var generatorViewModel = new GeneratorViewModel(model, generatorDefinition, service);
 

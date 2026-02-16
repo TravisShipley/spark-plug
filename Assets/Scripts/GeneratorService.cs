@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using UniRx;
-using UnityEngine;
 
 public class GeneratorService : IDisposable
 {
@@ -9,6 +8,7 @@ public class GeneratorService : IDisposable
     private readonly GeneratorDefinition definition;
     private readonly WalletService wallet;
     private readonly TickService tickService;
+    private readonly ModifierService modifierService;
 
     private double lastIntervalSeconds;
 
@@ -35,6 +35,7 @@ public class GeneratorService : IDisposable
     private readonly ReactiveProperty<bool> isOwned;
     private readonly ReactiveProperty<bool> isRunning;
     private readonly ReactiveProperty<bool> isAutomated;
+    private bool modifierAutomationEnabled;
 
     public IReadOnlyReactiveProperty<int> Level => level;
     public IReadOnlyReactiveProperty<bool> IsOwned => isOwned;
@@ -55,7 +56,8 @@ public class GeneratorService : IDisposable
         GeneratorModel model,
         GeneratorDefinition definition,
         WalletService wallet,
-        TickService tickService
+        TickService tickService,
+        ModifierService modifierService
     )
     {
         this.model = model;
@@ -70,20 +72,26 @@ public class GeneratorService : IDisposable
         this.definition = definition;
         this.wallet = wallet;
         this.tickService = tickService;
+        this.modifierService =
+            modifierService ?? throw new ArgumentNullException(nameof(modifierService));
+
+        RefreshFromModifiers();
 
         cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
         lastIntervalSeconds = cycleDurationSeconds.Value;
 
         tickService.OnTick.Subscribe(_ => OnTick()).AddTo(disposables);
+        this.modifierService
+            .Changed.Subscribe(_ => RefreshFromModifiers())
+            .AddTo(disposables);
 
         // Preserve elapsed percentage when speed changes mid-cycle so progress does not jump.
         speedMultiplier
             .DistinctUntilChanged()
-            .Skip(1)
             .Subscribe(newSpeed =>
             {
                 // Only adjust if we are actively running a cycle.
-                bool shouldRun = isAutomated.Value || isRunning.Value;
+                bool shouldRun = IsAutomationActive() || isRunning.Value;
                 if (!isOwned.Value || !shouldRun)
                 {
                     cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
@@ -117,7 +125,7 @@ public class GeneratorService : IDisposable
         }
 
         // Automated generators run continuously; otherwise only run when explicitly running
-        bool shouldRun = isAutomated.Value || isRunning.Value;
+        bool shouldRun = IsAutomationActive() || isRunning.Value;
         if (!shouldRun)
         {
             model.CycleElapsedSeconds = 0;
@@ -167,31 +175,6 @@ public class GeneratorService : IDisposable
         return definition.BaseOutputPerCycle * level.Value * outputMultiplier.Value;
     }
 
-    public void MultiplyOutput(double factor)
-    {
-        if (double.IsNaN(factor) || double.IsInfinity(factor))
-            return;
-
-        if (factor <= 0)
-            return;
-
-        outputMultiplier.Value *= factor;
-    }
-
-    public void MultiplySpeed(double factor)
-    {
-        if (double.IsNaN(factor) || double.IsInfinity(factor))
-            return;
-
-        if (factor <= 0)
-            return;
-
-        speedMultiplier.Value *= factor;
-
-        // Keep duration in sync immediately (subscription will also run)
-        cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
-    }
-
     private double CalculateNextLevelCost()
     {
         // Cost to buy the *next* level (current level -> level+1)
@@ -214,25 +197,12 @@ public class GeneratorService : IDisposable
         if (!wallet.TrySpend(CreateCost(definition.AutomationCostResourceId, AutomationCost)))
             return false;
         model.IsAutomated = true;
-        isAutomated.Value = true;
+        isAutomated.Value = IsAutomationActive();
 
         // Automation implies continuous running from now on
         isRunning.Value = true;
 
         return true;
-    }
-
-    public void EnableAutomationFromUpgrade()
-    {
-        if (model.IsAutomated)
-            return;
-
-        model.IsAutomated = true;
-        isAutomated.Value = true;
-
-        // Automation implies continuous running.
-        if (isOwned.Value)
-            isRunning.Value = true;
     }
 
     public bool TryBuyLevel()
@@ -267,33 +237,6 @@ public class GeneratorService : IDisposable
         isRunning.Value = true;
     }
 
-    public void ApplyUpgrade(UpgradeEntry upgrade)
-    {
-        switch (upgrade.effectType)
-        {
-            case UpgradeEffectType.OutputMultiplier:
-                MultiplyOutput(upgrade.value);
-                break;
-
-            case UpgradeEffectType.SpeedMultiplier:
-                MultiplySpeed(upgrade.value);
-
-                // Debug: log the new effective cycle duration (Option A: duration = base / speedMultiplier)
-                double newSeconds = Math.Max(
-                    0.0001,
-                    definition.BaseCycleDurationSeconds / speedMultiplier.Value
-                );
-                Debug.Log(
-                    $"[GeneratorService] {definition.Id} speed x{upgrade.value:0.##} → {newSeconds:0.###}s/cycle (mult={speedMultiplier.Value:0.###})"
-                );
-                break;
-
-            case UpgradeEffectType.AutomationPolicy:
-                EnableAutomationFromUpgrade();
-                break;
-        }
-    }
-
     public void Dispose()
     {
         cycleCompleted.OnCompleted();
@@ -320,5 +263,39 @@ public class GeneratorService : IDisposable
                 amount = amount.ToString(CultureInfo.InvariantCulture)
             }
         };
+    }
+
+    private bool IsAutomationActive()
+    {
+        return model.IsAutomated || modifierAutomationEnabled;
+    }
+
+    private void RefreshFromModifiers()
+    {
+        var previousAutomation = modifierAutomationEnabled;
+        modifierAutomationEnabled = modifierService.IsNodeAutomationEnabled(definition.Id);
+        isAutomated.Value = IsAutomationActive();
+
+        var newOutputMult = modifierService.GetNodeOutputMultiplier(
+            definition.Id,
+            definition.OutputResourceId
+        );
+        if (double.IsNaN(newOutputMult) || double.IsInfinity(newOutputMult) || newOutputMult <= 0)
+            newOutputMult = 1.0;
+        outputMultiplier.Value = newOutputMult;
+
+        var previousSpeedMult = speedMultiplier.Value;
+        var newSpeedMult = modifierService.GetNodeSpeedMultiplier(definition.Id);
+        if (double.IsNaN(newSpeedMult) || double.IsInfinity(newSpeedMult) || newSpeedMult <= 0)
+            newSpeedMult = 1.0;
+        speedMultiplier.Value = newSpeedMult;
+        if (Math.Abs(previousSpeedMult - newSpeedMult) <= 0.0000001)
+        {
+            cycleDurationSeconds.Value = ComputeCycleDurationSeconds(newSpeedMult);
+            lastIntervalSeconds = cycleDurationSeconds.Value;
+        }
+
+        if (!previousAutomation && modifierAutomationEnabled && isOwned.Value)
+            isRunning.Value = true;
     }
 }

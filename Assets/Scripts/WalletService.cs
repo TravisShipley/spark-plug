@@ -9,6 +9,7 @@ public class WalletService : IDisposable
     private readonly CompositeDisposable disposables = new();
     private readonly SaveService saveService;
     private readonly ResourceCatalog resourceCatalog;
+    private ModifierService modifierService;
     private readonly Dictionary<string, ReactiveProperty<double>> balancesByResourceId = new(
         StringComparer.Ordinal
     );
@@ -48,8 +49,18 @@ public class WalletService : IDisposable
         if (Math.Abs(amount) < double.Epsilon)
             return;
 
+        if (amount > 0 && modifierService != null)
+        {
+            amount *= modifierService.GetResourceGainMultiplier(resourceId);
+        }
+
         var balance = GetBalancePropertyInternal(resourceId);
         balance.Value += amount;
+    }
+
+    public void SetModifierService(ModifierService modifierService)
+    {
+        this.modifierService = modifierService;
     }
 
     public bool TrySpend(CostItem[] cost)
