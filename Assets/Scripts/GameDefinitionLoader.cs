@@ -29,7 +29,9 @@ public static class GameDefinitionLoader
                 throw new InvalidOperationException("GameDefinition: 'nodes' is missing or empty.");
 
             if (gd.nodeInstances == null || gd.nodeInstances.Count == 0)
-                throw new InvalidOperationException("GameDefinition: 'nodeInstances' is missing or empty.");
+                throw new InvalidOperationException(
+                    "GameDefinition: 'nodeInstances' is missing or empty."
+                );
 
             // Optional roots (may be empty, but should not be null if present in schema).
             if (gd.upgrades == null)
@@ -37,6 +39,9 @@ public static class GameDefinitionLoader
 
             if (gd.modifiers == null)
                 gd.modifiers = new List<ModifierEntry>();
+
+            if (gd.nodeInputs == null)
+                gd.nodeInputs = new List<NodeInputDefinition>();
 
             GameDefinitionValidator.Validate(gd);
             return gd;

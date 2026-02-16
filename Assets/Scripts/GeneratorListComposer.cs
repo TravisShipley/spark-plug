@@ -177,10 +177,12 @@ public class GeneratorListComposer
         );
 
         // v1 runtime mapping: use first output entry (fallback to 0)
-        var output = nodeDef?.outputs != null && nodeDef.outputs.Count > 0 ? nodeDef.outputs[0] : null;
+        var output =
+            nodeDef?.outputs != null && nodeDef.outputs.Count > 0 ? nodeDef.outputs[0] : null;
         var payout = output?.basePayout ?? 0.0;
         var perSecond = output?.basePerSecond ?? 0.0;
-        definition.BaseOutputPerCycle = payout > 0 ? payout : perSecond * definition.BaseCycleDurationSeconds;
+        definition.BaseOutputPerCycle =
+            payout > 0 ? payout : perSecond * definition.BaseCycleDurationSeconds;
         definition.OutputResourceId = (output?.resource ?? string.Empty).Trim();
         definition.LevelCostResourceId = (nodeDef?.leveling?.levelResource ?? string.Empty).Trim();
 
@@ -270,7 +272,10 @@ public class GeneratorListComposer
         return false;
     }
 
-    private static ModifierEntry FindModifierById(IReadOnlyList<ModifierEntry> modifiers, string modifierId)
+    private static ModifierEntry FindModifierById(
+        IReadOnlyList<ModifierEntry> modifiers,
+        string modifierId
+    )
     {
         for (int i = 0; i < modifiers.Count; i++)
         {
@@ -332,7 +337,11 @@ public class GeneratorListComposer
         return null;
     }
 
-    private static bool TryGetUpgradeCost(UpgradeEntry upgrade, out double cost, out string resourceId)
+    private static bool TryGetUpgradeCost(
+        UpgradeEntry upgrade,
+        out double cost,
+        out string resourceId
+    )
     {
         cost = 0.0;
         resourceId = "currencySoft";
@@ -353,7 +362,14 @@ public class GeneratorListComposer
         if (string.IsNullOrEmpty(amount))
             return false;
 
-        if (double.TryParse(amount, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        if (
+            double.TryParse(
+                amount,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsed
+            )
+        )
         {
             cost = parsed;
             return true;

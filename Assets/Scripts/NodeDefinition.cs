@@ -12,6 +12,7 @@ public sealed class NodeDefinition
     public string[] tags;
 
     // Production
+    public List<NodeInputDefinition> inputs;
     public CycleDefinition cycle;
 
     // Leveling / economy
@@ -67,4 +68,16 @@ public sealed class NodeOutputDefinition
     public double basePerSecond;
     public double basePayout;
     public double amountPerCycle;
+}
+
+[Serializable]
+public sealed class NodeInputDefinition
+{
+    // For top-level NodeInputs table rows.
+    // For node-local inputs, this may be empty and is inferred from the parent node.
+    public string nodeId;
+    public string resource;
+    public string amountPerCycle;
+    public string amountPerCycleFromVar;
+    public string amountPerCycleFromState;
 }

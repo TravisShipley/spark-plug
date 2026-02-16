@@ -1,14 +1,17 @@
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 public sealed class GameDefinitionService
 {
     public const string DefaultPath = "Assets/Data/game_definition.json";
     private readonly string path;
     private GameDefinition definition;
+    private readonly HashSet<string> warnedNodeInputsByNodeId = new(StringComparer.Ordinal);
     private ResourceCatalog resourceCatalog;
     private NodeCatalog nodeCatalog;
+    private NodeInputCatalog nodeInputCatalog;
     private NodeInstanceCatalog nodeInstanceCatalog;
     private UpgradeCatalog upgradeCatalog;
 
@@ -23,14 +26,18 @@ public sealed class GameDefinitionService
         definition = GameDefinitionLoader.LoadFromFile(path);
         resourceCatalog = new ResourceCatalog(definition?.resources);
         nodeCatalog = new NodeCatalog(definition?.nodes);
+        nodeInputCatalog = new NodeInputCatalog(definition);
         nodeInstanceCatalog = new NodeInstanceCatalog(definition?.nodeInstances);
         NormalizeUpgradeLegacyFields();
         upgradeCatalog = new UpgradeCatalog(definition?.upgrades);
+        WarnForNodeInputsNotExecuted();
     }
 
     public IReadOnlyList<ResourceDefinition> Resources =>
         resourceCatalog?.Resources ?? new List<ResourceDefinition>();
     public IReadOnlyList<NodeDefinition> Nodes => nodeCatalog?.Nodes ?? new List<NodeDefinition>();
+    public IReadOnlyList<NodeInputDefinition> NodeInputs =>
+        nodeInputCatalog?.NodeInputs ?? new List<NodeInputDefinition>();
     public IReadOnlyList<NodeInstanceDefinition> NodeInstances =>
         nodeInstanceCatalog?.NodeInstances ?? new List<NodeInstanceDefinition>();
     public IReadOnlyList<ModifierEntry> Modifiers =>
@@ -72,6 +79,7 @@ public sealed class GameDefinitionService
     }
 
     public NodeCatalog NodeCatalog => nodeCatalog;
+    public NodeInputCatalog NodeInputCatalog => nodeInputCatalog;
     public NodeInstanceCatalog NodeInstanceCatalog => nodeInstanceCatalog;
     public ResourceCatalog ResourceCatalog => resourceCatalog;
     public UpgradeCatalog UpgradeCatalog => upgradeCatalog;
@@ -215,5 +223,30 @@ public sealed class GameDefinitionService
         }
 
         return false;
+    }
+
+    // TODO: This hasn't really been tested as node inputs are not needed at the moment.
+    private void WarnForNodeInputsNotExecuted()
+    {
+        if (nodeInputCatalog == null || nodeInputCatalog.Count <= 0)
+            return;
+
+        Debug.Log(
+            $"[NodeInputs] Loaded {nodeInputCatalog.Count} row(s). Node inputs are parsed but not executed in the current vertical slice."
+        );
+
+        foreach (var nodeId in nodeInputCatalog.NodeIdsWithInputs)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+                continue;
+
+            var normalized = nodeId.Trim();
+            if (!warnedNodeInputsByNodeId.Add(normalized))
+                continue;
+
+            Debug.LogWarning(
+                $"[NodeInputs] Node '{normalized}' has inputs defined but inputs are not executed in the current vertical slice."
+            );
+        }
     }
 }

@@ -69,7 +69,10 @@ public static class GameDefinitionValidator
                 errors.Add($"Duplicate node id '{n.id}'.");
 
             ValidateNodeResourceReferences(n, i, resourceIds, errors);
+            ValidateNodeLocalInputsReferences(n, i, resourceIds, errors);
         }
+
+        ValidateTopLevelNodeInputsReferences(gd.nodeInputs, nodeIds, resourceIds, errors);
 
         // ---- NodeInstances -> Nodes
         var instanceIds = new HashSet<string>(StringComparer.Ordinal);
@@ -93,7 +96,9 @@ public static class GameDefinitionValidator
             }
             else if (!nodeIds.Contains(instance.nodeId))
             {
-                var instanceId = string.IsNullOrWhiteSpace(instance.id) ? $"index {i}" : instance.id;
+                var instanceId = string.IsNullOrWhiteSpace(instance.id)
+                    ? $"index {i}"
+                    : instance.id;
                 errors.Add(
                     $"nodeInstances[{i}] ('{instanceId}') references missing node '{instance.nodeId}'."
                 );
@@ -195,7 +200,9 @@ public static class GameDefinitionValidator
             var modifierId = (effect.modifierId ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(modifierId))
             {
-                errors.Add($"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId is empty.");
+                errors.Add(
+                    $"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId is empty."
+                );
                 continue;
             }
 
@@ -275,7 +282,9 @@ public static class GameDefinitionValidator
             var resourceId = (cost.resource ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(resourceId))
             {
-                errors.Add($"upgrades[{upgradeIndex}] ('{upgrade.id}') cost[{i}].resource is empty.");
+                errors.Add(
+                    $"upgrades[{upgradeIndex}] ('{upgrade.id}') cost[{i}].resource is empty."
+                );
             }
             else if (!resourceIds.Contains(resourceId))
             {
@@ -283,7 +292,82 @@ public static class GameDefinitionValidator
                     $"upgrades[{upgradeIndex}] ('{upgrade.id}') cost[{i}].resource '{resourceId}' references missing resources.id."
                 );
             }
+        }
+    }
 
+    private static void ValidateNodeLocalInputsReferences(
+        NodeDefinition node,
+        int nodeIndex,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        if (node?.inputs == null)
+            return;
+
+        for (int i = 0; i < node.inputs.Count; i++)
+        {
+            var input = node.inputs[i];
+            if (input == null)
+            {
+                errors.Add($"nodes[{nodeIndex}] ('{node?.id}') inputs[{i}] is null.");
+                continue;
+            }
+
+            var inputResource = (input.resource ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(inputResource))
+            {
+                errors.Add($"nodes[{nodeIndex}] ('{node?.id}') inputs[{i}].resource is empty.");
+            }
+            else if (!resourceIds.Contains(inputResource))
+            {
+                errors.Add(
+                    $"nodes[{nodeIndex}] ('{node?.id}') inputs[{i}].resource '{inputResource}' references missing resources.id."
+                );
+            }
+        }
+    }
+
+    private static void ValidateTopLevelNodeInputsReferences(
+        IReadOnlyList<NodeInputDefinition> nodeInputs,
+        HashSet<string> nodeIds,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        if (nodeInputs == null)
+            return;
+
+        for (int i = 0; i < nodeInputs.Count; i++)
+        {
+            var input = nodeInputs[i];
+            if (input == null)
+            {
+                errors.Add($"nodeInputs[{i}] is null.");
+                continue;
+            }
+
+            var nodeId = (input.nodeId ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(nodeId))
+            {
+                errors.Add($"nodeInputs[{i}].nodeId is empty.");
+            }
+            else if (!nodeIds.Contains(nodeId))
+            {
+                errors.Add($"nodeInputs[{i}].nodeId '{nodeId}' references missing nodes.id.");
+            }
+
+            var inputResource = (input.resource ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(inputResource))
+            {
+                errors.Add($"nodeInputs[{i}].resource is empty.");
+            }
+            else if (!resourceIds.Contains(inputResource))
+            {
+                errors.Add(
+                    $"nodeInputs[{i}].resource '{inputResource}' references missing resources.id."
+                );
+            }
         }
     }
 
