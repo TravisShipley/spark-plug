@@ -217,3 +217,69 @@ var runtimeState = generator.State;
 ```
 
 If the word helps clarify a domain distinction, it may be used.
+
+---
+
+## 6. Enforce MVVM boundaries
+
+UI code must follow this direction of responsibility:
+
+`Domain/Service -> ViewModel -> View`
+
+### 6.1 Service / Domain responsibilities
+
+- Own gameplay/business rules and derived state.
+- Expose reactive state needed by UI (`IReadOnlyReactiveProperty<T>`, observables, or equivalent).
+- Handle calculations like progression ratios, thresholds, affordability, unlock logic, and modifier effects.
+- Never read Unity UI components directly.
+
+### 6.2 ViewModel responsibilities
+
+- Adapt service/domain state for presentation.
+- Compose multiple streams when needed for display semantics.
+- Expose current values plus change streams.
+- Do not become source-of-truth for gameplay state.
+
+### 6.3 View responsibilities
+
+- Bind to ViewModel outputs and render.
+- Handle visual-only formatting and presentation concerns.
+- Forward user input/intents to services through ViewModel/service APIs.
+- Must not contain gameplay or progression calculations.
+
+### 6.4 Forbidden in Views
+
+- Derived gameplay math (ratios, rank progression, thresholds, unlock checks).
+- Content-definition lookups (catalog/definition traversal).
+- Save-state mutation.
+- Modifier resolution logic.
+
+If a view needs a value that is not exposed yet, add it to service/domain (preferred) or ViewModel composition layer.
+
+### 6.5 UI change review checklist (required)
+
+For any UI-related PR/change, include and answer:
+
+- [ ] Where does truth live? (service/domain type + field/property)
+- [ ] What is derived vs persisted?
+- [ ] Does the view only bind/render?
+- [ ] Is any gameplay math still in the view?
+- [ ] Is data flow explicitly documented?
+
+### 6.6 Required data-flow note in PR/AI output
+
+Include a short section:
+
+```text
+Data Flow:
+<domain source> -> <viewmodel property> -> <view binding>
+```
+
+Example:
+
+```text
+Data Flow:
+GeneratorService.MilestoneProgressRatio
+-> GeneratorViewModel.MilestoneProgressRatio
+-> GeneratorView.levelProgressFill.fillAmount
+```
