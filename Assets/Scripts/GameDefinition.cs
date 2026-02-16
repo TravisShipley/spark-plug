@@ -58,13 +58,7 @@ public sealed class UpgradeEntry
 
     public string[] tags;
 
-    // Legacy/simple fields (kept for backward compatibility if needed)
-    public string generatorId;
-    public double costSimple;
-
     public bool enabled = true;
-    public UpgradeEffectType effectType;
-    public double value;
 }
 
 [Serializable]

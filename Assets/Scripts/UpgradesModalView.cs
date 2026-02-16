@@ -67,9 +67,6 @@ public sealed class UpgradesModalView : ModalView
             return;
         }
 
-        // Generator lookup is provided by the ModalManager (delegates to UiServiceRegistry).
-        var generatorResolver = Manager as IGeneratorResolver;
-
         // UpgradeService should be exposed by ModalManager via a public property `UpgradeService`.
         upgradeService = null;
         var prop = Manager.GetType().GetProperty("UpgradeService");
@@ -95,22 +92,11 @@ public sealed class UpgradesModalView : ModalView
             return;
         }
 
-        // Show all upgrades in the catalog. Each entry wires itself to the generator specified by upgrade.generatorId.
+        // Show all upgrades in the catalog. Targeting/effects are derived from resolved modifiers.
         foreach (var upgrade in upgradeCatalog.Upgrades)
         {
             if (upgrade == null)
                 continue;
-
-            string genId = (upgrade.generatorId ?? string.Empty).Trim();
-            GeneratorService generator = null;
-            if (!string.IsNullOrEmpty(genId))
-            {
-                if (generatorResolver == null)
-                    continue;
-
-                if (!generatorResolver.TryGetGenerator(genId, out generator) || generator == null)
-                    continue;
-            }
 
             var entry = Instantiate(entryPrefab, listContainer);
             entry.name = $"Upgrade_{upgrade.id}";
@@ -121,8 +107,66 @@ public sealed class UpgradesModalView : ModalView
                 .ToReadOnlyReactiveProperty()
                 .AddTo(disposables);
 
-            entry.Bind(upgrade, generator, upgradeService, purchasedCount);
+            var summary = BuildUpgradeTargetSummary(gameDefService, upgrade);
+            entry.Bind(upgrade, summary, upgradeService, purchasedCount);
         }
+    }
+
+    private static string BuildUpgradeTargetSummary(GameDefinitionService gameDefService, UpgradeEntry upgrade)
+    {
+        if (upgrade == null)
+            return "modifier-driven";
+
+        if (gameDefService == null)
+            return "modifier-driven";
+
+        var modifiers = gameDefService.ResolveUpgradeModifiers(upgrade.id);
+        if (modifiers == null || modifiers.Count == 0)
+            return "modifier-driven";
+
+        for (int i = 0; i < modifiers.Count; i++)
+        {
+            var modifier = modifiers[i];
+            if (modifier == null)
+                continue;
+
+            var target = (modifier.target ?? string.Empty).Trim();
+            var scopeKind = (modifier.scope?.kind ?? string.Empty).Trim();
+            var scopeNodeId = (modifier.scope?.nodeId ?? string.Empty).Trim();
+            var scopeNodeTag = (modifier.scope?.nodeTag ?? string.Empty).Trim();
+            var scopeResource = (modifier.scope?.resource ?? string.Empty).Trim();
+
+            string where = "Global";
+            if (!string.IsNullOrEmpty(scopeNodeId) && gameDefService.TryGetNode(scopeNodeId, out var node) && node != null)
+                where = string.IsNullOrWhiteSpace(node.displayName) ? scopeNodeId : node.displayName;
+            else if (!string.IsNullOrEmpty(scopeNodeId))
+                where = scopeNodeId;
+            else if (!string.IsNullOrEmpty(scopeNodeTag))
+                where = $"Tag:{scopeNodeTag}";
+            else if (string.Equals(scopeKind, "resource", System.StringComparison.OrdinalIgnoreCase))
+                where = $"Resource:{scopeResource}";
+
+            string effect = "modifier";
+            if (
+                target.StartsWith("nodeSpeedMultiplier", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(target, "node.speedMultiplier", System.StringComparison.OrdinalIgnoreCase)
+            )
+                effect = $"speed x{Format.Abbreviated(modifier.value)}";
+            else if (
+                target.StartsWith("nodeOutput", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(target, "node.outputMultiplier", System.StringComparison.OrdinalIgnoreCase)
+                || target.StartsWith("node.outputMultiplier.", System.StringComparison.OrdinalIgnoreCase)
+            )
+                effect = $"output x{Format.Abbreviated(modifier.value)}";
+            else if (string.Equals(target, "automation.policy", System.StringComparison.OrdinalIgnoreCase))
+                effect = "automation enabled";
+            else if (target.StartsWith("resourceGain", System.StringComparison.OrdinalIgnoreCase))
+                effect = $"resource gain x{Format.Abbreviated(modifier.value)}";
+
+            return $"{where} {effect}";
+        }
+
+        return "modifier-driven";
     }
 
     private void ClearList()

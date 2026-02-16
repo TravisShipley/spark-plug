@@ -1,12 +1,15 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorResolver
+public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
 {
-    [SerializeField] private bool dontDestroyOnLoad = false;
+    [SerializeField]
+    private bool dontDestroyOnLoad = false;
 
-    private readonly Dictionary<string, GeneratorService> generatorsById =
-        new Dictionary<string, GeneratorService>(System.StringComparer.Ordinal);
+    private readonly Dictionary<string, GeneratorService> generatorsById = new Dictionary<
+        string,
+        GeneratorService
+    >(System.StringComparer.Ordinal);
 
     public WalletService Wallet { get; private set; }
 

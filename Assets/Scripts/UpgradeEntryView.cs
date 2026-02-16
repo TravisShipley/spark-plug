@@ -25,7 +25,7 @@ public sealed class UpgradeEntryView : MonoBehaviour
 
     public void Bind(
         UpgradeEntry upgrade,
-        GeneratorService generator,
+        string targetSummary,
         UpgradeService upgradeService,
         IReadOnlyReactiveProperty<int> purchasedCount
     )
@@ -66,19 +66,9 @@ public sealed class UpgradeEntryView : MonoBehaviour
 
         if (infoText != null)
         {
-            string effectText = upgrade.effectType switch
-            {
-                UpgradeEffectType.OutputMultiplier =>
-                    $"profits x{Format.Abbreviated(upgrade.value)}",
-                UpgradeEffectType.SpeedMultiplier => $"speed x{Format.Abbreviated(upgrade.value)}",
-                UpgradeEffectType.AutomationPolicy => "automation enabled",
-                _ => upgrade.effectType.ToString(),
-            };
-
-            infoText.text =
-                generator != null
-                    ? $"{generator.DisplayName} {effectText}"
-                    : $"Global {effectText}";
+            infoText.text = string.IsNullOrWhiteSpace(targetSummary)
+                ? "modifier-driven"
+                : targetSummary.Trim();
         }
 
         if (upgrade.cost == null || upgrade.cost.Length == 0 || upgrade.cost[0] == null)

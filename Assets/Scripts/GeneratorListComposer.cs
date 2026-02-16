@@ -357,12 +357,6 @@ public class GeneratorListComposer
         if (upgrade == null)
             return false;
 
-        if (upgrade.costSimple > 0)
-        {
-            cost = upgrade.costSimple;
-            return true;
-        }
-
         if (upgrade.cost == null || upgrade.cost.Length == 0 || upgrade.cost[0] == null)
             return false;
 

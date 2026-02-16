@@ -3,11 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using UniRx;
 
-public interface IGeneratorResolver
-{
-    bool TryGetGenerator(string generatorId, out GeneratorService generator);
-}
-
 public sealed class UpgradeService : IDisposable
 {
     private readonly UpgradeCatalog catalog;
@@ -24,14 +19,12 @@ public sealed class UpgradeService : IDisposable
     public UpgradeService(
         UpgradeCatalog catalog,
         WalletService wallet,
-        SaveService saveService,
-        IGeneratorResolver generatorResolver
+        SaveService saveService
     )
     {
         this.catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
-        _ = generatorResolver ?? throw new ArgumentNullException(nameof(generatorResolver));
     }
 
     public WalletService Wallet => wallet;

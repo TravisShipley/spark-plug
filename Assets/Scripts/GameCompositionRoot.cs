@@ -132,24 +132,8 @@ public class GameCompositionRoot : MonoBehaviour
         // Scene-bound registry that exposes runtime services to UI.
         uiService.Initialize(walletService);
 
-        if (uiService is not IGeneratorResolver generatorResolver)
-        {
-            Debug.LogError(
-                "GameCompositionRoot: UiServiceRegistry must implement IGeneratorResolver for UpgradeService.",
-                this
-            );
-            enabled = false;
-            modalService = null;
-            return;
-        }
-
         // Construct UpgradeService with the authoritative UpgradeCatalog
-        upgradeService = new UpgradeService(
-            gameDefinitionService.Catalog,
-            walletService,
-            saveService,
-            generatorResolver
-        );
+        upgradeService = new UpgradeService(gameDefinitionService.Catalog, walletService, saveService);
         modifierService = new ModifierService(
             gameDefinitionService.Modifiers,
             gameDefinitionService.Catalog,

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public sealed class ModalManager : MonoBehaviour, IGeneratorResolver
+public sealed class ModalManager : MonoBehaviour, IGeneratorLookup
 {
     // Inspector helper for modal registry
     [Serializable]

@@ -197,7 +197,12 @@ public static class GameDefinitionValidator
     )
     {
         if (upgrade.effects == null || upgrade.effects.Length == 0)
+        {
+            errors.Add(
+                $"Upgrade '{upgrade.id}' has no effects. Upgrades must define effects[].modifierId."
+            );
             return;
+        }
 
         for (int i = 0; i < upgrade.effects.Length; i++)
         {
@@ -211,16 +216,14 @@ public static class GameDefinitionValidator
             var modifierId = (effect.modifierId ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(modifierId))
             {
-                errors.Add(
-                    $"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId is empty."
-                );
+                errors.Add($"Upgrade '{upgrade.id}' has empty effects[{i}].modifierId.");
                 continue;
             }
 
             if (!modifierIds.Contains(modifierId))
             {
                 errors.Add(
-                    $"upgrades[{upgradeIndex}] ('{upgrade.id}') effects[{i}].modifierId '{modifierId}' references missing modifiers.id."
+                    $"Upgrade '{upgrade.id}' references missing modifierId '{modifierId}'. Fix the sheet."
                 );
             }
         }

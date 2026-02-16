@@ -45,22 +45,4 @@ public sealed class UpgradeCatalog
         return e;
     }
 
-    public List<UpgradeEntry> GetForGenerator(string generatorId)
-    {
-        var gen = (generatorId ?? string.Empty).Trim();
-        var result = new List<UpgradeEntry>();
-        foreach (var u in Upgrades)
-        {
-            var target = (u.generatorId ?? string.Empty).Trim();
-            if (
-                string.IsNullOrEmpty(target)
-                || (
-                    !string.IsNullOrEmpty(gen)
-                    && string.Equals(target, gen, StringComparison.Ordinal)
-                )
-            )
-                result.Add(u);
-        }
-        return result;
-    }
 }
