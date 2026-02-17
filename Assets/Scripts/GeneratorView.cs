@@ -46,7 +46,6 @@ public class GeneratorView : MonoBehaviour
 
     private CompositeDisposable disposables = new();
     private GeneratorViewModel viewModel;
-    private GeneratorService generatorService;
 
     private float cycleStartTime;
     private float lastCycleDuration;
@@ -60,20 +59,15 @@ public class GeneratorView : MonoBehaviour
 
     private ProgressState progressState;
 
-    public void Bind(
-        GeneratorViewModel vm,
-        GeneratorService generatorService,
-        WalletViewModel walletViewModel
-    )
+    public void Bind(GeneratorViewModel vm)
     {
         // Allow safe re-binding (e.g., scene reload / reuse) by clearing previous subscriptions.
         disposables.Dispose();
         disposables = new CompositeDisposable();
 
-        this.generatorService = generatorService;
         Initialize(vm);
 
-        lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+        lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
         progressState = ProgressState.Idle;
 
         if (progressFill == null)
@@ -82,39 +76,22 @@ public class GeneratorView : MonoBehaviour
             return;
         }
 
-        var nextLevelCost = vm
-            .Level.Select(_ => generatorService.NextLevelCost)
-            .StartWith(generatorService.NextLevelCost)
-            .DistinctUntilChanged();
-
-        var canAffordLevel = Observable
-            .CombineLatest(
-                walletViewModel.Balance(vm.LevelCostResourceId).DistinctUntilChanged(),
-                nextLevelCost,
-                (balance, cost) => balance >= cost
-            )
-            .DistinctUntilChanged();
-
-        var isOwned = vm.IsOwned.DistinctUntilChanged();
-
         // Start the progress bar running
-        generatorService
-            .IsRunning.DistinctUntilChanged()
+        vm.IsRunning.DistinctUntilChanged()
             .Where(running => running)
             .Subscribe(_ =>
             {
                 progressState = ProgressState.Animating;
 
                 cycleStartTime = Time.time;
-                lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+                lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
 
                 progressFill.fillAmount = 0f;
             })
             .AddTo(disposables);
 
         // Manual mode: when the sim stops, keep animating until the bar reaches full, then hold.
-        generatorService
-            .IsRunning.DistinctUntilChanged()
+        vm.IsRunning.DistinctUntilChanged()
             .Where(running => !running)
             .Subscribe(_ =>
             {
@@ -127,19 +104,18 @@ public class GeneratorView : MonoBehaviour
             .AddTo(disposables);
 
         // Handle mid-cycle speed changes by preserving elapsed percentage
-        generatorService
-            .CycleDurationSeconds.DistinctUntilChanged()
+        vm.CycleDurationSeconds.DistinctUntilChanged()
             .Subscribe(newDuration =>
             {
                 // If we're not actively running a cycle, just update the cached duration.
-                if (!generatorService.IsRunning.Value)
+                if (!vm.IsRunning.Value)
                 {
                     lastCycleDuration = (float)newDuration;
                     return;
                 }
 
                 // Preserve elapsed percentage based on simulation progress to avoid drift.
-                float percent = Mathf.Clamp01((float)generatorService.CycleProgress.Value);
+                float percent = Mathf.Clamp01((float)vm.CycleProgress.Value);
 
                 lastCycleDuration = Mathf.Max(MinCycleDurationSeconds, (float)newDuration);
                 cycleStartTime = Time.time - percent * lastCycleDuration;
@@ -148,76 +124,46 @@ public class GeneratorView : MonoBehaviour
 
         if (buildButtonView != null)
         {
-            var label = nextLevelCost.Select(cost => $"Build\n{Format.Currency(cost)}");
-
             buildButtonView.Bind(
-                labelText: label,
-                interactable: canAffordLevel,
-                visible: isOwned.Select(x => !x),
-                onClick: () =>
-                {
-                    if (generatorService.TryBuyLevel())
-                    {
-                        generatorService.StartRun();
-                    }
-                }
+                labelText: vm.NextLevelCost.Select(cost => $"Build\n{Format.Currency(cost)}")
+                    .DistinctUntilChanged(),
+                interactable: vm.BuildCommand.CanExecute,
+                visible: vm.BuildCommand.IsVisible,
+                onClick: vm.BuildCommand.Execute
             );
         }
 
         if (levelUpButtonView != null)
         {
-            var label = nextLevelCost.Select(cost => $"Level Up\n{Format.Currency(cost)}");
-
             levelUpButtonView.Bind(
-                labelText: label,
-                interactable: canAffordLevel,
-                visible: isOwned,
-                onClick: () => generatorService.TryBuyLevel()
+                labelText: vm.NextLevelCost.Select(cost => $"Level Up\n{Format.Currency(cost)}")
+                    .DistinctUntilChanged(),
+                interactable: vm.LevelUpCommand.CanExecute,
+                visible: vm.LevelUpCommand.IsVisible,
+                onClick: vm.LevelUpCommand.Execute
             );
         }
 
         if (collectButtonView != null)
         {
-            var label = Observable.Return("Collect");
-
-            // Interactable: only when not currently running (i.e., ready for player to start the next cycle)
-            var canCollect = generatorService
-                .IsRunning.Select(running => !running)
-                .DistinctUntilChanged();
-
-            // Visible: only show once owned, and only when NOT automated
-            var visible = Observable
-                .CombineLatest(
-                    vm.IsOwned.DistinctUntilChanged(),
-                    vm.IsAutomated.DistinctUntilChanged(),
-                    (owned, automated) => owned && !automated
-                )
-                .DistinctUntilChanged();
-
             collectButtonView.Bind(
-                labelText: label,
-                interactable: canCollect,
-                visible: visible,
-                onClick: () =>
-                {
-                    // Player-initiated collection: collect now, then immediately start the next cycle.
-                    generatorService.Collect();
-                    generatorService.StartRun();
-                }
+                labelText: Observable.Return("Collect"),
+                interactable: vm.CollectCommand.CanExecute,
+                visible: vm.CollectCommand.IsVisible,
+                onClick: vm.CollectCommand.Execute
             );
         }
 
         // Visual sync on cycle completion:
         // - Manual mode: animate to full and wait for Collect
         // - Automated mode: immediately restart from 0
-        generatorService
-            .CycleCompleted.Subscribe(_ =>
+        vm.CycleCompleted.Subscribe(_ =>
             {
                 if (viewModel.IsAutomated.Value)
                 {
                     progressState = ProgressState.Animating;
                     cycleStartTime = Time.time;
-                    lastCycleDuration = (float)generatorService.CycleDurationSeconds.Value;
+                    lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
 
                     progressFill.fillAmount = 0f;
                 }
@@ -291,7 +237,7 @@ public class GeneratorView : MonoBehaviour
         if (progressState == ProgressState.Complete)
             return;
 
-        bool isRunning = generatorService.IsRunning.Value;
+        bool isRunning = viewModel.IsRunning.Value;
         if (!isRunning && progressState != ProgressState.Animating)
             return;
 

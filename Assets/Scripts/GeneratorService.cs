@@ -25,9 +25,20 @@ public class GeneratorService : IDisposable
 
     private readonly ReactiveProperty<double> cycleDurationSeconds = new(0);
     public IReadOnlyReactiveProperty<double> CycleDurationSeconds => cycleDurationSeconds;
+    private readonly ReactiveProperty<double> nextLevelCost = new(0);
+    private readonly ReactiveProperty<bool> canBuyLevel = new(false);
+    private readonly ReactiveProperty<bool> canCollect = new(false);
 
     public double AutomationCost => definition.AutomationCost;
-    public double NextLevelCost => CalculateNextLevelCost();
+    public double BuildCost => NextLevelCost;
+    public double LevelCost => NextLevelCost;
+    public double NextLevelCost => nextLevelCost.Value;
+    public IReadOnlyReactiveProperty<double> NextLevelCostReactive => nextLevelCost;
+    public bool CanCollect => canCollect.Value;
+    public IReadOnlyReactiveProperty<bool> CanCollectReactive => canCollect;
+    public bool CanStart => isOwned.Value && !isAutomated.Value && !isRunning.Value;
+    public bool CanBuyLevel => canBuyLevel.Value;
+    public IReadOnlyReactiveProperty<bool> CanBuyLevelReactive => canBuyLevel;
 
     private readonly Subject<Unit> cycleCompleted = new();
     public IObservable<Unit> CycleCompleted => cycleCompleted;
@@ -91,14 +102,14 @@ public class GeneratorService : IDisposable
 
         ValidateMilestoneLevels(definition.MilestoneLevels);
         RefreshFromModifiers();
+        RefreshEconomyState();
+        RefreshCanCollectState();
 
         cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
         lastIntervalSeconds = cycleDurationSeconds.Value;
 
         tickService.OnTick.Subscribe(_ => OnTick()).AddTo(disposables);
-        this.modifierService
-            .Changed.Subscribe(_ => RefreshFromModifiers())
-            .AddTo(disposables);
+        this.modifierService.Changed.Subscribe(_ => RefreshFromModifiers()).AddTo(disposables);
 
         // Preserve elapsed percentage when speed changes mid-cycle so progress does not jump.
         speedMultiplier
@@ -125,6 +136,22 @@ public class GeneratorService : IDisposable
 
                 cycleProgress.Value = model.CycleElapsedSeconds / newInterval;
             })
+            .AddTo(disposables);
+
+        level.DistinctUntilChanged().Subscribe(_ => RefreshEconomyState()).AddTo(disposables);
+        isOwned.DistinctUntilChanged().Subscribe(_ => RefreshCanCollectState()).AddTo(disposables);
+        isAutomated
+            .DistinctUntilChanged()
+            .Subscribe(_ => RefreshCanCollectState())
+            .AddTo(disposables);
+        isRunning
+            .DistinctUntilChanged()
+            .Subscribe(_ => RefreshCanCollectState())
+            .AddTo(disposables);
+        wallet
+            .GetBalanceProperty(definition.LevelCostResourceId)
+            .DistinctUntilChanged()
+            .Subscribe(_ => RefreshEconomyState())
             .AddTo(disposables);
 
         level.DistinctUntilChanged().Subscribe(RefreshMilestoneProgress).AddTo(disposables);
@@ -204,11 +231,14 @@ public class GeneratorService : IDisposable
         double baseCost = Math.Max(0, definition.BaseLevelCost);
         double growth = Math.Max(1.0, definition.LevelCostGrowth);
 
-        int currentLevel = Math.Max(1, model.Level);
+        // Use the reactive level as the authoritative value.
+        int currentLevel = Math.Max(1, level.Value);
+
         baseCost =
             (baseCost > 0) ? baseCost
-            : (model.Level == 0) ? 0
+            : (level.Value == 0) ? 0
             : 1;
+
         return baseCost * Math.Pow(growth, currentLevel - 1);
     }
 
@@ -276,6 +306,9 @@ public class GeneratorService : IDisposable
         outputMultiplier.Dispose();
         speedMultiplier.Dispose();
         cycleDurationSeconds.Dispose();
+        nextLevelCost.Dispose();
+        canBuyLevel.Dispose();
+        canCollect.Dispose();
 
         disposables.Dispose();
     }
@@ -287,8 +320,8 @@ public class GeneratorService : IDisposable
             new CostItem
             {
                 resource = resourceId,
-                amount = amount.ToString(CultureInfo.InvariantCulture)
-            }
+                amount = amount.ToString(CultureInfo.InvariantCulture),
+            },
         };
     }
 
@@ -316,14 +349,12 @@ public class GeneratorService : IDisposable
         if (double.IsNaN(newSpeedMult) || double.IsInfinity(newSpeedMult) || newSpeedMult <= 0)
             newSpeedMult = 1.0;
         speedMultiplier.Value = newSpeedMult;
-        if (Math.Abs(previousSpeedMult - newSpeedMult) <= 0.0000001)
-        {
-            cycleDurationSeconds.Value = ComputeCycleDurationSeconds(newSpeedMult);
-            lastIntervalSeconds = cycleDurationSeconds.Value;
-        }
 
         if (!previousAutomation && modifierAutomationEnabled && isOwned.Value)
             isRunning.Value = true;
+
+        RefreshEconomyState();
+        RefreshCanCollectState();
     }
 
     private void RefreshMilestoneProgress(int currentLevel)
@@ -378,6 +409,18 @@ public class GeneratorService : IDisposable
         {
             milestoneProgressRatio.Value = 1f;
         }
+    }
+
+    private void RefreshEconomyState()
+    {
+        nextLevelCost.Value = CalculateNextLevelCost();
+        canBuyLevel.Value =
+            wallet.GetBalance(definition.LevelCostResourceId) >= nextLevelCost.Value;
+    }
+
+    private void RefreshCanCollectState()
+    {
+        canCollect.Value = isOwned.Value && !isAutomated.Value && !isRunning.Value;
     }
 
     private static void ValidateMilestoneLevels(int[] levels)

@@ -1,5 +1,5 @@
-using UnityEngine;
 using System;
+using UnityEngine;
 
 [CreateAssetMenu(menuName = "Idle/Generator Definition", fileName = "GeneratorDefinition")]
 public class GeneratorDefinition : ScriptableObject

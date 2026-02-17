@@ -150,12 +150,17 @@ public class GeneratorListComposer
             modifierService
         );
 
-        var generatorViewModel = new GeneratorViewModel(model, generatorDefinition, service);
+        var generatorViewModel = new GeneratorViewModel(
+            model,
+            generatorDefinition,
+            service,
+            walletViewModel
+        );
 
         generatorServices.Add(service);
         generatorViewModels.Add(generatorViewModel);
 
-        generatorView.Bind(generatorViewModel, service, walletViewModel);
+        generatorView.Bind(generatorViewModel);
 
         var generatorButtonView = generatorView.GetComponentInChildren<GeneratorButtonView>(true);
         if (generatorButtonView != null)
