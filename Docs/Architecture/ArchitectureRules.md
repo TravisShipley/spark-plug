@@ -119,7 +119,7 @@ A `Context` represents a **read-only grouping of related data or dependencies** 
 **Examples:**
 
 - `UiBindingsContext`
-- `UpgradesContext`
+- `GeneratorComposeContext`
 
 **Guidelines:**
 

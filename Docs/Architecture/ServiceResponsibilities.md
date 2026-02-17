@@ -21,7 +21,7 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 | `SaveService` | In-memory `GameData`, disk persistence scheduling | Disk (`SaveSystem`) |
 | `TickService` | Shared simulation time stream | n/a |
 | `UiScreenService` | Screen orchestration boundary for UI | n/a |
-| `PackLoaderService` | Runtime content loading + validation | n/a |
+| `GameDefinitionService` | Runtime game-definition loading, catalogs, and lookups | n/a |
 
 ## Detailed Boundaries
 
@@ -57,10 +57,10 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 - UI boundary for opening/closing screens.
 - Contains no domain simulation logic.
 
-### PackLoaderService
+### GameDefinitionService
 
-- Loads and validates content data.
-- Treats content as read-only runtime input.
+- Loads and validates game definition data (via `GameDefinitionLoader`).
+- Exposes read-only runtime catalogs/lookups used by services and UI composition.
 
 Related docs:
 

@@ -15,8 +15,8 @@ This document provides a runtime mental model and ownership map.
 ```text
 Google Sheets
   -> Importer
-  -> pack_v0_2.json
-  -> PackLoaderService
+  -> game_definition.json
+  -> GameDefinitionService
   -> GameCompositionRoot
       -> Services
       -> ViewModels
