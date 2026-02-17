@@ -41,9 +41,16 @@ public class GameData : ISerializationCallbackReceiver
     [NonSerialized]
     public HashSet<string> FiredMilestoneIds = new(StringComparer.Ordinal);
 
+    // Runtime lookup for unlocked node instances.
+    [NonSerialized]
+    public HashSet<string> UnlockedNodeInstanceIds = new(StringComparer.Ordinal);
+
     // Serialized bridge for JsonUtility (HashSet is not serialized directly).
     [SerializeField]
     private List<string> firedMilestoneIds = new();
+
+    [SerializeField]
+    private List<string> unlockedNodeInstanceIds = new();
 
     public void EnsureInitialized()
     {
@@ -51,7 +58,9 @@ public class GameData : ISerializationCallbackReceiver
         Upgrades ??= new List<UpgradeStateData>();
         Resources ??= new List<ResourceBalanceData>();
         FiredMilestoneIds ??= new HashSet<string>(StringComparer.Ordinal);
+        UnlockedNodeInstanceIds ??= new HashSet<string>(StringComparer.Ordinal);
         firedMilestoneIds ??= new List<string>();
+        unlockedNodeInstanceIds ??= new List<string>();
 
         if (FiredMilestoneIds.Count == 0 && firedMilestoneIds.Count > 0)
         {
@@ -60,6 +69,16 @@ public class GameData : ISerializationCallbackReceiver
                 var normalized = (firedMilestoneIds[i] ?? string.Empty).Trim();
                 if (!string.IsNullOrEmpty(normalized))
                     FiredMilestoneIds.Add(normalized);
+            }
+        }
+
+        if (UnlockedNodeInstanceIds.Count == 0 && unlockedNodeInstanceIds.Count > 0)
+        {
+            for (int i = 0; i < unlockedNodeInstanceIds.Count; i++)
+            {
+                var normalized = (unlockedNodeInstanceIds[i] ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(normalized))
+                    UnlockedNodeInstanceIds.Add(normalized);
             }
         }
     }
@@ -79,6 +98,18 @@ public class GameData : ISerializationCallbackReceiver
         }
 
         firedMilestoneIds.Sort(StringComparer.Ordinal);
+
+        unlockedNodeInstanceIds.Clear();
+        foreach (var id in UnlockedNodeInstanceIds)
+        {
+            var normalized = (id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized))
+                continue;
+
+            unlockedNodeInstanceIds.Add(normalized);
+        }
+
+        unlockedNodeInstanceIds.Sort(StringComparer.Ordinal);
     }
 
     public void OnAfterDeserialize()
@@ -93,6 +124,16 @@ public class GameData : ISerializationCallbackReceiver
                 continue;
 
             FiredMilestoneIds.Add(normalized);
+        }
+
+        UnlockedNodeInstanceIds.Clear();
+        for (int i = 0; i < unlockedNodeInstanceIds.Count; i++)
+        {
+            var normalized = (unlockedNodeInstanceIds[i] ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized))
+                continue;
+
+            UnlockedNodeInstanceIds.Add(normalized);
         }
     }
 }

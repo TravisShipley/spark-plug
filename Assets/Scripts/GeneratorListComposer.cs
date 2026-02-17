@@ -17,11 +17,21 @@ public class GeneratorListComposer
     private readonly SaveService saveService;
     private readonly UpgradeService upgradeService;
     private readonly GameDefinitionService gameDefinitionService;
+    private readonly UnlockService unlockService;
     private readonly CompositeDisposable disposables;
 
     private readonly List<GeneratorModel> generatorModels;
     private readonly List<GeneratorService> generatorServices;
     private readonly List<GeneratorViewModel> generatorViewModels;
+    private readonly List<string> orderedGeneratorInstanceIds = new();
+    private readonly Dictionary<string, NodeInstanceDefinition> nodeInstancesById = new(
+        StringComparer.Ordinal
+    );
+    private readonly Dictionary<string, GeneratorViewModel> generatorViewModelsById = new(
+        StringComparer.Ordinal
+    );
+    private readonly HashSet<string> instantiatedViewIds = new(StringComparer.Ordinal);
+    private int generatedViewsBaseSiblingIndex;
 
     public GeneratorListComposer(
         GameObject generatorUIRootPrefab,
@@ -34,6 +44,7 @@ public class GeneratorListComposer
         SaveService saveService,
         UpgradeService upgradeService,
         GameDefinitionService gameDefinitionService,
+        UnlockService unlockService,
         CompositeDisposable disposables,
         List<GeneratorModel> generatorModels,
         List<GeneratorService> generatorServices,
@@ -50,6 +61,7 @@ public class GeneratorListComposer
         this.saveService = saveService;
         this.upgradeService = upgradeService;
         this.gameDefinitionService = gameDefinitionService;
+        this.unlockService = unlockService;
         this.disposables = disposables;
         this.generatorModels = generatorModels;
         this.generatorServices = generatorServices;
@@ -66,6 +78,10 @@ public class GeneratorListComposer
             );
             return;
         }
+
+        string currentZoneId = string.Empty;
+        generatedViewsBaseSiblingIndex =
+            generatorUIContainer != null ? generatorUIContainer.childCount : 0;
 
         for (int i = 0; i < instances.Count; i++)
         {
@@ -94,29 +110,52 @@ public class GeneratorListComposer
                 continue;
             }
 
+            if (string.IsNullOrEmpty(currentZoneId))
+                currentZoneId = (nodeInstance.zoneId ?? string.Empty).Trim();
+
             var generatorDefinition = CreateRuntimeDefinition(nodeDef, nodeInstance);
+            ComposeSingle(generatorDefinition, nodeInstance, nodeTypeId);
 
-            var generatorUI = Object.Instantiate(generatorUIRootPrefab, generatorUIContainer);
-            generatorUI.name = $"Generator_{instanceId}";
+            orderedGeneratorInstanceIds.Add(instanceId);
+            nodeInstancesById[instanceId] = nodeInstance;
+        }
 
-            var generatorView = generatorUI.GetComponent<GeneratorView>();
-            if (generatorView == null)
-            {
-                Debug.LogError(
-                    $"GameCompositionRoot: Generator UI root prefab is missing a GeneratorView (instance '{instanceId}').",
-                    generatorUI
-                );
+        unlockService?.InitializeForZone(currentZoneId);
+
+        for (int i = 0; i < orderedGeneratorInstanceIds.Count; i++)
+        {
+            var instanceId = orderedGeneratorInstanceIds[i];
+            if (unlockService != null && !unlockService.IsUnlocked(instanceId))
                 continue;
-            }
 
-            ComposeSingle(generatorDefinition, nodeInstance, generatorView, nodeTypeId);
+            InstantiateGeneratorView(instanceId);
+        }
+
+        if (unlockService != null)
+        {
+            unlockService
+                .OnUnlocked.Subscribe(instanceId =>
+                {
+                    var normalizedId = (instanceId ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(normalizedId))
+                        return;
+
+                    if (!nodeInstancesById.TryGetValue(normalizedId, out var nodeInstance))
+                        return;
+
+                    var zoneId = (nodeInstance.zoneId ?? string.Empty).Trim();
+                    if (!string.Equals(zoneId, currentZoneId, StringComparison.Ordinal))
+                        return;
+
+                    InstantiateGeneratorView(normalizedId);
+                })
+                .AddTo(disposables);
         }
     }
 
     private void ComposeSingle(
         GeneratorDefinition generatorDefinition,
         NodeInstanceDefinition nodeInstance,
-        GeneratorView generatorView,
         string nodeTypeId
     )
     {
@@ -159,12 +198,7 @@ public class GeneratorListComposer
 
         generatorServices.Add(service);
         generatorViewModels.Add(generatorViewModel);
-
-        generatorView.Bind(generatorViewModel);
-
-        var generatorButtonView = generatorView.GetComponentInChildren<GeneratorButtonView>(true);
-        if (generatorButtonView != null)
-            generatorButtonView.Bind(generatorViewModel);
+        generatorViewModelsById[id] = generatorViewModel;
 
         // Register by instance id (authoritative runtime id).
         uiService.RegisterGenerator(model.Id, service);
@@ -173,6 +207,60 @@ public class GeneratorListComposer
             uiService.RegisterGenerator(nodeTypeId.Trim(), service);
 
         WireGeneratorPersistence(id, service);
+    }
+
+    private void InstantiateGeneratorView(string instanceId)
+    {
+        var id = (instanceId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(id))
+            return;
+
+        if (instantiatedViewIds.Contains(id))
+            return;
+
+        if (
+            !generatorViewModelsById.TryGetValue(id, out var generatorViewModel)
+            || generatorViewModel == null
+        )
+            return;
+
+        var generatorUI = Object.Instantiate(generatorUIRootPrefab, generatorUIContainer);
+        generatorUI.name = $"Generator_{id}";
+        generatorUI.transform.SetSiblingIndex(CalculateSiblingIndex(id));
+
+        var generatorView = generatorUI.GetComponent<GeneratorView>();
+        if (generatorView == null)
+        {
+            Debug.LogError(
+                $"GameCompositionRoot: Generator UI root prefab is missing a GeneratorView (instance '{id}').",
+                generatorUI
+            );
+            return;
+        }
+
+        generatorView.Bind(generatorViewModel);
+
+        var generatorButtonView = generatorView.GetComponentInChildren<GeneratorButtonView>(true);
+        if (generatorButtonView != null)
+            generatorButtonView.Bind(generatorViewModel);
+
+        instantiatedViewIds.Add(id);
+    }
+
+    private int CalculateSiblingIndex(string instanceId)
+    {
+        int generatedOffset = 0;
+        for (int i = 0; i < orderedGeneratorInstanceIds.Count; i++)
+        {
+            var id = orderedGeneratorInstanceIds[i];
+            if (string.Equals(id, instanceId, StringComparison.Ordinal))
+                break;
+
+            if (instantiatedViewIds.Contains(id))
+                generatedOffset++;
+        }
+
+        return generatedViewsBaseSiblingIndex + generatedOffset;
     }
 
     private GeneratorDefinition CreateRuntimeDefinition(

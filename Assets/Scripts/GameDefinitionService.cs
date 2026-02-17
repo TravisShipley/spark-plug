@@ -39,6 +39,8 @@ public sealed class GameDefinitionService
         nodeInputCatalog?.NodeInputs ?? new List<NodeInputDefinition>();
     public IReadOnlyList<NodeInstanceDefinition> NodeInstances =>
         nodeInstanceCatalog?.NodeInstances ?? new List<NodeInstanceDefinition>();
+    public IReadOnlyList<UnlockGraphEntry> UnlockGraph =>
+        definition?.unlockGraph ?? new List<UnlockGraphEntry>();
     public IReadOnlyList<ModifierEntry> Modifiers =>
         definition?.modifiers ?? new List<ModifierEntry>();
     public IReadOnlyList<UpgradeEntry> Upgrades =>

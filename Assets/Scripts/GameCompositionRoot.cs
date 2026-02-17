@@ -53,6 +53,7 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradesScreenViewModel upgradesScreenViewModel;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
+    private UnlockService unlockService;
     private GameDefinitionService gameDefinitionService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
@@ -82,7 +83,10 @@ public class GameCompositionRoot : MonoBehaviour
         if (!enabled)
             return;
 
-        if (gameDefinitionService.NodeInstances == null || gameDefinitionService.NodeInstances.Count == 0)
+        if (
+            gameDefinitionService.NodeInstances == null
+            || gameDefinitionService.NodeInstances.Count == 0
+        )
         {
             Debug.LogError("GameCompositionRoot: No node instances could be resolved.", this);
             enabled = false;
@@ -90,6 +94,14 @@ public class GameCompositionRoot : MonoBehaviour
         }
 
         LoadSaveState();
+
+        unlockService = new UnlockService(
+            gameDefinitionService,
+            uiService,
+            upgradeService,
+            saveService
+        );
+        unlockService.LoadUnlockedIds(saveService.Data?.UnlockedNodeInstanceIds);
 
         BindSceneUi(uiScreenService);
 
@@ -104,6 +116,7 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             upgradeService,
             gameDefinitionService,
+            unlockService,
             disposables,
             generatorModels,
             generatorServices,
@@ -282,6 +295,7 @@ public class GameCompositionRoot : MonoBehaviour
         foreach (var s in generatorServices)
             s?.Dispose();
         milestoneService?.Dispose();
+        unlockService?.Dispose();
         modifierService?.Dispose();
 
         // Dispose time source after consumers

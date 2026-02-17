@@ -43,6 +43,9 @@ public static class GameDefinitionLoader
             if (gd.nodeInputs == null)
                 gd.nodeInputs = new List<NodeInputDefinition>();
 
+            if (gd.unlockGraph == null)
+                gd.unlockGraph = new List<UnlockGraphEntry>();
+
             if (gd.milestones == null)
                 gd.milestones = new List<MilestoneEntry>();
 

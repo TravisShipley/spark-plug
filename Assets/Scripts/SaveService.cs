@@ -70,6 +70,27 @@ public sealed class SaveService : IDisposable
         RequestSave();
     }
 
+    public void SetUnlockedNodeInstanceIds(IEnumerable<string> ids)
+    {
+        if (Data == null)
+            return;
+
+        Data.UnlockedNodeInstanceIds ??= new HashSet<string>(StringComparer.Ordinal);
+        Data.UnlockedNodeInstanceIds.Clear();
+
+        if (ids == null)
+            return;
+
+        foreach (var id in ids)
+        {
+            var normalized = (id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(normalized))
+                continue;
+
+            Data.UnlockedNodeInstanceIds.Add(normalized);
+        }
+    }
+
     private void OnSaveReset(GameData _)
     {
         // Reset in-memory snapshot to a clean state.

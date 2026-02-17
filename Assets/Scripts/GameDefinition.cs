@@ -9,6 +9,7 @@ public sealed class GameDefinition
     public List<NodeDefinition> nodes = new List<NodeDefinition>();
     public List<NodeInputDefinition> nodeInputs = new List<NodeInputDefinition>();
     public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
+    public List<UnlockGraphEntry> unlockGraph = new List<UnlockGraphEntry>();
     public List<ModifierEntry> modifiers = new List<ModifierEntry>();
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
     public List<MilestoneEntry> milestones = new List<MilestoneEntry>();
@@ -128,4 +129,43 @@ public sealed class MilestoneEntry
     public string zoneId;
     public int atLevel;
     public EffectItem[] grantEffects;
+}
+
+[Serializable]
+public sealed class UnlockGraphEntry
+{
+    public string id;
+    public string zoneId;
+    public string targetNodeInstanceId;
+    public UnlockRequirement[] requirements;
+
+    // Legacy compatibility for existing packs that still use "unlocks": [{ kind, id }].
+    public UnlockTarget[] unlocks;
+}
+
+[Serializable]
+public sealed class UnlockTarget
+{
+    public string kind;
+    public string id;
+}
+
+[Serializable]
+public sealed class UnlockRequirement
+{
+    public string type;
+    public string nodeInstanceId;
+    public int minLevel;
+    public string upgradeId;
+    public UnlockRequirementArgs args;
+}
+
+[Serializable]
+public sealed class UnlockRequirementArgs
+{
+    public string nodeInstanceId;
+    public int minLevel;
+    public string upgradeId;
+    public string id;
+    public int level;
 }
