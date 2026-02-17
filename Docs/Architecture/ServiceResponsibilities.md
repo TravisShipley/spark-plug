@@ -20,7 +20,7 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 | `UpgradeService` | Purchase state/rank and effect application | `SaveService` |
 | `SaveService` | In-memory `GameData`, disk persistence scheduling | Disk (`SaveSystem`) |
 | `TickService` | Shared simulation time stream | n/a |
-| `ModalService` | Modal orchestration boundary for UI | n/a |
+| `UiScreenService` | Screen orchestration boundary for UI | n/a |
 | `PackLoaderService` | Runtime content loading + validation | n/a |
 
 ## Detailed Boundaries
@@ -52,9 +52,9 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 - Provides a central tick source.
 - Contains no game economy or progression rules.
 
-### ModalService
+### UiScreenService
 
-- UI boundary for opening/closing modals.
+- UI boundary for opening/closing screens.
 - Contains no domain simulation logic.
 
 ### PackLoaderService

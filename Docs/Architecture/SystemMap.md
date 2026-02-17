@@ -56,7 +56,7 @@ Service reactive state -> ViewModel projection -> View rendering
 
 - New player fact: `GameData` + `SaveService`
 - New simulation mechanic: new/extended Service
-- New UI screen: ViewModel + View (+ modal wiring if needed)
+- New UI screen: ViewModel + View (+ screen wiring if needed)
 - New content feature: schema/import + service integration
 
 For constraints and forbidden patterns, see `ArchitectureRules.md`.

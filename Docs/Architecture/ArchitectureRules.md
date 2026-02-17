@@ -33,7 +33,7 @@ Examples:
 - `WalletService`
 - `GeneratorService`
 - `UpgradeService`
-- `ModalService`
+- `UiScreenService`
 - `TickService`
 - `SaveService`
 
@@ -201,7 +201,7 @@ Examples:
 
 - `WalletViewModel`
 - `UpgradeService`
-- `ModalService`
+- `UiScreenService`
 
 **Avoid:**
 
@@ -220,7 +220,7 @@ Example:
 - `WalletService`
 - `WalletViewModel`
 - `UpgradeService`
-- `ModalService`
+- `UiScreenService`
 - `UiServiceRegistry`
 
 This optimizes clarity at call sites and avoids abbreviation-based ambiguity.

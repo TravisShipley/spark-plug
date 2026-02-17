@@ -130,14 +130,14 @@ Avoid repeating the type name when the variable’s role is clear.
 
 ```csharp
 var wallet = new WalletService();
-var modal = modalManager.Show<UpgradesModalView>();
+var screen = uiScreenManager.Show<UpgradesScreenView>();
 ```
 
 **Avoid**
 
 ```csharp
 var walletServiceInstance = new WalletService();
-var upgradesModalViewInstance = modalManager.Show<UpgradesModalView>();
+var upgradesScreenViewInstance = uiScreenManager.Show<UpgradesScreenView>();
 ```
 
 ---
