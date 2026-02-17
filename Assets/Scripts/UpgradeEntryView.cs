@@ -41,10 +41,10 @@ public sealed class UpgradeEntryView : MonoBehaviour
             checkmark.SetActive(viewModel.IsMaxed.Value);
 
         if (nameText != null)
-            nameText.text = viewModel.Title;
+            nameText.text = viewModel.DisplayName;
 
         if (infoText != null)
-            infoText.text = viewModel.Summary;
+            infoText.text = viewModel.InfoText;
 
         if (costText != null)
             costText.text = viewModel.CostText;
@@ -60,9 +60,9 @@ public sealed class UpgradeEntryView : MonoBehaviour
 
         buyButton.Bind(
             labelText: Observable.Return(viewModel.CostLabel),
-            interactable: viewModel.Purchase.CanExecute,
-            visible: viewModel.Purchase.IsVisible,
-            onClick: viewModel.Purchase.Execute
+            interactable: viewModel.CanPurchase,
+            visible: viewModel.IsVisible,
+            onClick: viewModel.PurchaseCommand.Execute
         );
     }
 

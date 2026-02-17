@@ -6,8 +6,8 @@ public sealed class UpgradeEntryViewModel : IDisposable
     private readonly CompositeDisposable disposables = new();
 
     public string UpgradeId { get; }
-    public string Title { get; }
-    public string Summary { get; }
+    public string DisplayName { get; }
+    public string InfoText { get; }
     public string CostText { get; }
     public string CostLabel { get; }
     public bool Repeatable { get; }
@@ -16,8 +16,16 @@ public sealed class UpgradeEntryViewModel : IDisposable
     public IReadOnlyReactiveProperty<int> PurchasedCount { get; }
     public IReadOnlyReactiveProperty<bool> IsOwned { get; }
     public IReadOnlyReactiveProperty<bool> IsMaxed { get; }
-    public IReadOnlyReactiveProperty<bool> CanAfford { get; }
-    public UiCommand Purchase { get; }
+    public IReadOnlyReactiveProperty<bool> IsAffordable { get; }
+    public IReadOnlyReactiveProperty<bool> CanPurchase { get; }
+    public IReadOnlyReactiveProperty<bool> IsVisible { get; }
+    public UiCommand PurchaseCommand { get; }
+
+    // Backward-compatible aliases for existing bindings.
+    public string Title => DisplayName;
+    public string Summary => InfoText;
+    public IReadOnlyReactiveProperty<bool> CanAfford => IsAffordable;
+    public UiCommand Purchase => PurchaseCommand;
 
     public UpgradeEntryViewModel(
         UpgradeEntry upgrade,
@@ -34,8 +42,10 @@ public sealed class UpgradeEntryViewModel : IDisposable
             throw new ArgumentNullException(nameof(upgradeService));
 
         UpgradeId = (upgrade.id ?? string.Empty).Trim();
-        Title = string.IsNullOrWhiteSpace(upgrade.displayName) ? UpgradeId : upgrade.displayName.Trim();
-        Summary = string.IsNullOrWhiteSpace(summary) ? "modifier-driven" : summary.Trim();
+        DisplayName = string.IsNullOrWhiteSpace(upgrade.displayName)
+            ? UpgradeId
+            : upgrade.displayName.Trim();
+        InfoText = string.IsNullOrWhiteSpace(summary) ? "modifier-driven" : summary.Trim();
         CostText = Format.Currency(costAmount);
         CostLabel = $"Buy\n{CostText}";
         Repeatable = upgrade.repeatable;
@@ -48,42 +58,47 @@ public sealed class UpgradeEntryViewModel : IDisposable
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        int maxPurchases = upgrade.repeatable ? (upgrade.maxRank > 0 ? upgrade.maxRank : int.MaxValue) : 1;
-
         IsMaxed = PurchasedCount
-            .Select(count => count >= maxPurchases)
+            .Select(_ => upgradeService.IsAtMaxRank(UpgradeId))
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        CanAfford = upgradeService
-            .Wallet.GetBalanceProperty(costResourceId)
-            .DistinctUntilChanged()
-            .Select(balance => balance >= costAmount)
-            .DistinctUntilChanged()
-            .ToReadOnlyReactiveProperty()
-            .AddTo(disposables);
-
-        var canPurchase = Observable
+        // Re-evaluate service-authored affordability/can-purchase whenever
+        // either wallet balance for this upgrade's primary cost resource or
+        // purchased count changes.
+        var affordabilityTrigger = Observable
             .CombineLatest(
-                CanAfford,
-                IsMaxed,
-                (afford, maxed) => upgrade.enabled && isValidDefinition && afford && !maxed
+                upgradeService.Wallet.GetBalanceProperty(costResourceId).DistinctUntilChanged(),
+                PurchasedCount.DistinctUntilChanged(),
+                (balance, _) => balance
             )
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        var isVisible = IsMaxed
+        IsAffordable = affordabilityTrigger
+            .Select(_ => upgradeService.CanAfford(UpgradeId))
+            .DistinctUntilChanged()
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
+
+        CanPurchase = affordabilityTrigger
+            .Select(_ => isValidDefinition && upgradeService.CanPurchase(UpgradeId))
+            .DistinctUntilChanged()
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
+
+        IsVisible = IsMaxed
             .Select(maxed => upgrade.enabled && !maxed)
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        Purchase = new UiCommand(
+        PurchaseCommand = new UiCommand(
             () => upgradeService.TryPurchase(UpgradeId),
-            canPurchase,
-            isVisible
+            CanPurchase,
+            IsVisible
         );
     }
 
