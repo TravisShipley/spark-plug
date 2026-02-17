@@ -26,7 +26,7 @@ public sealed class UiScreenService
 
 // TODO
 /*
-modalService.Confirm(
+uiScreenService.Confirm(
   title: "Reset save?",
   message: "This cannot be undone.",
   confirmText: "Reset",

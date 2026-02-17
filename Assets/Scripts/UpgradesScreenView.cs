@@ -1,7 +1,7 @@
 using UniRx;
 using UnityEngine;
 
-public sealed class UpgradesModalView : UiScreenView
+public sealed class UpgradesScreenView : UiScreenView
 {
     [Header("UI")]
     [SerializeField]
@@ -42,7 +42,7 @@ public sealed class UpgradesModalView : UiScreenView
         if (upgradeCatalog == null)
         {
             Debug.LogError(
-                "UpgradesModalView: Could not resolve upgrades source from UiScreenManager. "
+                "UpgradesScreenView: Could not resolve upgrades source from UiScreenManager. "
                     + "Expose `GameDefinitionService` or `UpgradeCatalog` on UiScreenManager and assign it during bootstrap.",
                 this
             );
@@ -52,7 +52,7 @@ public sealed class UpgradesModalView : UiScreenView
         if (entryPrefab == null || listContainer == null)
         {
             Debug.LogError(
-                "UpgradesModalView: entryPrefab or listContainer is not assigned.",
+                "UpgradesScreenView: entryPrefab or listContainer is not assigned.",
                 this
             );
             return;
@@ -61,7 +61,7 @@ public sealed class UpgradesModalView : UiScreenView
         if (Manager == null)
         {
             Debug.LogError(
-                "UpgradesModalView: Manager is not set; this screen must be shown via UiScreenManager.",
+                "UpgradesScreenView: Manager is not set; this screen must be shown via UiScreenManager.",
                 this
             );
             return;
@@ -76,7 +76,7 @@ public sealed class UpgradesModalView : UiScreenView
         if (upgradeService == null)
         {
             Debug.LogError(
-                "UpgradesModalView: UpgradeService could not be resolved from UiScreenManager. "
+                "UpgradesScreenView: UpgradeService could not be resolved from UiScreenManager. "
                     + "Expose a public property `public UpgradeService UpgradeService { get; }` on UiScreenManager and assign it during bootstrap.",
                 this
             );
@@ -86,7 +86,7 @@ public sealed class UpgradesModalView : UiScreenView
         if (upgradeService.Wallet == null)
         {
             Debug.LogError(
-                "UpgradesModalView: UpgradeService.Wallet is null (did bootstrap initialize it?).",
+                "UpgradesScreenView: UpgradeService.Wallet is null (did bootstrap initialize it?).",
                 this
             );
             return;

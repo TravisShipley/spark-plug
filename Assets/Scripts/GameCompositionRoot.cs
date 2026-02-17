@@ -6,7 +6,7 @@
  *
  * Responsibilities:
  * - Validate required scene references and configuration
- * - Initialize core services (Wallet, Tick, Upgrade, Modal)
+ * - Initialize core services (Wallet, Tick, Upgrade, Screen)
  * - Bind runtime services into the UI composition layer
  * - Instantiate and compose Generator models, services, and view-models
  * - Restore persisted game state and apply saved upgrades
@@ -158,12 +158,12 @@ public class GameCompositionRoot : MonoBehaviour
 
         // UiScreenManager needs the UpgradeService for screens like Upgrades.
         uiScreenManager.Initialize(upgradeService);
-        // Provide the content-driven catalog to modals so they can render upgrades.
+        // Provide the content-driven catalog to screens so they can render upgrades.
         uiScreenManager.UpgradeCatalog = gameDefinitionService.Catalog;
-        // Also expose the full GameDefinitionService for modals that need richer access.
+        // Also expose the full GameDefinitionService for screens that need richer access.
         uiScreenManager.GameDefinitionService = gameDefinitionService;
 
-        // Domain-facing modal API (intent-based)
+        // Domain-facing screen API (intent-based)
         uiScreenService = new UiScreenService(uiScreenManager);
     }
 

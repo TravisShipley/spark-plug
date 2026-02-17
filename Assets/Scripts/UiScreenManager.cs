@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 {
-    // Inspector helper for modal registry
+    // FormerlySerializedAs is temporary; remove after opening/saving all prefabs/scenes once.
+    // Inspector helper for screen registry
     [Serializable]
-    private sealed class ModalEntry
+    private sealed class ScreenEntry
     {
         public string Id;
         public UiScreenView Prefab;
@@ -18,11 +20,12 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     private UiServiceRegistry uiServices;
 
     [Header("Scene References")]
+    [FormerlySerializedAs("modalContainer")]
     [SerializeField]
-    private Transform modalContainer;
+    private Transform screenContainer;
 
     [SerializeField]
-    private Button backdropButton; // full-screen button behind modal(s)
+    private Button backdropButton; // full-screen button behind screen(s)
 
     [SerializeField]
     private CanvasGroup backdropGroup;
@@ -38,18 +41,20 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     private bool closeOnBackdropClick = true;
 
     [Header("Stacking")]
+    [FormerlySerializedAs("baseModalSortingOrder")]
     [SerializeField]
-    private int baseModalSortingOrder = 100;
+    private int baseScreenSortingOrder = 100;
 
     [SerializeField]
     private int sortingStep = 10;
 
-    [Header("Modal Registry")]
+    [Header("Screen Registry")]
+    [FormerlySerializedAs("modalPrefabs")]
     [SerializeField]
-    private List<ModalEntry> modalPrefabs = new();
+    private List<ScreenEntry> screenPrefabs = new();
 
     private readonly Stack<UiScreenView> stack = new();
-    private Dictionary<string, UiScreenView> modalById;
+    private Dictionary<string, UiScreenView> screenById;
 
     public UpgradeService UpgradeService { get; private set; }
     public UpgradeCatalog UpgradeCatalog { get; set; }
@@ -68,8 +73,8 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 
     private void Awake()
     {
-        if (modalContainer == null)
-            modalContainer = transform;
+        if (screenContainer == null)
+            screenContainer = transform;
 
         if (uiServices == null)
         {
@@ -91,9 +96,9 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
                 backdropCanvas = backdropButton.GetComponentInParent<Canvas>(true);
         }
 
-        modalById = new Dictionary<string, UiScreenView>(StringComparer.Ordinal);
+        screenById = new Dictionary<string, UiScreenView>(StringComparer.Ordinal);
 
-        foreach (var entry in modalPrefabs)
+        foreach (var entry in screenPrefabs)
         {
             if (entry == null || entry.Prefab == null)
                 continue;
@@ -108,7 +113,7 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
                 continue;
             }
 
-            if (modalById.ContainsKey(id))
+            if (screenById.ContainsKey(id))
             {
                 Debug.LogWarning(
                     $"UiScreenManager: Duplicate screen Id '{id}' found. Keeping the first, ignoring '{entry.Prefab.name}'.",
@@ -117,7 +122,7 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
                 continue;
             }
 
-            modalById.Add(id, entry.Prefab);
+            screenById.Add(id, entry.Prefab);
         }
 
         RefreshStack();
@@ -142,7 +147,7 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 
     private void EnsureUpgradeServiceInitializedIfNeeded()
     {
-        // Awake order is not guaranteed; only validate when a modal is actually being shown.
+        // Awake order is not guaranteed; only validate when a screen is actually being shown.
         if (UpgradeService == null)
             return;
 
@@ -162,15 +167,15 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
         Show(id);
     }
 
-    public T Show<T>(T modalPrefab, object payload = null)
+    public T Show<T>(T screenPrefab, object payload = null)
         where T : UiScreenView
     {
-        if (modalPrefab == null)
-            throw new ArgumentNullException(nameof(modalPrefab));
+        if (screenPrefab == null)
+            throw new ArgumentNullException(nameof(screenPrefab));
 
         EnsureUpgradeServiceInitializedIfNeeded();
 
-        var instance = Instantiate(modalPrefab, modalContainer);
+        var instance = Instantiate(screenPrefab, screenContainer);
         instance.gameObject.SetActive(true);
 
         instance.Manager = this;
@@ -186,15 +191,15 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 
     public UiScreenView Show(string id, object payload = null)
     {
-        if (modalById == null)
+        if (screenById == null)
             throw new InvalidOperationException("UiScreenManager has not been initialized.");
 
         if (string.IsNullOrWhiteSpace(id))
-            throw new ArgumentException("Modal id is null or empty.", nameof(id));
+            throw new ArgumentException("Screen id is null or empty.", nameof(id));
 
         id = id.Trim();
 
-        if (!modalById.TryGetValue(id, out var prefab) || prefab == null)
+        if (!screenById.TryGetValue(id, out var prefab) || prefab == null)
             throw new KeyNotFoundException(
                 $"UiScreenManager: No screen registered with id '{id}'."
             );
@@ -261,19 +266,19 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     {
         bool any = stack.Count > 0;
 
-        // Keep backdrop just below the top-most modal.
+        // Keep backdrop just below the top-most screen.
         if (backdropCanvas != null)
         {
             backdropCanvas.overrideSorting = true;
 
             if (stack.Count == 0)
             {
-                backdropCanvas.sortingOrder = baseModalSortingOrder - 1;
+                backdropCanvas.sortingOrder = baseScreenSortingOrder - 1;
             }
             else
             {
-                // Top modal uses baseModalSortingOrder + (stack.Count - 1) * sortingStep
-                int topSortingOrder = baseModalSortingOrder + (stack.Count - 1) * sortingStep;
+                // Top screen uses baseScreenSortingOrder + (stack.Count - 1) * sortingStep
+                int topSortingOrder = baseScreenSortingOrder + (stack.Count - 1) * sortingStep;
                 backdropCanvas.sortingOrder = topSortingOrder - 1;
             }
         }
@@ -288,12 +293,12 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
             backdropGroup.interactable = any;
         }
 
-        // Ensure only the top modal is interactable and assign sorting orders.
+        // Ensure only the top screen is interactable and assign sorting orders.
         // Stack enumerates from top -> bottom.
         int i = 0;
-        foreach (var modal in stack)
+        foreach (var screen in stack)
         {
-            if (modal == null)
+            if (screen == null)
             {
                 i++;
                 continue;
@@ -302,13 +307,13 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
             bool isTop = (i == 0);
 
             // Sorting: bottom = base, then +step per layer.
-            int sortingOrder = baseModalSortingOrder + (stack.Count - 1 - i) * sortingStep;
+            int sortingOrder = baseScreenSortingOrder + (stack.Count - 1 - i) * sortingStep;
 
-            var canvas = modal.Canvas;
+            var canvas = screen.Canvas;
             if (canvas != null && canvas.overrideSorting)
                 canvas.sortingOrder = sortingOrder;
 
-            var cg = modal.CanvasGroup;
+            var cg = screen.CanvasGroup;
             if (cg != null)
             {
                 cg.blocksRaycasts = isTop;

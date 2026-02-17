@@ -24,7 +24,7 @@ public abstract class UiScreenView : MonoBehaviour
 
     private void Awake()
     {
-        EnsureModalSetup();
+        EnsureScreenSetup();
     }
 
     public void RequestClose()
@@ -54,7 +54,7 @@ public abstract class UiScreenView : MonoBehaviour
         Manager.ShowById(id);
     }
 
-    private void EnsureModalSetup()
+    private void EnsureScreenSetup()
     {
         if (canvas == null)
             canvas = GetComponent<Canvas>();
