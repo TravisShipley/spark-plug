@@ -14,7 +14,9 @@ public sealed class ModifierService : IDisposable
 
     private readonly Dictionary<string, ModifierEntry> modifiersById = new(StringComparer.Ordinal);
     private readonly List<ModifierEntry> modifiers = new();
-    private readonly Dictionary<string, MilestoneEntry> milestonesById = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MilestoneEntry> milestonesById = new(
+        StringComparer.Ordinal
+    );
 
     private readonly Dictionary<string, List<ModifierEntry>> resolvedModifiersByUpgradeId = new(
         StringComparer.Ordinal
@@ -383,7 +385,9 @@ public sealed class ModifierService : IDisposable
                 var resolved = ResolveModifiersForUpgrade(upgrade);
                 for (int i = 0; i < resolved.Count; i++)
                 {
-                    active.Add(new ActiveModifier { Modifier = resolved[i], PurchaseCount = count });
+                    active.Add(
+                        new ActiveModifier { Modifier = resolved[i], PurchaseCount = count }
+                    );
                 }
             }
         }
