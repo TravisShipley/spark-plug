@@ -49,6 +49,8 @@ public class GameCompositionRoot : MonoBehaviour
 
     private WalletService walletService;
     private UpgradeService upgradeService;
+    private UpgradeListBuilder upgradeListBuilder;
+    private UpgradesScreenViewModel upgradesScreenViewModel;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
     private GameDefinitionService gameDefinitionService;
@@ -142,7 +144,12 @@ public class GameCompositionRoot : MonoBehaviour
         uiService.Initialize(walletService);
 
         // Construct UpgradeService with the authoritative UpgradeCatalog
-        upgradeService = new UpgradeService(gameDefinitionService.Catalog, walletService, saveService);
+        upgradeService = new UpgradeService(
+            gameDefinitionService.Catalog,
+            walletService,
+            saveService,
+            gameDefinitionService.Modifiers
+        );
         modifierService = new ModifierService(
             gameDefinitionService.Modifiers,
             gameDefinitionService.Catalog,
@@ -160,6 +167,13 @@ public class GameCompositionRoot : MonoBehaviour
         uiScreenManager.UpgradeCatalog = gameDefinitionService.Catalog;
         // Also expose the full GameDefinitionService for screens that need richer access.
         uiScreenManager.GameDefinitionService = gameDefinitionService;
+        upgradeListBuilder = new UpgradeListBuilder(
+            gameDefinitionService.Catalog,
+            upgradeService,
+            gameDefinitionService
+        );
+        upgradesScreenViewModel = new UpgradesScreenViewModel(upgradeListBuilder);
+        uiScreenManager.UpgradesScreenViewModel = upgradesScreenViewModel;
 
         // Domain-facing screen API (intent-based)
         uiScreenService = new UiScreenService(uiScreenManager);
@@ -276,6 +290,7 @@ public class GameCompositionRoot : MonoBehaviour
         // Dispose viewmodels after services (they may be subscribed to service state)
         foreach (var generatorViewModel in generatorViewModels)
             generatorViewModel?.Dispose();
+        upgradesScreenViewModel?.Dispose();
         walletViewModel?.Dispose();
 
         // Dispose core state last

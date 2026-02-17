@@ -425,39 +425,63 @@ public sealed class ModifierService : IDisposable
         )
             return cached;
 
+        bool hasInvalidReference = false;
+
         if (upgrade.effects != null && upgrade.effects.Length > 0)
         {
             for (int i = 0; i < upgrade.effects.Length; i++)
             {
-                var modifierId = (upgrade.effects[i]?.modifierId ?? string.Empty).Trim();
-                if (string.IsNullOrEmpty(modifierId))
+                var effect = upgrade.effects[i];
+                if (effect == null)
+                {
+                    hasInvalidReference = true;
+                    WarnOnce(
+                        $"upgrade.invalid_effect:{upgrade.id}:{i}",
+                        $"[ModifierService] Upgrade '{upgrade.id}' has null effects[{i}]."
+                    );
                     continue;
+                }
 
-                if (modifiersById.TryGetValue(modifierId, out var modifier) && modifier != null)
-                    resolved.Add(modifier);
+                var modifierId = (effect.modifierId ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(modifierId))
+                {
+                    hasInvalidReference = true;
+                    WarnOnce(
+                        $"upgrade.invalid_modifier_id:{upgrade.id}:{i}",
+                        $"[ModifierService] Upgrade '{upgrade.id}' has empty effects[{i}].modifierId."
+                    );
+                    continue;
+                }
+
+                if (!modifiersById.TryGetValue(modifierId, out var modifier) || modifier == null)
+                {
+                    hasInvalidReference = true;
+                    WarnOnce(
+                        $"upgrade.missing_modifier:{upgrade.id}:{modifierId}",
+                        $"[ModifierService] Upgrade '{upgrade.id}' references missing modifierId '{modifierId}'."
+                    );
+                    continue;
+                }
+
+                resolved.Add(modifier);
             }
         }
-
-        if (resolved.Count == 0)
+        else
         {
-            var source = (upgrade.id ?? string.Empty).Trim();
-            if (!string.IsNullOrEmpty(source))
-            {
-                for (int i = 0; i < modifiers.Count; i++)
-                {
-                    var modifier = modifiers[i];
-                    if (
-                        string.Equals(
-                            (modifier.source ?? string.Empty).Trim(),
-                            source,
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        resolved.Add(modifier);
-                    }
-                }
-            }
+            hasInvalidReference = true;
+            WarnOnce(
+                $"upgrade.no_effects:{upgrade.id}",
+                $"[ModifierService] Upgrade '{upgrade.id}' has no effects[].modifierId entries."
+            );
+        }
+
+        if (hasInvalidReference)
+        {
+            WarnOnce(
+                $"upgrade.invalid_not_applied:{upgrade.id}",
+                $"[ModifierService] Upgrade '{upgrade.id}' has invalid modifier references and will not be applied."
+            );
+            resolved.Clear();
         }
 
         resolved.Sort(

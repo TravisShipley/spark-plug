@@ -1,5 +1,3 @@
-using System;
-using System.Globalization;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -23,24 +21,13 @@ public sealed class UpgradeEntryView : MonoBehaviour
 
     private readonly CompositeDisposable disposables = new CompositeDisposable();
 
-    public void Bind(
-        UpgradeEntry upgrade,
-        string targetSummary,
-        UpgradeService upgradeService,
-        IReadOnlyReactiveProperty<int> purchasedCount
-    )
+    public void Bind(UpgradeEntryViewModel viewModel)
     {
         disposables.Clear();
 
-        if (upgrade == null)
+        if (viewModel == null)
         {
-            Debug.LogError("UpgradeEntryView: upgrade is null.", this);
-            return;
-        }
-
-        if (upgradeService == null)
-        {
-            Debug.LogError("UpgradeEntryView: upgradeService is null.", this);
+            Debug.LogError("UpgradeEntryView: viewModel is null.", this);
             return;
         }
 
@@ -50,74 +37,20 @@ public sealed class UpgradeEntryView : MonoBehaviour
             return;
         }
 
-        int maxPurchases = upgrade.repeatable
-            ? (upgrade.maxRank > 0 ? upgrade.maxRank : int.MaxValue)
-            : 1;
-
-        var isMaxed = purchasedCount.Select(c => c >= maxPurchases).DistinctUntilChanged();
-
         if (checkmark != null)
-            checkmark.SetActive(purchasedCount.Value >= maxPurchases);
+            checkmark.SetActive(viewModel.IsMaxed.Value);
 
         if (nameText != null)
-            nameText.text = string.IsNullOrEmpty(upgrade.displayName)
-                ? upgrade.id
-                : upgrade.displayName;
+            nameText.text = viewModel.Title;
 
         if (infoText != null)
-        {
-            infoText.text = string.IsNullOrWhiteSpace(targetSummary)
-                ? "modifier-driven"
-                : targetSummary.Trim();
-        }
-
-        if (upgrade.cost == null || upgrade.cost.Length == 0 || upgrade.cost[0] == null)
-            throw new InvalidOperationException(
-                $"UpgradeEntryView: Upgrade '{upgrade.id}' is missing cost[0]."
-            );
-
-        string costResourceId = (upgrade.cost[0].resource ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(costResourceId))
-        {
-            throw new InvalidOperationException(
-                $"UpgradeEntryView: Upgrade '{upgrade.id}' has empty cost[0].resource."
-            );
-        }
-
-        if (
-            !double.TryParse(
-                upgrade.cost[0].amount,
-                NumberStyles.Float | NumberStyles.AllowThousands,
-                CultureInfo.InvariantCulture,
-                out var cost
-            )
-        )
-        {
-            throw new InvalidOperationException(
-                $"UpgradeEntryView: Upgrade '{upgrade.id}' has invalid cost[0].amount '{upgrade.cost[0].amount}'."
-            );
-        }
+            infoText.text = viewModel.Summary;
 
         if (costText != null)
-            costText.text = Format.Currency(cost);
+            costText.text = viewModel.CostText;
 
-        var canAfford = upgradeService
-            .Wallet.GetBalanceProperty(costResourceId)
-            .DistinctUntilChanged()
-            .Select(balance => balance >= cost)
-            .DistinctUntilChanged();
-
-        var interactable = Observable
-            .CombineLatest(
-                canAfford,
-                isMaxed,
-                (afford, maxed) => upgrade.enabled && afford && !maxed
-            )
-            .DistinctUntilChanged();
-
-        var buyVisible = isMaxed.Select(maxed => upgrade.enabled && !maxed).DistinctUntilChanged();
-
-        isMaxed
+        viewModel
+            .IsMaxed
             .Subscribe(maxed =>
             {
                 if (checkmark != null)
@@ -126,10 +59,10 @@ public sealed class UpgradeEntryView : MonoBehaviour
             .AddTo(disposables);
 
         buyButton.Bind(
-            labelText: Observable.Return($"Buy\n{Format.Currency(cost)}"),
-            interactable: interactable,
-            visible: buyVisible,
-            onClick: () => upgradeService.TryPurchase(upgrade.id)
+            labelText: Observable.Return(viewModel.CostLabel),
+            interactable: viewModel.Purchase.CanExecute,
+            visible: viewModel.Purchase.IsVisible,
+            onClick: viewModel.Purchase.Execute
         );
     }
 

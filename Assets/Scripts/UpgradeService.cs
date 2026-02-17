@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using UniRx;
+using UnityEngine;
 
 public sealed class UpgradeService : IDisposable
 {
     private readonly UpgradeCatalog catalog;
     private readonly WalletService wallet;
     private readonly SaveService saveService;
+    private readonly Dictionary<string, ModifierEntry> modifiersById;
+    private readonly HashSet<string> invalidUpgradeErrorsLogged = new(StringComparer.Ordinal);
     private readonly Subject<string> purchasedStateChanged = new();
 
     // UpgradeId -> PurchasedCount (reactive)
@@ -19,12 +22,26 @@ public sealed class UpgradeService : IDisposable
     public UpgradeService(
         UpgradeCatalog catalog,
         WalletService wallet,
-        SaveService saveService
+        SaveService saveService,
+        IReadOnlyList<ModifierEntry> modifiers
     )
     {
         this.catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
+        modifiersById = new Dictionary<string, ModifierEntry>(StringComparer.Ordinal);
+        if (modifiers != null)
+        {
+            for (int i = 0; i < modifiers.Count; i++)
+            {
+                var modifier = modifiers[i];
+                var modifierId = (modifier?.id ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(modifierId) || modifiersById.ContainsKey(modifierId))
+                    continue;
+
+                modifiersById[modifierId] = modifier;
+            }
+        }
     }
 
     public WalletService Wallet => wallet;
@@ -68,6 +85,9 @@ public sealed class UpgradeService : IDisposable
         if (!def.enabled)
             return false;
 
+        if (!HasValidModifierReferences(def.id, out _))
+            return false;
+
         var count = PurchasedCount(def.id).Value;
         if (IsAtMaxRank(def, count))
             return false;
@@ -80,6 +100,12 @@ public sealed class UpgradeService : IDisposable
         var def = catalog.GetRequired(upgradeId);
         if (!def.enabled)
             return false;
+
+        if (!HasValidModifierReferences(def.id, out var validationError))
+        {
+            LogInvalidUpgradeDefinition(def.id, validationError);
+            return false;
+        }
 
         var count = PurchasedCount(def.id).Value;
         if (IsAtMaxRank(def, count))
@@ -244,5 +270,61 @@ public sealed class UpgradeService : IDisposable
         }
 
         return snapshot;
+    }
+
+    public bool HasValidModifierReferences(string upgradeId, out string error)
+    {
+        error = null;
+
+        var def = catalog.GetRequired(upgradeId);
+        if (def == null)
+        {
+            error = $"Upgrade '{upgradeId}' is missing from catalog.";
+            return false;
+        }
+
+        if (def.effects == null || def.effects.Length == 0)
+        {
+            error = $"Upgrade '{def.id}' has no effects[].modifierId.";
+            return false;
+        }
+
+        for (int i = 0; i < def.effects.Length; i++)
+        {
+            var effect = def.effects[i];
+            if (effect == null)
+            {
+                error = $"Upgrade '{def.id}' has null effects[{i}].";
+                return false;
+            }
+
+            var modifierId = (effect.modifierId ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(modifierId))
+            {
+                error = $"Upgrade '{def.id}' has empty effects[{i}].modifierId.";
+                return false;
+            }
+
+            if (!modifiersById.ContainsKey(modifierId))
+            {
+                error =
+                    $"Upgrade '{def.id}' references missing modifierId '{modifierId}' in effects[{i}].";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void LogInvalidUpgradeDefinition(string upgradeId, string details)
+    {
+        var id = (upgradeId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(id))
+            id = "unknown";
+
+        if (!invalidUpgradeErrorsLogged.Add(id))
+            return;
+
+        Debug.LogError($"UpgradeService: {details}");
     }
 }

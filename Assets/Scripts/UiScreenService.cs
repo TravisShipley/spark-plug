@@ -17,7 +17,7 @@ public sealed class UiScreenService
 
     public void CloseTop() => uiScreenManager.CloseTop();
 
-    public void ShowUpgrades() => uiScreenManager.ShowById("UPGRADES");
+    public void ShowUpgrades() => uiScreenManager.Show("UPGRADES", uiScreenManager.UpgradesScreenViewModel);
 
     public void ShowManagers() => uiScreenManager.ShowById("MANAGERS");
 
