@@ -157,6 +157,10 @@ public class GeneratorListComposer
 
         generatorView.Bind(generatorViewModel, service, walletViewModel);
 
+        var generatorButtonView = generatorView.GetComponentInChildren<GeneratorButtonView>(true);
+        if (generatorButtonView != null)
+            generatorButtonView.Bind(generatorViewModel);
+
         // Register by instance id (authoritative runtime id).
         uiService.RegisterGenerator(model.Id, service);
         // Compatibility path: allow lookups by node type id when there is a 1:1 instance mapping.
