@@ -44,6 +44,7 @@ Examples:
 - Own state, rules, and persistence triggers
 - Never reference UI types
 - Only `SaveService` may read from or write to disk (`SaveSystem`).
+- Avoid naming non-authoritative helpers as `*Service` (use `Builder`/`Composer`/`Factory` instead).
 
 ---
 
@@ -63,6 +64,7 @@ Examples:
 - Expose reactive properties (`IReadOnlyReactiveProperty<T>`)
 - Expose `UiCommand`s for user intent
 - Do not mutate services except through explicit methods
+- Prefer delegating list/entry construction to a `Builder`/`Composer` rather than embedding complex lookup/parsing in the ViewModel.
 
 ---
 
@@ -102,6 +104,42 @@ Examples:
 - The _only_ place where services and view models are instantiated
 - No gameplay logic
 - Construction and save-state loading are separate phases
+
+### 2.4.1 Builders, Composers, and Factories
+
+**Rule:** Prefer intent-based nouns like `Builder`, `Composer`, or `Factory` for _UI shaping_ and _object construction_ helpers. Avoid naming these helpers as `*Service`.
+
+**Intent:**
+These types assemble or transform existing data into a convenient shape for a caller (often a ViewModel or UI layer). They are not authoritative game systems.
+
+**Use these suffixes:**
+
+- `*Composer` — wires together multiple objects or creates a set of runtime objects from definitions.
+  - Examples:
+    - `GeneratorListComposer`
+    - `UiCompositionRoot` (still a CompositionRoot, but conceptually similar)
+
+- `*Builder` — builds a value or list from existing inputs, typically returning DTOs/ViewModels.
+  - Examples:
+    - `UpgradeListBuilder`
+    - `UpgradeEntryBuilder`
+
+- `*Factory` — creates instances (often one-at-a-time) with minimal transformation.
+  - Examples:
+    - `UpgradeEntryViewModelFactory`
+    - `NodeRuntimeFactory`
+
+**Avoid these names for helpers:**
+
+- `*ProjectionService` (too abstract; reads like domain authority)
+- `*UiService` / `*ManagerService` (vague; overlaps with authoritative `Service` meaning)
+
+**Guidelines:**
+
+- Builders/Composers/Factories contain **no domain authority**.
+- They may depend on catalogs/definitions/services, but must not own persistent state.
+- They should be easy to delete/replace without affecting save data or core rules.
+- If a helper starts owning rules/state, promote it into an authoritative `*Service`.
 
 ---
 
