@@ -619,7 +619,7 @@ GameObject:
   - component: {fileID: 1120071345}
   - component: {fileID: 1120071346}
   m_Layer: 0
-  m_Name: ModalManager
+  m_Name: UiScreenManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -653,21 +653,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModalManager
   uiServices: {fileID: 5399439}
-  modalContainer: {fileID: 194516104}
+  screenContainer: {fileID: 194516104}
   backdropButton: {fileID: 6065628833239432592}
   backdropGroup: {fileID: 6065628833239432591}
   backdropCanvas: {fileID: 6065628833239432595}
   closeOnEscape: 1
   closeOnBackdropClick: 1
-  baseModalSortingOrder: 100
+  baseScreenSortingOrder: 100
   sortingStep: 100
-  modalPrefabs:
-  - Id: ALERT
-    Prefab: {fileID: 7732882825203242694, guid: 95edef2221650445b8ecb2ed5d747c26,
-      type: 3}
-  - Id: WINDOW
-    Prefab: {fileID: 7732882825203242694, guid: c167771c26ca24969b45ef2480482963,
-      type: 3}
+  screenPrefabs:
   - Id: UPGRADES
     Prefab: {fileID: 8129661465548805835, guid: 23bdf05a3551340f294d46f8de4ca521,
       type: 3}
@@ -700,10 +694,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40894c04f38be423cb23fe58dd8222e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  generatorDatabase: {fileID: 11400000, guid: 0df5a9fe58df94e4794d1bce720f37f1, type: 2}
   uiRoot: {fileID: 634886349}
   uiService: {fileID: 5399439}
-  modalManager: {fileID: 1120071346}
+  uiScreenManager: {fileID: 1120071346}
   generatorUIRootPrefab: {fileID: 5203841696497185053, guid: c2d5911ca7967430d9f70489f4f407a3,
     type: 3}
   generatorUIContainer: {fileID: 1596328118}
@@ -859,6 +852,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 780846359773498737, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_fontSize
+      value: 72
       objectReference: {fileID: 0}
     - target: {fileID: 780846359773498737, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
@@ -1969,6 +1967,11 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5776474100335571950, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_Name
+      value: UiScreens
+      objectReference: {fileID: 0}
     - target: {fileID: 5785924660203454963, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchorMax.y
@@ -2657,16 +2660,21 @@ PrefabInstance:
     - target: {fileID: 8322882022150349467, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8322882022150349467, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8322882022150349467, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8322882022150349467, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8470735337951960505, guid: 602b3793041444a11842ad222eb83510,
