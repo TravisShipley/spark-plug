@@ -25,7 +25,6 @@ using System;
 using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.SceneManagement;
 
 public class GameCompositionRoot : MonoBehaviour
@@ -38,7 +37,6 @@ public class GameCompositionRoot : MonoBehaviour
     private UiServiceRegistry uiService;
 
     [Header("Managers")]
-    [FormerlySerializedAs("modalManager")]
     [SerializeField]
     private UiScreenManager uiScreenManager;
 

@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 {
-    // FormerlySerializedAs is temporary; remove after opening/saving all prefabs/scenes once.
     // Inspector helper for screen registry
     [Serializable]
     private sealed class ScreenEntry
@@ -20,7 +18,6 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     private UiServiceRegistry uiServices;
 
     [Header("Scene References")]
-    [FormerlySerializedAs("modalContainer")]
     [SerializeField]
     private Transform screenContainer;
 
@@ -41,7 +38,6 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     private bool closeOnBackdropClick = true;
 
     [Header("Stacking")]
-    [FormerlySerializedAs("baseModalSortingOrder")]
     [SerializeField]
     private int baseScreenSortingOrder = 100;
 
@@ -49,7 +45,6 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     private int sortingStep = 10;
 
     [Header("Screen Registry")]
-    [FormerlySerializedAs("modalPrefabs")]
     [SerializeField]
     private List<ScreenEntry> screenPrefabs = new();
 
