@@ -206,6 +206,7 @@ public sealed class UpgradeListBuilder
             where = $"Resource:{scopeResource}";
 
         string effect = "modifier";
+        bool isAutomation = false;
         if (
             target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
             || string.Equals(target, "node.speedMultiplier", StringComparison.OrdinalIgnoreCase)
@@ -222,11 +223,14 @@ public sealed class UpgradeListBuilder
             || string.Equals(target, "automation.autoCollect", StringComparison.OrdinalIgnoreCase)
             || string.Equals(target, "automation.autoRestart", StringComparison.OrdinalIgnoreCase)
         )
-            effect = "automation enabled";
+        {
+            effect = "Automates ";
+            isAutomation = true;
+        }
         else if (target.StartsWith("resourceGain", StringComparison.OrdinalIgnoreCase))
             effect = $"resource gain x{Format.Abbreviated(modifier.value)}";
 
-        return $"{where} {effect}";
+        return isAutomation ? $"{effect}{where}" : $"{where} {effect}";
     }
 
     private static bool TryGetPrimaryCost(
