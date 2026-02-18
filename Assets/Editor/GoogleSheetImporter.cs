@@ -1004,7 +1004,30 @@ public static class GoogleSheetImporter
         if (path.EndsWith("_json", StringComparison.OrdinalIgnoreCase))
         {
             // Strict mode: fail loud if JSON is invalid.
-            return ParseJsonLikeValue(s);
+            // Accept either raw JSON (preferred) OR a quoted/escaped JSON string (common when copy/pasting).
+            var raw = s;
+
+            // If the entire cell is a quoted string, unquote and unescape CSV-style doubled quotes.
+            // Example:
+            //   "[{""type"":""resourceAtLeast""}]"  ->  [{"type":"resourceAtLeast"}]
+            if (
+                raw.Length >= 2
+                && raw.StartsWith("\"", StringComparison.Ordinal)
+                && raw.EndsWith("\"", StringComparison.Ordinal)
+            )
+            {
+                raw = raw.Substring(1, raw.Length - 2);
+
+                // Undo CSV-style escaping ("" -> ")
+                raw = raw.Replace("\"\"", "\"");
+
+                // Also undo common backslash escaping for quotes if present.
+                raw = raw.Replace("\\\"", "\"");
+            }
+
+            raw = raw.Trim();
+
+            return ParseJsonLikeValue(raw);
         }
 
         if (bool.TryParse(s, out var b))
