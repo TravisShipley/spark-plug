@@ -41,21 +41,23 @@ public class WalletService : IDisposable
 
     public void Add(string resourceId, double amount)
     {
-        if (double.IsNaN(amount) || double.IsInfinity(amount))
-            throw new InvalidOperationException(
-                $"WalletService.Add: Invalid amount '{amount}' for resource '{resourceId}'."
-            );
+        AddInternal(resourceId, amount, applyResourceGainMultiplier: true);
+    }
 
-        if (Math.Abs(amount) < double.Epsilon)
+    public void ApplyOfflineEarnings(OfflineSessionResult result)
+    {
+        if (result == null || result.ResourceGains == null)
             return;
 
-        if (amount > 0 && modifierService != null)
+        for (int i = 0; i < result.ResourceGains.Count; i++)
         {
-            amount *= modifierService.GetResourceGainMultiplier(resourceId);
-        }
+            var gain = result.ResourceGains[i];
+            if (gain == null)
+                continue;
 
-        var balance = GetBalancePropertyInternal(resourceId);
-        balance.Value += amount;
+            // OfflineProgressCalculator already applies global resource-gain multipliers.
+            AddInternal(gain.resourceId, gain.amount, applyResourceGainMultiplier: false);
+        }
     }
 
     public void SetModifierService(ModifierService modifierService)
@@ -218,22 +220,9 @@ public class WalletService : IDisposable
 
     private void PersistToSave()
     {
-        var data = saveService.Data;
-        if (data == null)
-            return;
-
-        data.Resources ??= new List<GameData.ResourceBalanceData>();
-        data.Resources.Clear();
-
         foreach (var kv in balancesByResourceId)
         {
-            data.Resources.Add(
-                new GameData.ResourceBalanceData
-                {
-                    ResourceId = kv.Key,
-                    Amount = kv.Value?.Value ?? 0,
-                }
-            );
+            saveService.SetResourceBalance(kv.Key, kv.Value?.Value ?? 0d, requestSave: false);
         }
 
         saveService.RequestSave();
@@ -246,5 +235,26 @@ public class WalletService : IDisposable
         balancesByResourceId.Clear();
 
         disposables.Dispose();
+    }
+
+    private void AddInternal(
+        string resourceId,
+        double amount,
+        bool applyResourceGainMultiplier
+    )
+    {
+        if (double.IsNaN(amount) || double.IsInfinity(amount))
+            throw new InvalidOperationException(
+                $"WalletService.Add: Invalid amount '{amount}' for resource '{resourceId}'."
+            );
+
+        if (Math.Abs(amount) < double.Epsilon)
+            return;
+
+        if (amount > 0d && applyResourceGainMultiplier && modifierService != null)
+            amount *= modifierService.GetResourceGainMultiplier(resourceId);
+
+        var balance = GetBalancePropertyInternal(resourceId);
+        balance.Value += amount;
     }
 }

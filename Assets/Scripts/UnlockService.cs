@@ -302,7 +302,7 @@ public sealed class UnlockService : IDisposable
         EnsureUnlockProperty(id).Value = true;
 
         if (markSaveDirty)
-            SyncUnlockedIdsToSave(requestSave: true);
+            saveService.SetNodeInstanceUnlocked(id, unlocked: true, requestSave: true);
 
         if (emitEvent)
             unlockedSubject.OnNext(id);
@@ -312,7 +312,7 @@ public sealed class UnlockService : IDisposable
 
     private void SyncUnlockedIdsToSave(bool requestSave)
     {
-        saveService.SetUnlockedNodeInstanceIds(unlockedIds);
+        saveService.SetUnlockedNodeInstanceIds(unlockedIds, requestSave: false);
         if (requestSave)
             saveService.RequestSave();
     }

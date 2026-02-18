@@ -3,11 +3,13 @@ using System;
 public sealed class UiScreenService
 {
     private readonly UiScreenManager uiScreenManager;
+    private readonly WalletService walletService;
 
-    public UiScreenService(UiScreenManager uiScreenManager)
+    public UiScreenService(UiScreenManager uiScreenManager, WalletService walletService)
     {
         this.uiScreenManager =
             uiScreenManager ?? throw new ArgumentNullException(nameof(uiScreenManager));
+        this.walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
     }
 
     // Generic helpers (optional, but handy)
@@ -22,6 +24,12 @@ public sealed class UiScreenService
     public void ShowManagers() => uiScreenManager.Show("MANAGERS", uiScreenManager.ManagersScreenViewModel);
 
     public void ShowStore() => uiScreenManager.ShowById("STORE");
+
+    public void ShowOfflineEarnings(OfflineSessionResult result)
+    {
+        var viewModel = new OfflineEarningsViewModel(result, walletService, CloseTop);
+        uiScreenManager.Show("OFFLINE_EARNINGS", viewModel);
+    }
 }
 
 // TODO

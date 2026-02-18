@@ -47,6 +47,7 @@ public class GeneratorService : IDisposable
     private readonly ReactiveProperty<bool> isOwned;
     private readonly ReactiveProperty<bool> isRunning;
     private readonly ReactiveProperty<bool> isAutomated;
+    private readonly ReactiveProperty<bool> isAutomationPurchased;
     private readonly ReactiveProperty<int> milestoneRank;
     private readonly ReactiveProperty<int> previousMilestoneAtLevel;
     private readonly ReactiveProperty<int> nextMilestoneAtLevel;
@@ -57,6 +58,7 @@ public class GeneratorService : IDisposable
     public IReadOnlyReactiveProperty<bool> IsOwned => isOwned;
     public IReadOnlyReactiveProperty<bool> IsRunning => isRunning;
     public IReadOnlyReactiveProperty<bool> IsAutomated => isAutomated;
+    public IReadOnlyReactiveProperty<bool> IsAutomationPurchased => isAutomationPurchased;
     public IReadOnlyReactiveProperty<int> MilestoneRank => milestoneRank;
     public IReadOnlyReactiveProperty<int> PreviousMilestoneAtLevel => previousMilestoneAtLevel;
     public IReadOnlyReactiveProperty<int> NextMilestoneAtLevel => nextMilestoneAtLevel;
@@ -86,6 +88,7 @@ public class GeneratorService : IDisposable
         level = new ReactiveProperty<int>(model.Level);
         isOwned = new ReactiveProperty<bool>(model.IsOwned);
         isAutomated = new ReactiveProperty<bool>(model.IsAutomated);
+        isAutomationPurchased = new ReactiveProperty<bool>(model.IsAutomated);
         milestoneRank = new ReactiveProperty<int>(0);
         previousMilestoneAtLevel = new ReactiveProperty<int>(0);
         nextMilestoneAtLevel = new ReactiveProperty<int>(0);
@@ -250,6 +253,7 @@ public class GeneratorService : IDisposable
         if (!wallet.TrySpend(CreateCost(definition.AutomationCostResourceId, AutomationCost)))
             return false;
         model.IsAutomated = true;
+        isAutomationPurchased.Value = true;
         isAutomated.Value = IsAutomationActive();
 
         // Automation implies continuous running from now on
@@ -298,6 +302,7 @@ public class GeneratorService : IDisposable
         level.Dispose();
         isOwned.Dispose();
         isAutomated.Dispose();
+        isAutomationPurchased.Dispose();
         milestoneRank.Dispose();
         previousMilestoneAtLevel.Dispose();
         nextMilestoneAtLevel.Dispose();

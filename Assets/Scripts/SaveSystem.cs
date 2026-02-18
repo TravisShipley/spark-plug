@@ -5,9 +5,12 @@ using System.Collections.Generic;
 
 public static class SaveSystem
 {
-    public static event Action<GameData> OnSaveReset;
-
     private static string SavePath => Path.Combine(Application.persistentDataPath, "save.json");
+
+    public static bool HasSave()
+    {
+        return File.Exists(SavePath);
+    }
 
     public static void SaveGame(GameData data)
     {
@@ -41,32 +44,30 @@ public static class SaveSystem
 
     public static GameData LoadGame()
     {
-        if (File.Exists(SavePath))
+        if (!File.Exists(SavePath))
+            return null;
+
+        try
         {
-            try
+            string json = File.ReadAllText(SavePath);
+            var data = JsonUtility.FromJson<GameData>(json);
+            if (data == null)
             {
-                string json = File.ReadAllText(SavePath);
-
-                var data = JsonUtility.FromJson<GameData>(json);
-
-                // Migration / null-safety for older saves
-                if (data == null)
-                    return CreateNewGameData();
-
-                data.EnsureInitialized();
-
-                return data;
+                Debug.LogError("Failed to load or parse save data: JSON produced null GameData.");
+                return null;
             }
-            catch (Exception e)
-            {
-                Debug.LogError($"Failed to load or parse save data: {e.Message}");
-                return CreateNewGameData();
-            }
+
+            data.EnsureInitialized();
+            return data;
         }
-        return CreateNewGameData();
+        catch (Exception e)
+        {
+            Debug.LogError($"Failed to load or parse save data: {e.Message}");
+            return null;
+        }
     }
 
-    public static void ClearSave()
+    public static void DeleteSaveFile()
     {
         try
         {
@@ -86,23 +87,14 @@ public static class SaveSystem
         }
     }
 
-    public static GameData ResetSave()
-    {
-        ClearSave();
-        GameData defaultData = CreateNewGameData();
-        Debug.Log("SaveSystem: Resetting save data to defaults.");
-        SaveGame(defaultData);
-        OnSaveReset?.Invoke(defaultData);
-        return defaultData;
-    }
-
     private static GameData CreateNewGameData()
     {
         var data = new GameData
         {
             Generators = new List<GameData.GeneratorStateData>(),
             Upgrades = new List<GameData.UpgradeStateData>(),
-            Resources = new List<GameData.ResourceBalanceData>()
+            Resources = new List<GameData.ResourceBalanceData>(),
+            lastSeenUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
         };
         data.EnsureInitialized();
         return data;

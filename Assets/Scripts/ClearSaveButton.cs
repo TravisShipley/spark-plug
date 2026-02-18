@@ -17,7 +17,7 @@ public class ClearSaveButton : MonoBehaviour
             labelText: Observable.Return("Reset"),
             interactable: Observable.Return(true),
             visible: Observable.Return(true),
-            onClick: () => SaveSystem.ResetSave()
+            onClick: () => EventSystem.OnResetSaveRequested.OnNext(Unit.Default)
         );
     }
 

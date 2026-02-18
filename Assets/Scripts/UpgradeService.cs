@@ -144,8 +144,7 @@ public sealed class UpgradeService : IDisposable
         rp.Value = rp.Value + 1;
 
         // Persist upgrade purchase facts immediately.
-        SaveInto(saveService.Data);
-        saveService.RequestSave();
+        saveService.SetUpgradeRank(def.id, rp.Value);
         purchasedStateChanged.OnNext(def.id);
 
         return true;
@@ -167,6 +166,12 @@ public sealed class UpgradeService : IDisposable
             var id = (s.Id ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(id))
                 continue;
+
+            if (!catalog.TryGet(id, out _))
+            {
+                Debug.LogWarning($"UpgradeService: Save references missing upgrade '{id}'. Skipping.");
+                continue;
+            }
 
             int count = Math.Max(0, s.PurchasedCount);
             var rp = (ReactiveProperty<int>)PurchasedCount(id);
@@ -248,29 +253,6 @@ public sealed class UpgradeService : IDisposable
             return true;
 
         return purchasedCount >= maxPurchases;
-    }
-
-    /// <summary>
-    /// Write current purchased counts into save data.
-    /// </summary>
-    public void SaveInto(GameData data)
-    {
-        if (data == null)
-            return;
-
-        data.Upgrades ??= new List<GameData.UpgradeStateData>();
-        data.Upgrades.Clear();
-
-        foreach (var kv in purchasedCountById)
-        {
-            int count = kv.Value?.Value ?? 0;
-            if (count <= 0)
-                continue;
-
-            data.Upgrades.Add(
-                new GameData.UpgradeStateData { Id = kv.Key, PurchasedCount = count }
-            );
-        }
     }
 
     public void Dispose()

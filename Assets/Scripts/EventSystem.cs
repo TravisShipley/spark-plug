@@ -5,4 +5,6 @@ public static class EventSystem
 {
     public static readonly Subject<(string resourceId, double amount)> OnIncrementBalance =
         new Subject<(string resourceId, double amount)>();
+
+    public static readonly Subject<Unit> OnResetSaveRequested = new Subject<Unit>();
 }

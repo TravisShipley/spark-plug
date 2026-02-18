@@ -668,6 +668,9 @@ MonoBehaviour:
   - Id: MANAGERS
     Prefab: {fileID: 8091284333021123456, guid: dde1b116d098d4a85a8ae3a06a7a7e01,
       type: 3}
+  - Id: OFFLINE_EARNINGS
+    Prefab: {fileID: -3593859944293834060, guid: 2b4fdca78bd234560ba02240dea15163,
+      type: 3}
 --- !u!1 &1263566856
 GameObject:
   m_ObjectHideFlags: 0
@@ -1808,6 +1811,11 @@ PrefabInstance:
     - target: {fileID: 4319490324697048817, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4653334151199274128, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_MatchWidthOrHeight
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4673064816105296989, guid: 602b3793041444a11842ad222eb83510,

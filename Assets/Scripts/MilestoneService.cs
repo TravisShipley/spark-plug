@@ -96,11 +96,10 @@ public sealed class MilestoneService : IDisposable
         if (string.IsNullOrEmpty(nodeId))
             return;
 
-        if (!milestonesByNodeId.TryGetValue(nodeId, out var nodeMilestones) || nodeMilestones == null)
-            return;
-
-        var firedIds = saveService.Data?.FiredMilestoneIds;
-        if (firedIds == null)
+        if (
+            !milestonesByNodeId.TryGetValue(nodeId, out var nodeMilestones)
+            || nodeMilestones == null
+        )
             return;
 
         bool firedAny = false;
@@ -114,7 +113,7 @@ public sealed class MilestoneService : IDisposable
             if (string.IsNullOrEmpty(milestoneId))
                 continue;
 
-            if (firedIds.Contains(milestoneId))
+            if (saveService.IsMilestoneFired(milestoneId))
                 continue;
 
             if (currentLevel < milestone.atLevel)
@@ -123,7 +122,7 @@ public sealed class MilestoneService : IDisposable
             if (!ValidateMilestone(milestone))
                 continue;
 
-            firedIds.Add(milestoneId);
+            saveService.MarkMilestoneFired(milestoneId, requestSave: false);
             var modifierIds = new List<string>();
             for (int e = 0; e < milestone.grantEffects.Length; e++)
             {

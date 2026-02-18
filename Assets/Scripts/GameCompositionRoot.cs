@@ -55,6 +55,7 @@ public class GameCompositionRoot : MonoBehaviour
     private ModifierService modifierService;
     private MilestoneService milestoneService;
     private UnlockService unlockService;
+    private OfflineProgressCalculator offlineProgressCalculator;
     private GameDefinitionService gameDefinitionService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
@@ -62,6 +63,7 @@ public class GameCompositionRoot : MonoBehaviour
 
     // Timing
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
+    private const long MaxOfflineSeconds = 8 * 60 * 60;
 
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
@@ -78,7 +80,6 @@ public class GameCompositionRoot : MonoBehaviour
 
         // SaveService owns an in-memory snapshot.
         saveService = new SaveService();
-        saveService.Load();
 
         InitializeCoreServices(out var uiScreenService);
         if (!enabled)
@@ -105,6 +106,7 @@ public class GameCompositionRoot : MonoBehaviour
         unlockService.LoadUnlockedIds(saveService.Data?.UnlockedNodeInstanceIds);
 
         BindSceneUi(uiScreenService);
+        TryShowOfflineEarnings(uiScreenService);
 
         var generatorComposer = new GeneratorListComposer(
             generatorUIRootPrefab,
@@ -115,7 +117,6 @@ public class GameCompositionRoot : MonoBehaviour
             modifierService,
             uiService,
             saveService,
-            upgradeService,
             gameDefinitionService,
             unlockService,
             disposables,
@@ -136,6 +137,10 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             modifierService
         );
+
+        EventSystem
+            .OnResetSaveRequested.Subscribe(_ => HandleResetRequested())
+            .AddTo(disposables);
     }
 
     private void InitializeCoreServices(out UiScreenService uiScreenService)
@@ -147,6 +152,7 @@ public class GameCompositionRoot : MonoBehaviour
 
         // Load content-driven definitions and build catalogs first.
         gameDefinitionService = new GameDefinitionService();
+        saveService.Load(gameDefinitionService.Definition);
 
         walletService = new WalletService(saveService, gameDefinitionService.ResourceCatalog);
         walletViewModel = new WalletViewModel(walletService);
@@ -174,6 +180,10 @@ public class GameCompositionRoot : MonoBehaviour
             gameDefinitionService.Milestones
         );
         walletService.SetModifierService(modifierService);
+        offlineProgressCalculator = new OfflineProgressCalculator(
+            gameDefinitionService,
+            modifierService
+        );
 
         // UiScreenManager needs the UpgradeService for screens like Upgrades.
         uiScreenManager.Initialize(upgradeService);
@@ -192,7 +202,7 @@ public class GameCompositionRoot : MonoBehaviour
         uiScreenManager.ManagersScreenViewModel = managersScreenViewModel;
 
         // Domain-facing screen API (intent-based)
-        uiScreenService = new UiScreenService(uiScreenManager);
+        uiScreenService = new UiScreenService(uiScreenManager, walletService);
     }
 
     private void LoadSaveState()
@@ -269,25 +279,10 @@ public class GameCompositionRoot : MonoBehaviour
         return true;
     }
 
-    private void OnEnable()
-    {
-        SaveSystem.OnSaveReset += OnSaveReset;
-    }
-
-    private void OnDisable()
-    {
-        SaveSystem.OnSaveReset -= OnSaveReset;
-    }
-
-    private void OnSaveReset(GameData _)
-    {
-        // For testing: a full scene reload guarantees all services, models, and views reset cleanly
-        // without needing every ViewModel/View to support re-initialization.
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-    }
-
     private void OnDestroy()
     {
+        UpdateLastSeenTimestamp(saveImmediately: false);
+
         // Flush any pending save (best effort)
         saveService?.Dispose();
 
@@ -314,5 +309,76 @@ public class GameCompositionRoot : MonoBehaviour
         // Dispose core state last
         upgradeService?.Dispose();
         walletService?.Dispose();
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (!pauseStatus)
+            return;
+
+        UpdateLastSeenTimestamp(saveImmediately: true);
+    }
+
+    private void OnApplicationQuit()
+    {
+        UpdateLastSeenTimestamp(saveImmediately: true);
+    }
+
+    private void HandleResetRequested()
+    {
+        if (saveService == null || gameDefinitionService?.Definition == null)
+            return;
+
+        saveService.Reset(gameDefinitionService.Definition);
+
+        // For testing: a full scene reload guarantees all services, models, and views reset cleanly
+        // without needing every ViewModel/View to support re-initialization.
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    private void TryShowOfflineEarnings(UiScreenService uiScreenService)
+    {
+        if (
+            uiScreenService == null
+            || saveService == null
+            || offlineProgressCalculator == null
+            || saveService.Data == null
+        )
+        {
+            return;
+        }
+
+        var now = GetCurrentUnixSeconds();
+        var lastSeen = saveService.LastSeenUnixSeconds;
+        if (lastSeen <= 0 || lastSeen > now)
+        {
+            saveService.SetLastSeenUnixSeconds(now, requestSave: true);
+            return;
+        }
+
+        var secondsAway = Math.Max(0, now - lastSeen);
+        var clampedSecondsAway = Math.Min(secondsAway, MaxOfflineSeconds);
+        var result = offlineProgressCalculator.Calculate(clampedSecondsAway, saveService.Data);
+
+        // Stamp this session immediately so repeated launches do not double-pay.
+        saveService.SetLastSeenUnixSeconds(now, requestSave: true);
+
+        if (result != null && result.HasMeaningfulGain())
+            uiScreenService.ShowOfflineEarnings(result);
+    }
+
+    private void UpdateLastSeenTimestamp(bool saveImmediately)
+    {
+        if (saveService == null)
+            return;
+
+        saveService.SetLastSeenUnixSeconds(GetCurrentUnixSeconds(), requestSave: !saveImmediately);
+        if (saveImmediately)
+            saveService.SaveNow();
+    }
+
+    private static long GetCurrentUnixSeconds()
+    {
+        return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 }

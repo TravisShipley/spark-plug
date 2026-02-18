@@ -12,14 +12,16 @@ public class GameData : ISerializationCallbackReceiver
         public double Amount;
     }
 
-    public double globalIncomeMultiplier = 1.0;
-
     [Serializable]
     public class GeneratorStateData
     {
         public string Id;
         public bool IsOwned;
+        public bool IsEnabled;
+
+        // Legacy compatibility for older saves.
         public bool IsAutomated;
+        public bool IsAutomationPurchased;
         public int Level;
     }
 
@@ -36,6 +38,7 @@ public class GameData : ISerializationCallbackReceiver
     public List<GeneratorStateData> Generators = new();
     public List<UpgradeStateData> Upgrades = new();
     public List<ResourceBalanceData> Resources = new();
+    public long lastSeenUnixSeconds;
 
     // Runtime lookup of one-time milestones that have already fired.
     [NonSerialized]
@@ -81,11 +84,14 @@ public class GameData : ISerializationCallbackReceiver
                     UnlockedNodeInstanceIds.Add(normalized);
             }
         }
+
+        NormalizeGeneratorStates();
     }
 
     public void OnBeforeSerialize()
     {
         EnsureInitialized();
+        NormalizeGeneratorStates();
         firedMilestoneIds.Clear();
 
         foreach (var id in FiredMilestoneIds)
@@ -134,6 +140,43 @@ public class GameData : ISerializationCallbackReceiver
                 continue;
 
             UnlockedNodeInstanceIds.Add(normalized);
+        }
+    }
+
+    private void NormalizeGeneratorStates()
+    {
+        if (Generators == null)
+            return;
+
+        for (int i = 0; i < Generators.Count; i++)
+        {
+            var state = Generators[i];
+            if (state == null)
+                continue;
+
+            state.Id = (state.Id ?? string.Empty).Trim();
+            state.IsAutomationPurchased = state.IsAutomationPurchased || state.IsAutomated;
+
+            if (state.IsOwned)
+                state.IsEnabled = true;
+
+            if (state.IsAutomationPurchased)
+            {
+                state.IsOwned = true;
+                state.IsEnabled = true;
+            }
+
+            if (state.IsOwned && state.Level < 1)
+                state.Level = 1;
+
+            if (!state.IsOwned && state.Level < 0)
+                state.Level = 0;
+
+            if (!state.IsOwned)
+                state.Level = 0;
+
+            // Write legacy field for forward/backward compatibility.
+            state.IsAutomated = state.IsAutomationPurchased;
         }
     }
 }

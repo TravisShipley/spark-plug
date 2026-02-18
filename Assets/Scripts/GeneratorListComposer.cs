@@ -15,7 +15,6 @@ public class GeneratorListComposer
     private readonly ModifierService modifierService;
     private readonly UiServiceRegistry uiService;
     private readonly SaveService saveService;
-    private readonly UpgradeService upgradeService;
     private readonly GameDefinitionService gameDefinitionService;
     private readonly UnlockService unlockService;
     private readonly CompositeDisposable disposables;
@@ -42,7 +41,6 @@ public class GeneratorListComposer
         ModifierService modifierService,
         UiServiceRegistry uiService,
         SaveService saveService,
-        UpgradeService upgradeService,
         GameDefinitionService gameDefinitionService,
         UnlockService unlockService,
         CompositeDisposable disposables,
@@ -59,7 +57,6 @@ public class GeneratorListComposer
         this.modifierService = modifierService;
         this.uiService = uiService;
         this.saveService = saveService;
-        this.upgradeService = upgradeService;
         this.gameDefinitionService = gameDefinitionService;
         this.unlockService = unlockService;
         this.disposables = disposables;
@@ -549,7 +546,7 @@ public class GeneratorListComposer
             if (savedGen != null)
             {
                 isOwned = savedGen.IsOwned;
-                isAutomated = savedGen.IsAutomated;
+                isAutomated = savedGen.IsAutomationPurchased || savedGen.IsAutomated;
                 level = savedGen.Level;
             }
         }
@@ -569,19 +566,19 @@ public class GeneratorListComposer
             .CombineLatest(
                 service.Level.DistinctUntilChanged(),
                 service.IsOwned.DistinctUntilChanged(),
-                service.IsAutomated.DistinctUntilChanged(),
-                (lvl, owned, automated) => (lvl, owned, automated)
+                service.IsAutomationPurchased.DistinctUntilChanged(),
+                (lvl, owned, automationPurchased) => (lvl, owned, automationPurchased)
             )
             .Subscribe(state =>
             {
-                // Update in-memory save snapshot (facts)
-                saveService.SetGeneratorState(id, state.lvl, state.owned, state.automated);
-
-                // Persist upgrade purchases alongside generator state
-                upgradeService.SaveInto(saveService.Data);
-
-                // Request a debounced save
-                saveService.RequestSave();
+                var isEnabled = unlockService?.IsUnlocked(id) ?? state.owned;
+                saveService.SetNodeInstanceState(
+                    id,
+                    state.owned,
+                    isEnabled,
+                    state.lvl,
+                    state.automationPurchased
+                );
             })
             .AddTo(disposables);
     }

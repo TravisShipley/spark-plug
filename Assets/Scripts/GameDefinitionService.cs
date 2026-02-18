@@ -105,6 +105,7 @@ public sealed class GameDefinitionService
     public ResourceCatalog ResourceCatalog => resourceCatalog;
     public UpgradeCatalog UpgradeCatalog => upgradeCatalog;
     public UpgradeCatalog Catalog => upgradeCatalog;
+    public GameDefinition Definition => definition;
 
     private static List<ModifierEntry> ResolveModifiersForUpgrade(
         UpgradeEntry upgrade,
