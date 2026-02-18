@@ -9,9 +9,13 @@ public sealed class UpgradeService : IDisposable
     private readonly UpgradeCatalog catalog;
     private readonly WalletService wallet;
     private readonly SaveService saveService;
+    private readonly CompositeDisposable disposables = new();
     private readonly Dictionary<string, ModifierEntry> modifiersById;
     private readonly HashSet<string> invalidUpgradeErrorsLogged = new(StringComparer.Ordinal);
+    private readonly HashSet<string> affordabilityScanErrorsLogged = new(StringComparer.Ordinal);
     private readonly Subject<string> purchasedStateChanged = new();
+    private readonly ReadOnlyReactiveProperty<bool> hasAffordableUpgrades;
+    private readonly ReadOnlyReactiveProperty<bool> hasAffordableManagers;
 
     // UpgradeId -> PurchasedCount (reactive)
     private readonly Dictionary<string, ReactiveProperty<int>> purchasedCountById = new Dictionary<
@@ -42,9 +46,30 @@ public sealed class UpgradeService : IDisposable
                 modifiersById[modifierId] = modifier;
             }
         }
+
+        var affordabilityRecompute = Observable
+            .Merge(ObserveRelevantWalletBalanceChanges(), purchasedStateChanged.Select(_ => Unit.Default))
+            .ThrottleFrame(1)
+            .StartWith(Unit.Default)
+            .Publish()
+            .RefCount();
+
+        hasAffordableUpgrades = affordabilityRecompute
+            .Select(_ => HasAnyAffordableUpgrade(IsNonAutomationUpgrade))
+            .DistinctUntilChanged()
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
+
+        hasAffordableManagers = affordabilityRecompute
+            .Select(_ => HasAnyAffordableUpgrade(IsAutomationUpgrade))
+            .DistinctUntilChanged()
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
     }
 
     public WalletService Wallet => wallet;
+    public IReadOnlyReactiveProperty<bool> HasAffordableUpgrades => hasAffordableUpgrades;
+    public IReadOnlyReactiveProperty<bool> HasAffordableManagers => hasAffordableManagers;
 
     public IObservable<string> PurchasedStateChangedAsObservable() => purchasedStateChanged;
 
@@ -250,6 +275,8 @@ public sealed class UpgradeService : IDisposable
 
     public void Dispose()
     {
+        disposables.Dispose();
+
         purchasedStateChanged.OnCompleted();
         purchasedStateChanged.Dispose();
 
@@ -326,5 +353,114 @@ public sealed class UpgradeService : IDisposable
             return;
 
         Debug.LogError($"UpgradeService: {details}");
+    }
+
+    private IObservable<Unit> ObserveRelevantWalletBalanceChanges()
+    {
+        var streams = new List<IObservable<Unit>>();
+        var seenResources = new HashSet<string>(StringComparer.Ordinal);
+        var upgrades = catalog.Upgrades;
+        if (upgrades == null || upgrades.Count == 0)
+            return Observable.Empty<Unit>();
+
+        for (int i = 0; i < upgrades.Count; i++)
+        {
+            var upgrade = upgrades[i];
+            if (upgrade?.cost == null || upgrade.cost.Length == 0)
+                continue;
+
+            for (int costIndex = 0; costIndex < upgrade.cost.Length; costIndex++)
+            {
+                var cost = upgrade.cost[costIndex];
+                var resourceId = (cost?.resource ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(resourceId) || !seenResources.Add(resourceId))
+                    continue;
+
+                try
+                {
+                    streams.Add(
+                        wallet
+                            .GetBalanceProperty(resourceId)
+                            .DistinctUntilChanged()
+                            .Skip(1)
+                            .Select(_ => Unit.Default)
+                    );
+                }
+                catch (Exception ex)
+                {
+                    LogAffordabilityScanError(
+                        upgrade.id,
+                        $"Skipping badge scan subscription for unknown resource '{resourceId}': {ex.Message}"
+                    );
+                }
+            }
+        }
+
+        return streams.Count > 0 ? Observable.Merge(streams) : Observable.Empty<Unit>();
+    }
+
+    private bool HasAnyAffordableUpgrade(Func<UpgradeEntry, bool> includeFilter)
+    {
+        var upgrades = catalog.Upgrades;
+        if (upgrades == null || upgrades.Count == 0)
+            return false;
+
+        for (int i = 0; i < upgrades.Count; i++)
+        {
+            var upgrade = upgrades[i];
+            if (upgrade == null || !includeFilter(upgrade))
+                continue;
+
+            if (TryCanPurchase(upgrade.id, out var canPurchase) && canPurchase)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool TryCanPurchase(string upgradeId, out bool canPurchase)
+    {
+        canPurchase = false;
+        var id = (upgradeId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(id))
+            return false;
+
+        if (!catalog.TryGet(id, out var upgrade) || upgrade == null)
+            return false;
+
+        if (upgrade.cost == null || upgrade.cost.Length == 0)
+            return false;
+
+        try
+        {
+            canPurchase = CanPurchase(id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogAffordabilityScanError(id, ex.Message);
+            return false;
+        }
+    }
+
+    private static bool IsAutomationUpgrade(UpgradeEntry upgrade)
+    {
+        var category = (upgrade?.category ?? string.Empty).Trim();
+        return string.Equals(category, "Automation", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNonAutomationUpgrade(UpgradeEntry upgrade) =>
+        !IsAutomationUpgrade(upgrade);
+
+    private void LogAffordabilityScanError(string upgradeId, string details)
+    {
+        var id = (upgradeId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(id))
+            id = "unknown";
+
+        if (!affordabilityScanErrorsLogged.Add(id))
+            return;
+
+        Debug.LogError($"UpgradeService: Badge affordability scan failed for '{id}': {details}");
     }
 }

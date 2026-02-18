@@ -51,6 +51,7 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradeService upgradeService;
     private UpgradeListBuilder upgradeListBuilder;
     private UpgradesScreenViewModel upgradesScreenViewModel;
+    private ManagersScreenViewModel managersScreenViewModel;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
     private UnlockService unlockService;
@@ -186,7 +187,9 @@ public class GameCompositionRoot : MonoBehaviour
             gameDefinitionService
         );
         upgradesScreenViewModel = new UpgradesScreenViewModel(upgradeListBuilder);
+        managersScreenViewModel = new ManagersScreenViewModel(upgradeListBuilder);
         uiScreenManager.UpgradesScreenViewModel = upgradesScreenViewModel;
+        uiScreenManager.ManagersScreenViewModel = managersScreenViewModel;
 
         // Domain-facing screen API (intent-based)
         uiScreenService = new UiScreenService(uiScreenManager);
@@ -305,6 +308,7 @@ public class GameCompositionRoot : MonoBehaviour
         foreach (var generatorViewModel in generatorViewModels)
             generatorViewModel?.Dispose();
         upgradesScreenViewModel?.Dispose();
+        managersScreenViewModel?.Dispose();
         walletViewModel?.Dispose();
 
         // Dispose core state last

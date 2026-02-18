@@ -12,6 +12,13 @@ public sealed class BottomBarView : MonoBehaviour
     [SerializeField]
     private ReactiveButtonView storeButton;
 
+    [Header("Badges")]
+    [SerializeField]
+    private GameObject upgradesBadge;
+
+    [SerializeField]
+    private GameObject managersBadge;
+
     private readonly CompositeDisposable disposables = new();
     private bool isBound;
 
@@ -25,6 +32,13 @@ public sealed class BottomBarView : MonoBehaviour
             );
             return;
         }
+
+        if (vm == null)
+        {
+            Debug.LogError("BottomBarView: viewModel is null.", this);
+            return;
+        }
+
         isBound = true;
         disposables.Clear();
 
@@ -37,7 +51,7 @@ public sealed class BottomBarView : MonoBehaviour
 
         managersButton.Bind(
             labelText: Observable.Return("Managers"),
-            interactable: Observable.Return(false),
+            interactable: vm.ShowManagers.CanExecute,
             visible: vm.ShowManagers.IsVisible,
             onClick: vm.ShowManagers.Execute
         );
@@ -48,6 +62,22 @@ public sealed class BottomBarView : MonoBehaviour
             visible: vm.ShowStore.IsVisible,
             onClick: vm.ShowStore.Execute
         );
+
+        if (upgradesBadge != null)
+        {
+            vm.ShowUpgradesBadge
+                .DistinctUntilChanged()
+                .Subscribe(show => upgradesBadge.SetActive(show))
+                .AddTo(disposables);
+        }
+
+        if (managersBadge != null)
+        {
+            vm.ShowManagersBadge
+                .DistinctUntilChanged()
+                .Subscribe(show => managersBadge.SetActive(show))
+                .AddTo(disposables);
+        }
     }
 
     private void OnDestroy()

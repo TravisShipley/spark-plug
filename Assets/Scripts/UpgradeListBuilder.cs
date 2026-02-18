@@ -17,8 +17,10 @@ public sealed class UpgradeListBuilder
         GameDefinitionService gameDefinitionService
     )
     {
-        this.upgradeCatalog = upgradeCatalog ?? throw new ArgumentNullException(nameof(upgradeCatalog));
-        this.upgradeService = upgradeService ?? throw new ArgumentNullException(nameof(upgradeService));
+        this.upgradeCatalog =
+            upgradeCatalog ?? throw new ArgumentNullException(nameof(upgradeCatalog));
+        this.upgradeService =
+            upgradeService ?? throw new ArgumentNullException(nameof(upgradeService));
         this.gameDefinitionService =
             gameDefinitionService ?? throw new ArgumentNullException(nameof(gameDefinitionService));
 
@@ -38,8 +40,12 @@ public sealed class UpgradeListBuilder
         }
     }
 
-    public IReadOnlyList<UpgradeEntryViewModel> BuildEntries()
+    public IReadOnlyList<UpgradeEntryViewModel> BuildEntries(
+        Func<UpgradeEntry, bool> includeFilter = null
+    )
     {
+        includeFilter ??= _ => true;
+
         var entries = new List<UpgradeEntryViewModel>();
 
         var upgrades = upgradeCatalog.Upgrades;
@@ -50,6 +56,8 @@ public sealed class UpgradeListBuilder
         {
             var upgrade = upgrades[i];
             if (upgrade == null)
+                continue;
+            if (!includeFilter(upgrade))
                 continue;
 
             var upgradeId = (upgrade.id ?? string.Empty).Trim();

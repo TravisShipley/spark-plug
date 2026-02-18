@@ -62,6 +62,24 @@ public sealed class ModifierService : IDisposable
             upgradeService ?? throw new ArgumentNullException(nameof(upgradeService));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
 
+        // Initialize milestones from the provided collection, filtering out nulls and duplicates
+        if (milestones != null)
+        {
+            for (int i = 0; i < milestones.Count; i++)
+            {
+            var milestone = milestones[i];
+            if (milestone == null)
+                continue;
+
+            var id = (milestone.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(id))
+                continue;
+            if (milestonesById.ContainsKey(id))
+                continue;
+
+            milestonesById[id] = milestone;
+            }
+        }
         if (modifiers != null)
         {
             for (int i = 0; i < modifiers.Count; i++)

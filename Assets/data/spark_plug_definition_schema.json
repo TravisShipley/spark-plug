@@ -214,7 +214,7 @@
         "iconId": "iconId?",
         "imageId": "imageId?"
       },
-      "category": "upgrade|research|card",
+      "category": "node|global|automation|prestige|progression",
       "zoneId": "zone.main",
 
       "cost": [{ "resource": "resourceId", "amount": "bigNumberString" }],

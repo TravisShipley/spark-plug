@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 2959922973540562129}
   - component: {fileID: 5626776244844554485}
   m_Layer: 5
-  m_Name: UpgradeLEntryView
+  m_Name: UpgradeEntryView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -648,6 +648,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_fontSize
       value: 48
+      objectReference: {fileID: 0}
+    - target: {fileID: 2613339066893362956, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      propertyPath: m_Name
+      value: BuyLabel
       objectReference: {fileID: 0}
     - target: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}

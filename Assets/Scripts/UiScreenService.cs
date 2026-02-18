@@ -19,7 +19,7 @@ public sealed class UiScreenService
 
     public void ShowUpgrades() => uiScreenManager.Show("UPGRADES", uiScreenManager.UpgradesScreenViewModel);
 
-    public void ShowManagers() => uiScreenManager.ShowById("MANAGERS");
+    public void ShowManagers() => uiScreenManager.Show("MANAGERS", uiScreenManager.ManagersScreenViewModel);
 
     public void ShowStore() => uiScreenManager.ShowById("STORE");
 }

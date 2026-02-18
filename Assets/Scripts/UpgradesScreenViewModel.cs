@@ -7,12 +7,18 @@ public sealed class UpgradesScreenViewModel : IDisposable
 
     public IReadOnlyList<UpgradeEntryViewModel> Entries => entries;
 
-    public UpgradesScreenViewModel(UpgradeListBuilder projectionService)
+    public UpgradesScreenViewModel(UpgradeListBuilder builder)
     {
-        if (projectionService == null)
-            throw new ArgumentNullException(nameof(projectionService));
+        if (builder == null)
+            throw new ArgumentNullException(nameof(builder));
 
-        entries = new List<UpgradeEntryViewModel>(projectionService.BuildEntries());
+        entries = new List<UpgradeEntryViewModel>(builder.BuildEntries(IsRelevantUpgrade));
+    }
+
+    private static bool IsRelevantUpgrade(UpgradeEntry upgrade)
+    {
+        var category = (upgrade?.category ?? string.Empty).Trim();
+        return string.Equals(category, "node", StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()

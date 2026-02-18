@@ -665,6 +665,9 @@ MonoBehaviour:
   - Id: UPGRADES
     Prefab: {fileID: 8129661465548805835, guid: 23bdf05a3551340f294d46f8de4ca521,
       type: 3}
+  - Id: MANAGERS
+    Prefab: {fileID: 8091284333021123456, guid: dde1b116d098d4a85a8ae3a06a7a7e01,
+      type: 3}
 --- !u!1 &1263566856
 GameObject:
   m_ObjectHideFlags: 0
@@ -1718,6 +1721,11 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 3848329835502330559, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_ReverseArrangement
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 3981291762967837695, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchorMax.x
@@ -1770,7 +1778,7 @@ PrefabInstance:
     - target: {fileID: 4299117159431893523, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AdditionalShaderChannelsFlag
-      value: 7
+      value: 31
       objectReference: {fileID: 0}
     - target: {fileID: 4319490324697048817, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
@@ -1971,6 +1979,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5733667854438800210, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_Color.a
+      value: 0.8392157
       objectReference: {fileID: 0}
     - target: {fileID: 5776474100335571950, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
