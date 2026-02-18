@@ -30,16 +30,16 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private bool hasBound;
 
-    public void Bind(in UiBindingsContext ctx)
+    public void Bind(in UiBindingsContext context)
     {
         if (!TryBeginBind())
             return;
 
-        if (!Validate(ctx))
+        if (!Validate(context))
             return;
 
-        BindWalletHud(ctx);
-        BindBottomBar(ctx);
+        BindWalletHud(context);
+        BindBottomBar(context);
     }
 
     private bool TryBeginBind()
@@ -54,7 +54,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
         return true;
     }
 
-    private bool Validate(in UiBindingsContext ctx)
+    private bool Validate(in UiBindingsContext context)
     {
         if (bottomBarView == null)
         {
@@ -62,7 +62,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return false;
         }
 
-        if (ctx.WalletViewModel == null)
+        if (context.WalletViewModel == null)
         {
             Debug.LogError(
                 "UiCompositionRoot: WalletViewModel is null in UiBindingsContext.",
@@ -71,7 +71,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return false;
         }
 
-        if (ctx.UiScreenService == null)
+        if (context.UiScreenService == null)
         {
             Debug.LogError(
                 "UiCompositionRoot: UiScreenService is null in UiBindingsContext.",
@@ -80,7 +80,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return false;
         }
 
-        if (ctx.UpgradeService == null)
+        if (context.UpgradeService == null)
         {
             Debug.LogError("UiCompositionRoot: UpgradeService is null in UiBindingsContext.", this);
             return false;
@@ -89,7 +89,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
         return true;
     }
 
-    private void BindWalletHud(in UiBindingsContext ctx)
+    private void BindWalletHud(in UiBindingsContext context)
     {
         if (currencyViews == null || currencyViews.Length == 0)
             return;
@@ -99,13 +99,13 @@ public sealed class UiCompositionRoot : MonoBehaviour
             if (v == null)
                 continue;
 
-            v.Initialize(ctx.WalletViewModel);
+            v.Initialize(context.WalletViewModel);
         }
     }
 
-    private void BindBottomBar(in UiBindingsContext ctx)
+    private void BindBottomBar(in UiBindingsContext context)
     {
-        var bottomBarVm = new BottomBarViewModel(ctx.UiScreenService, ctx.UpgradeService);
+        var bottomBarVm = new BottomBarViewModel(context.UiScreenService, context.UpgradeService);
         bottomBarView.Bind(bottomBarVm);
     }
 }
