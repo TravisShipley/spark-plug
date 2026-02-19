@@ -94,6 +94,8 @@ public static class SaveSystem
             Generators = new List<GameData.GeneratorStateData>(),
             Upgrades = new List<GameData.UpgradeStateData>(),
             Resources = new List<GameData.ResourceBalanceData>(),
+            ActiveBuffId = string.Empty,
+            ActiveBuffExpiresAtUnixSeconds = 0,
             lastSeenUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
         };
         data.EnsureInitialized();

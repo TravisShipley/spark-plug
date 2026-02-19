@@ -13,6 +13,7 @@ public sealed class GameDefinition
     public List<ModifierEntry> modifiers = new List<ModifierEntry>();
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
     public List<MilestoneEntry> milestones = new List<MilestoneEntry>();
+    public List<BuffDefinition> buffs = new List<BuffDefinition>();
 }
 
 [Serializable]
@@ -168,4 +169,19 @@ public sealed class UnlockRequirementArgs
     public string upgradeId;
     public string id;
     public int level;
+}
+
+[Serializable]
+public sealed class BuffDefinition
+{
+    public string id;
+    public string displayName;
+    public string zoneId;
+    public int durationSeconds;
+    public string stacking;
+    public EffectItem[] effects;
+
+    // Optional raw import path; loader may normalize into effects.
+    public string effects_json;
+    public string[] tags;
 }

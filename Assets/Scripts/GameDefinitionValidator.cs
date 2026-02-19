@@ -18,6 +18,7 @@ public static class GameDefinitionValidator
         "project",
         "buff",
     };
+    private static readonly string[] SupportedBuffStackingValues = { "none" };
 
     public static void Validate(GameDefinition gd)
     {
@@ -145,9 +146,9 @@ public static class GameDefinitionValidator
         }
 
         // ---- Upgrades basic integrity + effects references
+        var upgradeIds = new HashSet<string>(StringComparer.Ordinal);
         if (gd.upgrades != null)
         {
-            var upgradeIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < gd.upgrades.Count; i++)
             {
                 var u = gd.upgrades[i];
@@ -165,21 +166,24 @@ public static class GameDefinitionValidator
                 ValidateUpgradeEffectsReferences(u, i, modifierIds, errors);
                 ValidateUpgradeCostResources(u, i, resourceIds, errors);
             }
+        }
 
-            // Optional reference check: when modifier.source is set, it should point to an existing upgrade id.
-            if (gd.modifiers != null)
+        var buffIds = new HashSet<string>(StringComparer.Ordinal);
+        ValidateBuffEntries(gd.buffs, modifierIds, buffIds, errors);
+
+        // Optional reference check: when modifier.source is set, it should point to a known content id.
+        if (gd.modifiers != null)
+        {
+            for (int i = 0; i < gd.modifiers.Count; i++)
             {
-                for (int i = 0; i < gd.modifiers.Count; i++)
-                {
-                    var modifier = gd.modifiers[i];
-                    if (modifier == null)
-                        continue;
+                var modifier = gd.modifiers[i];
+                if (modifier == null)
+                    continue;
 
-                    var source = (modifier.source ?? string.Empty).Trim();
-                    if (!string.IsNullOrEmpty(source))
-                    {
-                        ValidateModifierSource(source, modifier, i, upgradeIds, errors);
-                    }
+                var source = (modifier.source ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(source))
+                {
+                    ValidateModifierSource(source, modifier, i, upgradeIds, buffIds, errors);
                 }
             }
         }
@@ -231,6 +235,85 @@ public static class GameDefinitionValidator
                 errors.Add(
                     $"Upgrade '{upgrade.id}' references missing modifierId '{modifierId}'. Fix the sheet."
                 );
+            }
+        }
+    }
+
+    private static void ValidateBuffEntries(
+        IReadOnlyList<BuffDefinition> buffs,
+        HashSet<string> modifierIds,
+        HashSet<string> buffIds,
+        List<string> errors
+    )
+    {
+        if (buffs == null)
+            return;
+
+        for (int i = 0; i < buffs.Count; i++)
+        {
+            var buff = buffs[i];
+            if (buff == null)
+            {
+                errors.Add($"buffs[{i}] is null.");
+                continue;
+            }
+
+            var buffId = (buff.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(buffId))
+            {
+                errors.Add($"buffs[{i}].id is empty.");
+                continue;
+            }
+
+            if (!buffIds.Add(buffId))
+                errors.Add($"Duplicate buff id '{buffId}'.");
+
+            if (buff.durationSeconds <= 0)
+            {
+                errors.Add(
+                    $"buffs[{i}] ('{buffId}') durationSeconds must be > 0. Found '{buff.durationSeconds}'."
+                );
+            }
+
+            var stacking = (buff.stacking ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(stacking))
+                stacking = "none";
+
+            if (!ContainsIgnoreCase(SupportedBuffStackingValues, stacking))
+            {
+                errors.Add(
+                    $"buffs[{i}] ('{buffId}') stacking '{buff.stacking}' is unsupported in this slice. Expected 'none'."
+                );
+            }
+
+            if (buff.effects == null || buff.effects.Length == 0)
+            {
+                errors.Add($"buffs[{i}] ('{buffId}') has no effects[].modifierId entries.");
+                continue;
+            }
+
+            for (int e = 0; e < buff.effects.Length; e++)
+            {
+                var effect = buff.effects[e];
+                if (effect == null)
+                {
+                    errors.Add($"buffs[{i}] ('{buffId}') effects[{e}] is null.");
+                    continue;
+                }
+
+                var modifierId = (effect.modifierId ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(modifierId))
+                {
+                    errors.Add($"buffs[{i}] ('{buffId}') effects[{e}].modifierId is empty.");
+                    continue;
+                }
+
+                if (!modifierIds.Contains(modifierId))
+                {
+                    errors.Add(
+                        $"buffs[{i}] ('{buffId}') references missing modifierId '{modifierId}'."
+                    );
+                }
             }
         }
     }
@@ -588,6 +671,7 @@ public static class GameDefinitionValidator
         ModifierEntry modifier,
         int modifierIndex,
         HashSet<string> upgradeIds,
+        HashSet<string> buffIds,
         List<string> errors
     )
     {
@@ -619,6 +703,16 @@ public static class GameDefinitionValidator
         {
             errors.Add(
                 $"modifiers[{modifierIndex}] ('{modifier.id}') source '{source}' does not match any upgrades.id."
+            );
+        }
+
+        if (
+            string.Equals(domain, "buff", StringComparison.OrdinalIgnoreCase)
+            && !buffIds.Contains(source)
+        )
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') source '{source}' does not match any buffs.id."
             );
         }
     }

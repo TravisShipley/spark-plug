@@ -194,6 +194,7 @@ public class GeneratorService : IDisposable
             while (model.CycleElapsedSeconds >= interval)
             {
                 model.CycleElapsedSeconds -= interval;
+                QueueCompletedCyclePayout();
                 Collect();
             }
         }
@@ -203,6 +204,7 @@ public class GeneratorService : IDisposable
             if (model.CycleElapsedSeconds >= interval)
             {
                 model.CycleElapsedSeconds = 0;
+                QueueCompletedCyclePayout();
                 isRunning.Value = false;
             }
         }
@@ -212,8 +214,15 @@ public class GeneratorService : IDisposable
 
     public void Collect()
     {
-        double amount = CalculateOutput();
-        wallet.Add(definition.OutputResourceId, amount);
+        if (!model.HasPendingPayout || model.PendingPayout <= 0)
+            return;
+
+        var amount = model.PendingPayout;
+        model.PendingPayout = 0;
+        model.HasPendingPayout = false;
+
+        wallet.AddRaw(definition.OutputResourceId, amount);
+        RefreshCanCollectState();
         cycleCompleted.OnNext(Unit.Default);
     }
 
@@ -226,6 +235,18 @@ public class GeneratorService : IDisposable
     {
         // Use reactive level + multiplier as the authoritative values.
         return definition.BaseOutputPerCycle * level.Value * outputMultiplier.Value;
+    }
+
+    private void QueueCompletedCyclePayout()
+    {
+        var payout = CalculateOutput();
+        var resourceGain = modifierService.GetResourceGainMultiplier(definition.OutputResourceId);
+        if (double.IsNaN(resourceGain) || double.IsInfinity(resourceGain) || resourceGain <= 0)
+            resourceGain = 1.0;
+
+        model.PendingPayout += payout * resourceGain;
+        model.HasPendingPayout = model.PendingPayout > 0;
+        RefreshCanCollectState();
     }
 
     private double CalculateNextLevelCost()
@@ -425,7 +446,12 @@ public class GeneratorService : IDisposable
 
     private void RefreshCanCollectState()
     {
-        canCollect.Value = isOwned.Value && !isAutomated.Value && !isRunning.Value;
+        canCollect.Value =
+            isOwned.Value
+            && !isAutomated.Value
+            && !isRunning.Value
+            && model.HasPendingPayout
+            && model.PendingPayout > 0;
     }
 
     private static void ValidateMilestoneLevels(int[] levels)

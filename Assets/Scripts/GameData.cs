@@ -38,6 +38,8 @@ public class GameData : ISerializationCallbackReceiver
     public List<GeneratorStateData> Generators = new();
     public List<UpgradeStateData> Upgrades = new();
     public List<ResourceBalanceData> Resources = new();
+    public string ActiveBuffId;
+    public long ActiveBuffExpiresAtUnixSeconds;
     public long lastSeenUnixSeconds;
 
     // Runtime lookup of one-time milestones that have already fired.
@@ -60,6 +62,11 @@ public class GameData : ISerializationCallbackReceiver
         Generators ??= new List<GeneratorStateData>();
         Upgrades ??= new List<UpgradeStateData>();
         Resources ??= new List<ResourceBalanceData>();
+        ActiveBuffId = (ActiveBuffId ?? string.Empty).Trim();
+        if (ActiveBuffExpiresAtUnixSeconds < 0)
+            ActiveBuffExpiresAtUnixSeconds = 0;
+        if (string.IsNullOrEmpty(ActiveBuffId))
+            ActiveBuffExpiresAtUnixSeconds = 0;
         FiredMilestoneIds ??= new HashSet<string>(StringComparer.Ordinal);
         UnlockedNodeInstanceIds ??= new HashSet<string>(StringComparer.Ordinal);
         firedMilestoneIds ??= new List<string>();

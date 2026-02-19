@@ -14,6 +14,7 @@ public sealed class GameDefinitionService
     private NodeInputCatalog nodeInputCatalog;
     private NodeInstanceCatalog nodeInstanceCatalog;
     private UpgradeCatalog upgradeCatalog;
+    private BuffCatalog buffCatalog;
 
     public GameDefinitionService(string projectRelativePath = "Assets/Data/game_definition.json")
     {
@@ -29,6 +30,7 @@ public sealed class GameDefinitionService
         nodeInputCatalog = new NodeInputCatalog(definition);
         nodeInstanceCatalog = new NodeInstanceCatalog(definition?.nodeInstances);
         upgradeCatalog = new UpgradeCatalog(definition?.upgrades);
+        buffCatalog = new BuffCatalog(definition?.buffs);
         WarnForNodeInputsNotExecuted();
     }
 
@@ -45,6 +47,7 @@ public sealed class GameDefinitionService
         definition?.modifiers ?? new List<ModifierEntry>();
     public IReadOnlyList<UpgradeEntry> Upgrades =>
         upgradeCatalog?.Upgrades ?? new List<UpgradeEntry>();
+    public IReadOnlyList<BuffDefinition> Buffs => buffCatalog?.Buffs ?? new List<BuffDefinition>();
     public IReadOnlyList<MilestoneEntry> Milestones =>
         definition?.milestones ?? new List<MilestoneEntry>();
 
@@ -105,6 +108,7 @@ public sealed class GameDefinitionService
     public ResourceCatalog ResourceCatalog => resourceCatalog;
     public UpgradeCatalog UpgradeCatalog => upgradeCatalog;
     public UpgradeCatalog Catalog => upgradeCatalog;
+    public BuffCatalog BuffCatalog => buffCatalog;
     public GameDefinition Definition => definition;
 
     private static List<ModifierEntry> ResolveModifiersForUpgrade(

@@ -49,6 +49,11 @@ public static class GameDefinitionLoader
             if (gd.milestones == null)
                 gd.milestones = new List<MilestoneEntry>();
 
+            if (gd.buffs == null)
+                gd.buffs = new List<BuffDefinition>();
+
+            NormalizeBuffEffects(gd.buffs);
+
             GameDefinitionValidator.Validate(gd);
             return gd;
         }
@@ -69,5 +74,64 @@ public static class GameDefinitionLoader
 
             throw wrapped;
         }
+    }
+
+    private static void NormalizeBuffEffects(IReadOnlyList<BuffDefinition> buffs)
+    {
+        if (buffs == null || buffs.Count == 0)
+            return;
+
+        for (int i = 0; i < buffs.Count; i++)
+        {
+            var buff = buffs[i];
+            if (buff == null)
+                continue;
+
+            if (buff.effects != null && buff.effects.Length > 0)
+                continue;
+
+            var rawEffectsJson = (buff.effects_json ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(rawEffectsJson))
+                continue;
+
+            buff.effects = ParseEffectsJson(rawEffectsJson, buff.id);
+        }
+    }
+
+    private static EffectItem[] ParseEffectsJson(string effectsJson, string buffId)
+    {
+        try
+        {
+            var raw = (effectsJson ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(raw))
+                return Array.Empty<EffectItem>();
+
+            if (raw.StartsWith("[", StringComparison.Ordinal))
+            {
+                var wrapped = "{\"items\":" + raw + "}";
+                var list = JsonUtility.FromJson<EffectItemList>(wrapped);
+                return list?.items ?? Array.Empty<EffectItem>();
+            }
+
+            var single = JsonUtility.FromJson<EffectItem>(raw);
+            if (single != null && !string.IsNullOrWhiteSpace(single.modifierId))
+                return new[] { single };
+
+            var parsedList = JsonUtility.FromJson<EffectItemList>(raw);
+            return parsedList?.items ?? Array.Empty<EffectItem>();
+        }
+        catch (Exception ex)
+        {
+            var id = string.IsNullOrWhiteSpace(buffId) ? "unknown" : buffId.Trim();
+            throw new InvalidOperationException(
+                $"Buff '{id}' has invalid effects_json. Ensure it is valid JSON for effects[].modifierId. {ex.Message}"
+            );
+        }
+    }
+
+    [Serializable]
+    private sealed class EffectItemList
+    {
+        public EffectItem[] items;
     }
 }

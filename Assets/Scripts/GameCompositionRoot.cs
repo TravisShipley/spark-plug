@@ -52,6 +52,7 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradeListBuilder upgradeListBuilder;
     private UpgradesScreenViewModel upgradesScreenViewModel;
     private ManagersScreenViewModel managersScreenViewModel;
+    private BuffService buffService;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
     private UnlockService unlockService;
@@ -179,6 +180,12 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             gameDefinitionService.Milestones
         );
+        buffService = new BuffService(
+            saveService,
+            gameDefinitionService.BuffCatalog,
+            modifierService,
+            tickService
+        );
         walletService.SetModifierService(modifierService);
         offlineProgressCalculator = new OfflineProgressCalculator(
             gameDefinitionService,
@@ -293,6 +300,7 @@ public class GameCompositionRoot : MonoBehaviour
         foreach (var s in generatorServices)
             s?.Dispose();
         milestoneService?.Dispose();
+        buffService?.Dispose();
         unlockService?.Dispose();
         modifierService?.Dispose();
 

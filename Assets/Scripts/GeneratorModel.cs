@@ -11,4 +11,6 @@ public class GeneratorModel
 
     // runtime-only (not serialized)
     [NonSerialized] public double CycleElapsedSeconds;
+    [NonSerialized] public double PendingPayout;
+    [NonSerialized] public bool HasPendingPayout;
 }

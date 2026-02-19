@@ -15,6 +15,8 @@ public sealed class SaveService : IDisposable
 
     public GameData Data { get; private set; }
     public long LastSeenUnixSeconds => Data?.lastSeenUnixSeconds ?? 0;
+    public string ActiveBuffId => NormalizeId(Data?.ActiveBuffId);
+    public long ActiveBuffExpiresAtUnixSeconds => Data?.ActiveBuffExpiresAtUnixSeconds ?? 0;
 
     public SaveService()
     {
@@ -80,6 +82,53 @@ public sealed class SaveService : IDisposable
 
         Data.lastSeenUnixSeconds = normalized;
         if (requestSave)
+            RequestSave();
+    }
+
+    public void SetActiveBuffState(string buffId, long expiresAtUnixSeconds, bool requestSave = true)
+    {
+        var id = NormalizeId(buffId);
+        if (string.IsNullOrEmpty(id))
+            throw new InvalidOperationException("SaveService.SetActiveBuffState: buffId is empty.");
+
+        EnsureDataInitialized();
+        var normalizedExpiresAt = Math.Max(0, expiresAtUnixSeconds);
+
+        bool changed = false;
+        if (!string.Equals(Data.ActiveBuffId, id, StringComparison.Ordinal))
+        {
+            Data.ActiveBuffId = id;
+            changed = true;
+        }
+
+        if (Data.ActiveBuffExpiresAtUnixSeconds != normalizedExpiresAt)
+        {
+            Data.ActiveBuffExpiresAtUnixSeconds = normalizedExpiresAt;
+            changed = true;
+        }
+
+        if (changed && requestSave)
+            RequestSave();
+    }
+
+    public void ClearActiveBuffState(bool requestSave = true)
+    {
+        EnsureDataInitialized();
+        bool changed = false;
+
+        if (!string.IsNullOrEmpty(Data.ActiveBuffId))
+        {
+            Data.ActiveBuffId = string.Empty;
+            changed = true;
+        }
+
+        if (Data.ActiveBuffExpiresAtUnixSeconds != 0)
+        {
+            Data.ActiveBuffExpiresAtUnixSeconds = 0;
+            changed = true;
+        }
+
+        if (changed && requestSave)
             RequestSave();
     }
 
@@ -402,6 +451,8 @@ public sealed class SaveService : IDisposable
         data.Resources.Clear();
         data.Generators.Clear();
         data.Upgrades.Clear();
+        data.ActiveBuffId = string.Empty;
+        data.ActiveBuffExpiresAtUnixSeconds = 0;
         data.FiredMilestoneIds.Clear();
         data.UnlockedNodeInstanceIds.Clear();
 
@@ -533,6 +584,17 @@ public sealed class SaveService : IDisposable
                 var id = NormalizeId(definition.milestones[i]?.id);
                 if (!string.IsNullOrEmpty(id))
                     validMilestoneIds.Add(id);
+            }
+        }
+
+        var validBuffIds = new HashSet<string>(StringComparer.Ordinal);
+        if (definition.buffs != null)
+        {
+            for (int i = 0; i < definition.buffs.Count; i++)
+            {
+                var id = NormalizeId(definition.buffs[i]?.id);
+                if (!string.IsNullOrEmpty(id))
+                    validBuffIds.Add(id);
             }
         }
 
@@ -681,6 +743,32 @@ public sealed class SaveService : IDisposable
             merged.Upgrades.Add(
                 new GameData.UpgradeStateData { Id = kv.Key, PurchasedCount = kv.Value }
             );
+        }
+
+        var loadedActiveBuffId = NormalizeId(loaded.ActiveBuffId);
+        var loadedActiveBuffExpiresAt = Math.Max(0, loaded.ActiveBuffExpiresAtUnixSeconds);
+        if (!string.IsNullOrEmpty(loadedActiveBuffId))
+        {
+            if (!validBuffIds.Contains(loadedActiveBuffId))
+            {
+                Debug.LogWarning(
+                    $"SaveService: Save references missing buff id '{loadedActiveBuffId}'. Clearing active buff."
+                );
+                changed = true;
+            }
+            else if (loadedActiveBuffExpiresAt <= now)
+            {
+                changed = true;
+            }
+            else
+            {
+                merged.ActiveBuffId = loadedActiveBuffId;
+                merged.ActiveBuffExpiresAtUnixSeconds = loadedActiveBuffExpiresAt;
+            }
+        }
+        else if (loadedActiveBuffExpiresAt > 0)
+        {
+            changed = true;
         }
 
         merged.FiredMilestoneIds.Clear();

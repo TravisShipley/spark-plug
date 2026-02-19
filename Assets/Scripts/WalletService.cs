@@ -44,6 +44,11 @@ public class WalletService : IDisposable
         AddInternal(resourceId, amount, applyResourceGainMultiplier: true);
     }
 
+    public void AddRaw(string resourceId, double amount)
+    {
+        AddInternal(resourceId, amount, applyResourceGainMultiplier: false);
+    }
+
     public void ApplyOfflineEarnings(OfflineSessionResult result)
     {
         if (result == null || result.ResourceGains == null)

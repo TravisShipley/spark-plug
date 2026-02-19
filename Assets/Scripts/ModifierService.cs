@@ -24,6 +24,9 @@ public sealed class ModifierService : IDisposable
     private readonly Dictionary<string, List<ModifierEntry>> resolvedModifiersByMilestoneId = new(
         StringComparer.Ordinal
     );
+    private readonly Dictionary<string, List<ModifierEntry>> activeBuffModifiersBySourceKey = new(
+        StringComparer.Ordinal
+    );
 
     private static readonly bool LogRebuildSnapshots = false;
 
@@ -155,6 +158,63 @@ public sealed class ModifierService : IDisposable
     {
         var key = NormalizeId(nodeInstanceId, nameof(nodeInstanceId));
         return automationByInstanceId.TryGetValue(key, out var enabled) && enabled;
+    }
+
+    public void SetBuffModifierSource(
+        string sourceKey,
+        string buffId,
+        IReadOnlyList<EffectItem> effects
+    )
+    {
+        var key = NormalizeId(sourceKey, nameof(sourceKey));
+        var normalizedBuffId = NormalizeId(buffId, nameof(buffId));
+
+        if (effects == null || effects.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"ModifierService: buff '{normalizedBuffId}' has no effects."
+            );
+        }
+
+        var resolved = new List<ModifierEntry>();
+        for (int i = 0; i < effects.Count; i++)
+        {
+            var effect = effects[i];
+            var modifierId = (effect?.modifierId ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(modifierId))
+            {
+                throw new InvalidOperationException(
+                    $"ModifierService: buff '{normalizedBuffId}' has empty effects[{i}].modifierId."
+                );
+            }
+
+            if (!modifiersById.TryGetValue(modifierId, out var modifier) || modifier == null)
+            {
+                throw new InvalidOperationException(
+                    $"ModifierService: buff '{normalizedBuffId}' references missing modifierId '{modifierId}'."
+                );
+            }
+
+            ValidateBuffModifierOrThrow(normalizedBuffId, modifier);
+            resolved.Add(modifier);
+        }
+
+        resolved.Sort(
+            (a, b) =>
+                string.Compare(
+                    (a?.id ?? string.Empty).Trim(),
+                    (b?.id ?? string.Empty).Trim(),
+                    StringComparison.Ordinal
+                )
+        );
+
+        activeBuffModifiersBySourceKey[key] = resolved;
+    }
+
+    public void RemoveBuffModifierSource(string sourceKey)
+    {
+        var key = NormalizeId(sourceKey, nameof(sourceKey));
+        activeBuffModifiersBySourceKey.Remove(key);
     }
 
     public void RebuildActiveModifiers(string triggerUpgradeId = null)
@@ -392,6 +452,28 @@ public sealed class ModifierService : IDisposable
             }
         }
 
+        if (activeBuffModifiersBySourceKey.Count > 0)
+        {
+            var orderedSources = activeBuffModifiersBySourceKey.Keys.OrderBy(
+                key => key,
+                StringComparer.Ordinal
+            );
+            foreach (var sourceKey in orderedSources)
+            {
+                if (!activeBuffModifiersBySourceKey.TryGetValue(sourceKey, out var buffModifiers))
+                    continue;
+                if (buffModifiers == null || buffModifiers.Count == 0)
+                    continue;
+
+                for (int i = 0; i < buffModifiers.Count; i++)
+                {
+                    active.Add(
+                        new ActiveModifier { Modifier = buffModifiers[i], PurchaseCount = 1 }
+                    );
+                }
+            }
+        }
+
         var firedMilestones = saveService.Data?.FiredMilestoneIds;
         if (firedMilestones == null || firedMilestones.Count == 0)
             return active;
@@ -580,6 +662,33 @@ public sealed class ModifierService : IDisposable
             resolvedModifiersByMilestoneId[milestoneId] = resolved;
 
         return resolved;
+    }
+
+    private void ValidateBuffModifierOrThrow(string buffId, ModifierEntry modifier)
+    {
+        if (modifier == null)
+            throw new InvalidOperationException($"ModifierService: buff '{buffId}' has null modifier.");
+
+        if (!TryParseTarget(modifier, out var targetKind, out _))
+        {
+            throw new InvalidOperationException(
+                $"ModifierService: buff '{buffId}' modifier '{modifier.id}' has unsupported target '{modifier.target}'."
+            );
+        }
+
+        if (!TryResolveOperation(modifier, targetKind, out _))
+        {
+            throw new InvalidOperationException(
+                $"ModifierService: buff '{buffId}' modifier '{modifier.id}' has unsupported operation '{modifier.operation}'."
+            );
+        }
+
+        if (!TryResolveTargetInstanceIds(modifier, targetKind, out _))
+        {
+            throw new InvalidOperationException(
+                $"ModifierService: buff '{buffId}' modifier '{modifier.id}' has unsupported scope or target mapping."
+            );
+        }
     }
 
     private bool TryResolveTargetInstanceIds(
