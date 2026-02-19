@@ -160,7 +160,7 @@
       "zoneId": "zone.main",
       "scope": { "kind": "global", "zoneId": "zone.main" },
       "operation": "multiply",
-      "target": "resourceGain.cash",
+      "target": "resourceGain[cash]",
       "value": "2"
     },
 
@@ -214,7 +214,7 @@
         "nodeId": "nodeType.business.lemonade"
       },
       "operation": "multiply",
-      "target": "nodeOutput.cash",
+      "target": "nodeOutput[cash]",
       "value": "2"
     },
     {
@@ -227,7 +227,7 @@
         "nodeId": "nodeType.business.newspaper"
       },
       "operation": "multiply",
-      "target": "nodeOutput.cash",
+      "target": "nodeOutput[cash]",
       "value": "2"
     },
 
@@ -237,7 +237,7 @@
       "zoneId": "zone.main",
       "scope": { "kind": "global", "zoneId": "zone.main" },
       "operation": "multiply",
-      "target": "resourceGain.cash",
+      "target": "resourceGain[cash]",
       "valueFromState": "meta.angelEarningsMultiplier"
     }
   ],
@@ -361,7 +361,7 @@
     "prestigeResource": "angels",
     "formula": {
       "type": "sqrt",
-      "basedOn": "lifetimeEarnings.cash",
+      "basedOn": "lifetimeEarnings[cash]",
       "multiplier": "0.001",
       "offset": "0"
     },
@@ -379,7 +379,7 @@
         "displayName": "Angel Multiplier (computed)",
         "computed": {
           "type": "linear",
-          "basedOn": "resource.angels",
+          "basedOn": "resource[angels]",
           "multiplier": "0.02",
           "offset": "1.0"
         },

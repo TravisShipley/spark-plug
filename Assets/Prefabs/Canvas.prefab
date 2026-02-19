@@ -1096,6 +1096,11 @@ PrefabInstance:
       propertyPath: m_fontSize
       value: 48
       objectReference: {fileID: 0}
+    - target: {fileID: 2613339066893362956, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      propertyPath: m_Name
+      value: BoostLabel
+      objectReference: {fileID: 0}
     - target: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_Pivot.x
@@ -1203,7 +1208,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2150937678114895606, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       insertIndex: 3
-      addedObject: {fileID: 1170436821433665304}
+      addedObject: {fileID: 7038868785446700}
   m_SourcePrefab: {fileID: 100100000, guid: 8f956f11e8ebf49bb86224e5b93ba01f, type: 3}
 --- !u!1 &1907323376914430010 stripped
 GameObject:
@@ -1211,7 +1216,7 @@ GameObject:
     type: 3}
   m_PrefabInstance: {fileID: 549868984376413900}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1170436821433665304
+--- !u!114 &7038868785446700
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1220,10 +1225,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 1907323376914430010}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2583a5ee6323c4985814727492f4bbe8, type: 3}
+  m_Script: {fileID: 11500000, guid: f0963807cc3b4f2f93b18e8f42e6f90c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AdBoostButtonView
-  buttonView: {fileID: 8067819431296841778}
+  button: {fileID: 8067819431296841778}
 --- !u!224 &3471607145330553309 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,

@@ -6,6 +6,7 @@ using UnityEngine;
 public sealed class GameDefinition
 {
     public List<ResourceDefinition> resources = new List<ResourceDefinition>();
+    public List<ComputedVarDefinition> computedVars = new List<ComputedVarDefinition>();
     public List<NodeDefinition> nodes = new List<NodeDefinition>();
     public List<NodeInputDefinition> nodeInputs = new List<NodeInputDefinition>();
     public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
@@ -14,6 +15,7 @@ public sealed class GameDefinition
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
     public List<MilestoneEntry> milestones = new List<MilestoneEntry>();
     public List<BuffDefinition> buffs = new List<BuffDefinition>();
+    public PrestigeDefinition prestige;
 }
 
 [Serializable]
@@ -184,4 +186,38 @@ public sealed class BuffDefinition
     // Optional raw import path; loader may normalize into effects.
     public string effects_json;
     public string[] tags;
+}
+
+[Serializable]
+public sealed class ComputedVarDefinition
+{
+    public string id;
+    public string[] dependsOn;
+}
+
+[Serializable]
+public sealed class PrestigeDefinition
+{
+    public PrestigeFormula formula;
+    public MetaUpgradeDefinition[] metaUpgrades;
+}
+
+[Serializable]
+public sealed class PrestigeFormula
+{
+    public string basedOn;
+}
+
+[Serializable]
+public sealed class MetaUpgradeDefinition
+{
+    public string id;
+    public ComputedFormula computed;
+    public string writesToState;
+}
+
+[Serializable]
+public sealed class ComputedFormula
+{
+    public string basedOn;
 }

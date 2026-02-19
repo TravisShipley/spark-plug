@@ -12,6 +12,7 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
     >(System.StringComparer.Ordinal);
 
     public WalletService Wallet { get; private set; }
+    public BuffService BuffService { get; private set; }
 
     public static UiServiceRegistry Instance { get; private set; }
 
@@ -32,6 +33,11 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
     public void Initialize(WalletService wallet)
     {
         Wallet = wallet;
+    }
+
+    public void RegisterBuffService(BuffService buffService)
+    {
+        BuffService = buffService;
     }
 
     public void RegisterGenerator(string generatorId, GeneratorService generator)

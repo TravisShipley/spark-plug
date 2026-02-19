@@ -7,6 +7,7 @@ public static class GameDefinitionValidator
     private static readonly string[] SupportedModifierScopeKinds =
     {
         "global",
+        "zone",
         "node",
         "nodeTag",
         "resource",
@@ -18,7 +19,13 @@ public static class GameDefinitionValidator
         "project",
         "buff",
     };
-    private static readonly string[] SupportedBuffStackingValues = { "none" };
+    private static readonly string[] SupportedBuffStackingValues =
+    {
+        "none",
+        "refresh",
+        "extend",
+        "stack",
+    };
 
     public static void Validate(GameDefinition gd)
     {
@@ -170,6 +177,7 @@ public static class GameDefinitionValidator
 
         var buffIds = new HashSet<string>(StringComparer.Ordinal);
         ValidateBuffEntries(gd.buffs, modifierIds, buffIds, errors);
+        ValidateFormulaPaths(gd, resourceIds, errors);
 
         // Optional reference check: when modifier.source is set, it should point to a known content id.
         if (gd.modifiers != null)
@@ -282,7 +290,7 @@ public static class GameDefinitionValidator
             if (!ContainsIgnoreCase(SupportedBuffStackingValues, stacking))
             {
                 errors.Add(
-                    $"buffs[{i}] ('{buffId}') stacking '{buff.stacking}' is unsupported in this slice. Expected 'none'."
+                    $"buffs[{i}] ('{buffId}') stacking '{buff.stacking}' is unsupported in this slice. Expected 'none|refresh|extend|stack'."
                 );
             }
 
@@ -489,6 +497,26 @@ public static class GameDefinitionValidator
         var scopeResourceId = (modifier.scope?.resource ?? string.Empty).Trim();
         var operation = (modifier.operation ?? string.Empty).Trim();
         var target = (modifier.target ?? string.Empty).Trim();
+        ParameterizedPathParser.ParsedPath parsedTarget;
+        var hasParameterizedTarget = ParameterizedPathParser.TryParseModifierParameterizedPath(
+            target,
+            out parsedTarget
+        );
+
+        if (hasParameterizedTarget)
+        {
+            var canonical = parsedTarget.CanonicalPath;
+            if (!string.Equals(target, canonical, StringComparison.Ordinal))
+            {
+#if UNITY_EDITOR
+                Debug.LogWarning(
+                    $"GameDefinitionValidator: modifier '{modifier.id}' target '{target}' normalized to '{canonical}'. Prefer bracket form."
+                );
+#endif
+                target = canonical;
+                modifier.target = canonical;
+            }
+        }
 
         if (string.IsNullOrEmpty(scopeKind))
         {
@@ -562,20 +590,33 @@ public static class GameDefinitionValidator
         bool isNodeSpeed =
             target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
             || string.Equals(target, "node.speedMultiplier", StringComparison.OrdinalIgnoreCase);
-        bool isNodeOutput =
-            target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
-            || target.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase);
+        bool isNodeOutput = hasParameterizedTarget
+            ? (
+                string.IsNullOrEmpty(parsedTarget.Suffix)
+                && string.Equals(
+                    parsedTarget.CanonicalBaseName,
+                    "nodeOutput",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            : (
+                target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
+            );
         bool isAutomation =
             string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase)
             || string.Equals(target, "automation.autoCollect", StringComparison.OrdinalIgnoreCase)
             || string.Equals(target, "automation.autoRestart", StringComparison.OrdinalIgnoreCase);
-        bool isResourceGain =
-            target.StartsWith("resourceGain.", StringComparison.OrdinalIgnoreCase)
-            || (
-                target.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase)
-                && target.EndsWith("]")
-            );
+        bool isResourceGain = hasParameterizedTarget
+            ? (
+                string.IsNullOrEmpty(parsedTarget.Suffix)
+                && string.Equals(
+                    parsedTarget.CanonicalBaseName,
+                    "resourceGain",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            : target.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase);
 
         if (!isNodeSpeed && !isNodeOutput && !isAutomation && !isResourceGain)
         {
@@ -626,6 +667,19 @@ public static class GameDefinitionValidator
                 );
             }
         }
+
+        if (
+            hasParameterizedTarget
+            && !isNodeOutput
+            && !isResourceGain
+            && !string.IsNullOrEmpty(parsedTarget.ParameterId)
+            && !resourceIds.Contains(parsedTarget.ParameterId)
+        )
+        {
+            errors.Add(
+                $"modifiers[{modifierIndex}] ('{modifier.id}') target resource '{parsedTarget.ParameterId}' references missing resources.id."
+            );
+        }
     }
 
     private static string ExtractTargetResourceId(string target)
@@ -634,23 +688,9 @@ public static class GameDefinitionValidator
             return string.Empty;
 
         var normalized = target.Trim();
-        if (normalized.StartsWith("nodeOutput.", StringComparison.OrdinalIgnoreCase))
-            return normalized.Substring("nodeOutput.".Length).Trim();
 
-        if (normalized.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase))
-            return normalized.Substring("node.outputMultiplier.".Length).Trim();
-
-        if (normalized.StartsWith("resourceGain.", StringComparison.OrdinalIgnoreCase))
-            return normalized.Substring("resourceGain.".Length).Trim();
-
-        if (
-            normalized.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase)
-            && normalized.EndsWith("]")
-        )
-        {
-            var inner = normalized.Substring("resourceGain[".Length);
-            return inner.Substring(0, inner.Length - 1).Trim();
-        }
+        if (ParameterizedPathParser.TryParseModifierParameterizedPath(normalized, out var parsed))
+            return parsed.ParameterId;
 
         return string.Empty;
     }
@@ -715,5 +755,93 @@ public static class GameDefinitionValidator
                 $"modifiers[{modifierIndex}] ('{modifier.id}') source '{source}' does not match any buffs.id."
             );
         }
+    }
+
+    private static void ValidateFormulaPaths(
+        GameDefinition definition,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        if (definition == null)
+            return;
+
+        if (definition.computedVars != null)
+        {
+            for (int i = 0; i < definition.computedVars.Count; i++)
+            {
+                var computedVar = definition.computedVars[i];
+                if (computedVar?.dependsOn == null)
+                    continue;
+
+                for (int d = 0; d < computedVar.dependsOn.Length; d++)
+                {
+                    ValidateFormulaPathAndNormalize(
+                        ref computedVar.dependsOn[d],
+                        resourceIds,
+                        $"computedVars[{i}].dependsOn[{d}]",
+                        errors
+                    );
+                }
+            }
+        }
+
+        if (definition.prestige?.formula != null)
+        {
+            ValidateFormulaPathAndNormalize(
+                ref definition.prestige.formula.basedOn,
+                resourceIds,
+                "prestige.formula.basedOn",
+                errors
+            );
+        }
+
+        var metaUpgrades = definition.prestige?.metaUpgrades;
+        if (metaUpgrades == null)
+            return;
+
+        for (int i = 0; i < metaUpgrades.Length; i++)
+        {
+            var metaUpgrade = metaUpgrades[i];
+            if (metaUpgrade?.computed == null)
+                continue;
+
+            ValidateFormulaPathAndNormalize(
+                ref metaUpgrade.computed.basedOn,
+                resourceIds,
+                $"prestige.metaUpgrades[{i}].computed.basedOn",
+                errors
+            );
+        }
+    }
+
+    private static void ValidateFormulaPathAndNormalize(
+        ref string path,
+        HashSet<string> resourceIds,
+        string fieldPath,
+        List<string> errors
+    )
+    {
+        var raw = (path ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(raw))
+            return;
+
+        if (!ParameterizedPathParser.TryParseFormulaParameterizedPath(raw, out var parsed))
+            return;
+
+        if (!string.Equals(raw, parsed.CanonicalPath, StringComparison.Ordinal))
+        {
+#if UNITY_EDITOR
+            Debug.LogWarning(
+                $"GameDefinitionValidator: {fieldPath} '{raw}' normalized to '{parsed.CanonicalPath}'. Prefer bracket form."
+            );
+#endif
+            path = parsed.CanonicalPath;
+        }
+
+        if (string.IsNullOrEmpty(parsed.ParameterId) || resourceIds.Contains(parsed.ParameterId))
+            return;
+
+        errors.Add($"{fieldPath} resource '{parsed.ParameterId}' references missing resources.id.");
     }
 }

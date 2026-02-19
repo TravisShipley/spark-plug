@@ -28,6 +28,9 @@ public sealed class UiCompositionRoot : MonoBehaviour
     [SerializeField]
     private BottomBarView bottomBarView;
 
+    [SerializeField]
+    private AdBoostButtonView[] adBoostButtons;
+
     private bool hasBound;
 
     public void Bind(in UiBindingsContext context)
@@ -40,6 +43,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
         BindWalletHud(context);
         BindBottomBar(context);
+        BindAdBoostButtons(context);
     }
 
     private bool TryBeginBind()
@@ -107,5 +111,20 @@ public sealed class UiCompositionRoot : MonoBehaviour
     {
         var bottomBarVm = new BottomBarViewModel(context.UiScreenService, context.UpgradeService);
         bottomBarView.Bind(bottomBarVm);
+    }
+
+    private void BindAdBoostButtons(in UiBindingsContext context)
+    {
+        if (adBoostButtons == null || adBoostButtons.Length == 0)
+            return;
+
+        for (int i = 0; i < adBoostButtons.Length; i++)
+        {
+            var buttonView = adBoostButtons[i];
+            if (buttonView == null)
+                continue;
+
+            buttonView.Bind(context.UiScreenService);
+        }
     }
 }

@@ -52,7 +52,11 @@ public static class GameDefinitionLoader
             if (gd.buffs == null)
                 gd.buffs = new List<BuffDefinition>();
 
+            if (gd.computedVars == null)
+                gd.computedVars = new List<ComputedVarDefinition>();
+
             NormalizeBuffEffects(gd.buffs);
+            NormalizeParameterizedPaths(gd);
 
             GameDefinitionValidator.Validate(gd);
             return gd;
@@ -133,5 +137,148 @@ public static class GameDefinitionLoader
     private sealed class EffectItemList
     {
         public EffectItem[] items;
+    }
+
+    private static void NormalizeParameterizedPaths(GameDefinition definition)
+    {
+        if (definition == null)
+            return;
+
+        if (definition.modifiers != null)
+        {
+            for (int i = 0; i < definition.modifiers.Count; i++)
+            {
+                var modifier = definition.modifiers[i];
+                if (modifier == null)
+                    continue;
+
+                var rawTarget = (modifier.target ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(rawTarget))
+                    continue;
+
+                if (
+                    !ParameterizedPathParser.TryCanonicalizeModifierParameterizedPath(
+                        rawTarget,
+                        out var canonicalTarget,
+                        out var usedLegacyFormat
+                    )
+                )
+                {
+                    continue;
+                }
+
+                if (string.Equals(rawTarget, canonicalTarget, StringComparison.Ordinal))
+                    continue;
+
+                modifier.target = canonicalTarget;
+
+#if UNITY_EDITOR
+                if (usedLegacyFormat)
+                {
+                    Debug.LogWarning(
+                        $"GameDefinitionLoader: modifier '{modifier.id}' target '{rawTarget}' normalized to '{canonicalTarget}'. Prefer bracket form."
+                    );
+                }
+#endif
+            }
+        }
+
+        if (definition.computedVars != null)
+        {
+            for (int i = 0; i < definition.computedVars.Count; i++)
+            {
+                var computedVar = definition.computedVars[i];
+                if (computedVar?.dependsOn == null)
+                    continue;
+
+                for (int d = 0; d < computedVar.dependsOn.Length; d++)
+                {
+                    var raw = (computedVar.dependsOn[d] ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(raw))
+                        continue;
+
+                    if (
+                        !ParameterizedPathParser.TryCanonicalizeFormulaParameterizedPath(
+                            raw,
+                            out var canonical,
+                            out var usedLegacyFormat
+                        )
+                    )
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(raw, canonical, StringComparison.Ordinal))
+                        continue;
+
+                    computedVar.dependsOn[d] = canonical;
+
+#if UNITY_EDITOR
+                    if (usedLegacyFormat)
+                    {
+                        Debug.LogWarning(
+                            $"GameDefinitionLoader: computedVars[{i}] dependsOn '{raw}' normalized to '{canonical}'. Prefer bracket form."
+                        );
+                    }
+#endif
+                }
+            }
+        }
+
+        if (definition.prestige?.formula != null)
+        {
+            NormalizeFormulaPath(
+                ref definition.prestige.formula.basedOn,
+                "prestige.formula.basedOn"
+            );
+        }
+
+        var metaUpgrades = definition.prestige?.metaUpgrades;
+        if (metaUpgrades == null)
+            return;
+
+        for (int i = 0; i < metaUpgrades.Length; i++)
+        {
+            var metaUpgrade = metaUpgrades[i];
+            if (metaUpgrade?.computed == null)
+                continue;
+
+            NormalizeFormulaPath(
+                ref metaUpgrade.computed.basedOn,
+                $"prestige.metaUpgrades[{i}].computed.basedOn"
+            );
+        }
+    }
+
+    private static void NormalizeFormulaPath(ref string path, string context)
+    {
+        var raw = (path ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(raw))
+            return;
+
+        if (
+            !ParameterizedPathParser.TryCanonicalizeFormulaParameterizedPath(
+                raw,
+                out var canonical,
+                out var usedLegacyFormat
+            )
+        )
+        {
+            return;
+        }
+
+        if (string.Equals(raw, canonical, StringComparison.Ordinal))
+            return;
+
+        path = canonical;
+
+#if UNITY_EDITOR
+        if (usedLegacyFormat)
+        {
+            Debug.LogWarning(
+                $"GameDefinitionLoader: {context} '{raw}' normalized to '{canonical}'. Prefer bracket form."
+            );
+        }
+#endif
     }
 }

@@ -32,13 +32,9 @@ public sealed class BuffCatalog
                 );
             }
 
+            // Buff stacking policy is validated at import/definition validation time (GameDefinitionValidator).
+            // BuffCatalog should not maintain a duplicate list of valid stacking strings.
             var stacking = NormalizeId(buff.stacking);
-            if (!string.IsNullOrEmpty(stacking) && !string.Equals(stacking, "none", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    $"BuffCatalog: buff '{id}' stacking '{buff.stacking}' is unsupported in this slice. Expected 'none'."
-                );
-            }
 
             if (buff.effects == null || buff.effects.Length == 0)
             {
@@ -52,7 +48,8 @@ public sealed class BuffCatalog
         }
 
         ordered.Sort(
-            (a, b) => string.Compare(NormalizeId(a?.id), NormalizeId(b?.id), StringComparison.Ordinal)
+            (a, b) =>
+                string.Compare(NormalizeId(a?.id), NormalizeId(b?.id), StringComparison.Ordinal)
         );
 
         Buffs = ordered;

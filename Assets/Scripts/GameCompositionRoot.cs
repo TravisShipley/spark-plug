@@ -52,6 +52,7 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradeListBuilder upgradeListBuilder;
     private UpgradesScreenViewModel upgradesScreenViewModel;
     private ManagersScreenViewModel managersScreenViewModel;
+    private AdBoostScreenViewModel adBoostScreenViewModel;
     private BuffService buffService;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
@@ -186,6 +187,7 @@ public class GameCompositionRoot : MonoBehaviour
             modifierService,
             tickService
         );
+        uiService.RegisterBuffService(buffService);
         walletService.SetModifierService(modifierService);
         offlineProgressCalculator = new OfflineProgressCalculator(
             gameDefinitionService,
@@ -205,8 +207,14 @@ public class GameCompositionRoot : MonoBehaviour
         );
         upgradesScreenViewModel = new UpgradesScreenViewModel(upgradeListBuilder);
         managersScreenViewModel = new ManagersScreenViewModel(upgradeListBuilder);
+        adBoostScreenViewModel = new AdBoostScreenViewModel(
+            buffService,
+            gameDefinitionService.BuffCatalog,
+            CloseTopScreen
+        );
         uiScreenManager.UpgradesScreenViewModel = upgradesScreenViewModel;
         uiScreenManager.ManagersScreenViewModel = managersScreenViewModel;
+        uiScreenManager.AdBoostScreenViewModel = adBoostScreenViewModel;
 
         // Domain-facing screen API (intent-based)
         uiScreenService = new UiScreenService(uiScreenManager, walletService);
@@ -312,6 +320,7 @@ public class GameCompositionRoot : MonoBehaviour
             generatorViewModel?.Dispose();
         upgradesScreenViewModel?.Dispose();
         managersScreenViewModel?.Dispose();
+        adBoostScreenViewModel?.Dispose();
         walletViewModel?.Dispose();
 
         // Dispose core state last
@@ -388,5 +397,10 @@ public class GameCompositionRoot : MonoBehaviour
     private static long GetCurrentUnixSeconds()
     {
         return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    }
+
+    private void CloseTopScreen()
+    {
+        uiScreenManager?.CloseTop();
     }
 }

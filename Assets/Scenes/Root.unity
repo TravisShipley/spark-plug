@@ -387,18 +387,6 @@ RectTransform:
     type: 3}
   m_PrefabInstance: {fileID: 6065628833239432590}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &532607151 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1170436821433665304, guid: 602b3793041444a11842ad222eb83510,
-    type: 3}
-  m_PrefabInstance: {fileID: 6065628833239432590}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2583a5ee6323c4985814727492f4bbe8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AdBoostButtonView
 --- !u!1 &634886347
 GameObject:
   m_ObjectHideFlags: 0
@@ -446,7 +434,8 @@ MonoBehaviour:
   currencyViews:
   - {fileID: 190678306}
   bottomBarView: {fileID: 939591483}
-  adBoostButton: {fileID: 532607151}
+  adBoostButtons:
+  - {fileID: 6065628833239432593}
 --- !u!1 &720326203
 GameObject:
   m_ObjectHideFlags: 0
@@ -2868,6 +2857,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+--- !u!114 &6065628833239432593 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7038868785446700, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0963807cc3b4f2f93b18e8f42e6f90c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AdBoostButtonView
 --- !u!223 &6065628833239432595 stripped
 Canvas:
   m_CorrespondingSourceObject: {fileID: 7584166579324823389, guid: 602b3793041444a11842ad222eb83510,

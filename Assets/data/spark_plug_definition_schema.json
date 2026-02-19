@@ -25,11 +25,6 @@
     {
       "id": "zone.main",
       "displayName": "string",
-      "presentation": {
-        "descriptionKey": "localizationKey?",
-        "iconId": "iconId?",
-        "imageId": "imageId?"
-      },
       "description": "string?",
       "startingPhaseId": "phase.1",
       "localResources": ["resourceId"],
@@ -50,7 +45,7 @@
         "type": "constant|add|multiply|power|log10|min|max|clamp|if",
         "args": []
       },
-      "dependsOn": ["resource.resourceId", "state.run.someKey", "var.otherVar"]
+      "dependsOn": ["resource[resourceId]", "state.run.someKey", "var.otherVar"]
     }
   ],
 
@@ -59,11 +54,6 @@
       "id": "nodeTypeId",
       "type": "producer|converter|bottleneck|sink",
       "displayName": "string",
-      "presentation": {
-        "descriptionKey": "localizationKey?",
-        "iconId": "iconId?",
-        "imageId": "imageId?"
-      },
       "tags": ["string"],
 
       "zoneId": "zone.main",
@@ -209,11 +199,6 @@
     {
       "id": "upgradeId",
       "displayName": "string",
-      "presentation": {
-        "descriptionKey": "localizationKey?",
-        "iconId": "iconId?",
-        "imageId": "imageId?"
-      },
       "category": "node|global|automation|prestige|progression",
       "zoneId": "zone.main",
 
@@ -237,11 +222,6 @@
   "milestones": [
     {
       "id": "milestoneId",
-      "presentation": {
-        "descriptionKey": "localizationKey?",
-        "iconId": "iconId?",
-        "imageId": "imageId?"
-      },
       "nodeId": "nodeTypeId",
       "zoneId": "zone.main",
       "atLevel": 25,
@@ -253,11 +233,6 @@
     {
       "id": "projectId",
       "displayName": "string",
-      "presentation": {
-        "descriptionKey": "localizationKey?",
-        "iconId": "iconId?",
-        "imageId": "imageId?"
-      },
       "zoneId": "zone.main",
       "timeSeconds": 0,
       "cost": [{ "resource": "resourceId", "amount": "bigNumberString" }],
@@ -286,25 +261,10 @@
     {
       "id": "buffId",
       "displayName": "string",
-      "presentation": {
-        "descriptionKey": "localizationKey?",
-        "iconId": "iconId?",
-        "imageId": "imageId?"
-      },
       "zoneId": "zone.main",
       "durationSeconds": 600,
       "stacking": "refresh|extend|ignore|stack",
-      "effects": [
-        {
-          "id": "buffModifierId",
-          "source": "buffId",
-          "zoneId": "zone.main",
-          "scope": { "kind": "global" },
-          "operation": "multiply",
-          "target": "resourceGain.resourceId",
-          "value": "numberString"
-        }
-      ]
+      "effects": [{ "modifierId": "modifierId" }]
     }
   ],
 
@@ -314,7 +274,7 @@
     "prestigeResource": "resourceId",
     "formula": {
       "type": "sqrt|log10|linear|customExpression",
-      "basedOn": "lifetimeEarnings.resourceId|state.path|resource.resourceId",
+      "basedOn": "lifetimeEarnings[resourceId]|state.path|resource[resourceId]",
       "multiplier": "numberString",
       "offset": "bigNumberString",
       "expressionVarId": "varId?"
@@ -333,7 +293,7 @@
         "displayName": "string",
         "computed": {
           "type": "linear",
-          "basedOn": "resource.resourceId",
+          "basedOn": "resource[resourceId]",
           "multiplier": "numberString",
           "offset": "bigNumberString"
         },

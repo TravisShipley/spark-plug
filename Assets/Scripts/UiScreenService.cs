@@ -9,7 +9,8 @@ public sealed class UiScreenService
     {
         this.uiScreenManager =
             uiScreenManager ?? throw new ArgumentNullException(nameof(uiScreenManager));
-        this.walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
+        this.walletService =
+            walletService ?? throw new ArgumentNullException(nameof(walletService));
     }
 
     // Generic helpers (optional, but handy)
@@ -19,11 +20,16 @@ public sealed class UiScreenService
 
     public void CloseTop() => uiScreenManager.CloseTop();
 
-    public void ShowUpgrades() => uiScreenManager.Show("UPGRADES", uiScreenManager.UpgradesScreenViewModel);
+    public void ShowUpgrades() =>
+        uiScreenManager.Show("UPGRADES", uiScreenManager.UpgradesScreenViewModel);
 
-    public void ShowManagers() => uiScreenManager.Show("MANAGERS", uiScreenManager.ManagersScreenViewModel);
+    public void ShowManagers() =>
+        uiScreenManager.Show("MANAGERS", uiScreenManager.ManagersScreenViewModel);
 
     public void ShowStore() => uiScreenManager.ShowById("STORE");
+
+    public void ShowAdBoost() =>
+        uiScreenManager.Show("AD_BOOST", uiScreenManager.AdBoostScreenViewModel);
 
     public void ShowOfflineEarnings(OfflineSessionResult result)
     {

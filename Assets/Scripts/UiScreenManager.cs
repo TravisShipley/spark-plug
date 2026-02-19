@@ -56,6 +56,7 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     public GameDefinitionService GameDefinitionService { get; set; }
     public UpgradesScreenViewModel UpgradesScreenViewModel { get; set; }
     public ManagersScreenViewModel ManagersScreenViewModel { get; set; }
+    public AdBoostScreenViewModel AdBoostScreenViewModel { get; set; }
 
     public void Initialize(UpgradeService upgradeService)
     {

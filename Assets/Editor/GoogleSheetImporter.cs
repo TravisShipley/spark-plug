@@ -1357,6 +1357,9 @@ public static class GoogleSheetImporter
                 .Cast<object>()
                 .ToList();
 
+        if (tables.TryGetValue("Buffs", out var buffRows))
+            pack["buffs"] = buffRows.Select(FlattenBuff).Cast<object>().ToList();
+
         if (tables.TryGetValue("UnlockGraph", out var ugRows))
             pack["unlockGraph"] = ugRows
                 .Select(r =>
@@ -1470,6 +1473,13 @@ public static class GoogleSheetImporter
         RenameKey(d, "cost_json", "cost");
         RenameKey(d, "effects_json", "effects");
         RenameKey(d, "requirements_json", "requirements");
+        return d;
+    }
+
+    private static Dictionary<string, object> FlattenBuff(Dictionary<string, object> flat)
+    {
+        var d = FlattenNestedWithArrays(flat, "tags");
+        RenameKey(d, "effects_json", "effects");
         return d;
     }
 

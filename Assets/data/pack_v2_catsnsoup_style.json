@@ -124,7 +124,7 @@
       "zoneId": "zone.forest",
       "scope": { "kind": "global", "zoneId": "zone.forest" },
       "op": "multiply",
-      "target": "resourceGain.recipe",
+      "target": "resourceGain[recipe]",
       "value": "2"
     },
     {
@@ -191,7 +191,7 @@
       "durationSeconds": 30,
       "stacking": "refresh",
       "effects": [
-        { "id": "mod.buff.gold5x", "source": "buff.jarFairy", "zoneId": "zone.forest", "scope": { "kind": "global", "zoneId": "zone.forest" }, "op": "multiply", "target": "resourceGain.gold", "value": "5" }
+        { "id": "mod.buff.gold5x", "source": "buff.jarFairy", "zoneId": "zone.forest", "scope": { "kind": "global", "zoneId": "zone.forest" }, "op": "multiply", "target": "resourceGain[gold]", "value": "5" }
       ]
     }
   ],

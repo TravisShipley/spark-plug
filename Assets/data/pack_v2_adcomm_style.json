@@ -83,7 +83,7 @@
       "zoneId": "zone.motherland",
       "scope": { "kind": "node", "zoneId": "zone.motherland", "nodeId": "nodeType.industry.potatoField" },
       "op": "multiply",
-      "target": "nodeOutput.potato",
+      "target": "nodeOutput[potato]",
       "valueFromState": "cards.potatoField.multiplier"
     }
   ],

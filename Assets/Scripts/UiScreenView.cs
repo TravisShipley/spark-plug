@@ -6,13 +6,23 @@ using UnityEngine.UI;
 [RequireComponent(typeof(GraphicRaycaster))]
 public abstract class UiScreenView : MonoBehaviour
 {
-    [SerializeField] private bool dismissible = true;
-    [SerializeField] private bool closeOnBackdrop = true;
-    [SerializeField] private bool closeOnEscape = true;
+    [SerializeField]
+    private bool dismissible = true;
 
-    [SerializeField] private Canvas canvas;
-    [SerializeField] private CanvasGroup canvasGroup;
-    [SerializeField] private GraphicRaycaster graphicRaycaster;
+    [SerializeField]
+    private bool closeOnBackdrop = true;
+
+    [SerializeField]
+    private bool closeOnEscape = true;
+
+    [SerializeField]
+    private Canvas canvas;
+
+    [SerializeField]
+    private CanvasGroup canvasGroup;
+
+    [SerializeField]
+    private GraphicRaycaster graphicRaycaster;
 
     public bool Dismissible => dismissible;
     public bool CloseOnBackdrop => closeOnBackdrop;
@@ -70,6 +80,8 @@ public abstract class UiScreenView : MonoBehaviour
     }
 
     public virtual void OnBeforeShow(object payload) { }
+
     public virtual void OnShown() { }
+
     public virtual void OnBeforeClose() { }
 }

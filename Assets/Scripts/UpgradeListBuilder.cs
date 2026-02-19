@@ -186,6 +186,13 @@ public sealed class UpgradeListBuilder
     private string BuildModifierSummary(ModifierEntry modifier)
     {
         var target = (modifier.target ?? string.Empty).Trim();
+        var hasParameterizedTarget = ParameterizedPathParser.TryParseModifierParameterizedPath(
+            target,
+            out var parsedTarget
+        );
+        if (hasParameterizedTarget)
+            target = parsedTarget.CanonicalPath;
+
         var scopeKind = (modifier.scope?.kind ?? string.Empty).Trim();
         var scopeNodeId = (modifier.scope?.nodeId ?? string.Empty).Trim();
         var scopeNodeTag = (modifier.scope?.nodeTag ?? string.Empty).Trim();
@@ -213,9 +220,19 @@ public sealed class UpgradeListBuilder
         )
             effect = $"speed x{Format.Abbreviated(modifier.value)}";
         else if (
-            target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
-            || target.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase)
+            hasParameterizedTarget
+                ? (
+                    string.IsNullOrEmpty(parsedTarget.Suffix)
+                    && string.Equals(
+                        parsedTarget.CanonicalBaseName,
+                        "nodeOutput",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                : (
+                    target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
+                )
         )
             effect = $"output x{Format.Abbreviated(modifier.value)}";
         else if (
@@ -227,7 +244,18 @@ public sealed class UpgradeListBuilder
             effect = "Automates ";
             isAutomation = true;
         }
-        else if (target.StartsWith("resourceGain", StringComparison.OrdinalIgnoreCase))
+        else if (
+            hasParameterizedTarget
+                ? (
+                    string.IsNullOrEmpty(parsedTarget.Suffix)
+                    && string.Equals(
+                        parsedTarget.CanonicalBaseName,
+                        "resourceGain",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                : target.StartsWith("resourceGain", StringComparison.OrdinalIgnoreCase)
+        )
             effect = $"resource gain x{Format.Abbreviated(modifier.value)}";
 
         return isAutomation ? $"{effect}{where}" : $"{where} {effect}";

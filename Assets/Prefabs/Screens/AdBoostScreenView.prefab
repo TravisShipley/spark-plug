@@ -328,7 +328,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6692068852161113668}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5ddff7dd3e054b71ac58c3e1cbd9c74, type: 3}
+  m_Script: {fileID: 11500000, guid: 94f37f4f647f4d91b483f3fefde2ac6b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AdBoostScreenView
   dismissible: 1
@@ -359,7 +359,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 1
-  m_AdditionalShaderChannelsFlag: 25
+  m_AdditionalShaderChannelsFlag: 1
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
   m_SortingOrder: 0
@@ -624,6 +624,11 @@ PrefabInstance:
       propertyPath: m_text
       value: close
       objectReference: {fileID: 0}
+    - target: {fileID: 2613339066893362956, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      propertyPath: m_Name
+      value: CloseLabel
+      objectReference: {fileID: 0}
     - target: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_Pivot.x
@@ -758,12 +763,17 @@ PrefabInstance:
     - target: {fileID: 2150937678114895606, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_Name
-      value: WatchButton
+      value: BoostButton
       objectReference: {fileID: 0}
     - target: {fileID: 2505672749294639810, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_text
       value: watch
+      objectReference: {fileID: 0}
+    - target: {fileID: 2613339066893362956, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      propertyPath: m_Name
+      value: BoostLabel
       objectReference: {fileID: 0}
     - target: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}

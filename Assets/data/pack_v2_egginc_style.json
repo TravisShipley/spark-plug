@@ -106,7 +106,7 @@
       "zoneId": "zone.farm",
       "scope": { "kind": "node", "zoneId": "zone.farm", "nodeId": "nodeType.hatchery" },
       "op": "multiply",
-      "target": "nodeOutput.eggs",
+      "target": "nodeOutput[eggs]",
       "value": "2"
     },
     {
@@ -124,7 +124,7 @@
       "zoneId": "zone.farm",
       "scope": { "kind": "global", "zoneId": "zone.farm" },
       "op": "multiply",
-      "target": "resourceGain.cash",
+      "target": "resourceGain[cash]",
       "valueFromState": "meta.soulEarningsMultiplier"
     }
   ],
@@ -175,7 +175,7 @@
           "zoneId": "zone.farm",
           "scope": { "kind": "global", "zoneId": "zone.farm" },
           "op": "multiply",
-          "target": "resourceGain.cash",
+          "target": "resourceGain[cash]",
           "value": "10"
         }
       ]
@@ -186,13 +186,13 @@
     "enabled": true,
     "zoneId": "zone.farm",
     "prestigeResource": "soul",
-    "formula": { "type": "log10", "basedOn": "lifetimeEarnings.cash", "multiplier": "10", "offset": "0" },
+    "formula": { "type": "log10", "basedOn": "lifetimeEarnings[cash]", "multiplier": "10", "offset": "0" },
     "resetScopes": { "resetNodes": true, "resetSoftCurrencies": true, "keepHardCurrencies": true, "keepUnlocks": [], "keepUpgrades": ["upgrade.research.hatchery2x", "upgrade.research.shipping2x"], "keepProjects": [] },
     "metaUpgrades": [
       {
         "id": "meta.soul.multiplier",
         "displayName": "Soul Multiplier (computed)",
-        "computed": { "type": "linear", "basedOn": "resource.soul", "multiplier": "0.01", "offset": "1.0" },
+        "computed": { "type": "linear", "basedOn": "resource[soul]", "multiplier": "0.01", "offset": "1.0" },
         "writesToState": "meta.soulEarningsMultiplier"
       }
     ]

@@ -868,6 +868,43 @@ public sealed class ModifierService : IDisposable
             return false;
         }
 
+        if (ParameterizedPathParser.TryParseModifierParameterizedPath(target, out var parsed))
+        {
+            if (!string.Equals(target, parsed.CanonicalPath, StringComparison.Ordinal))
+            {
+                WarnOnce(
+                    $"{modifier.id}:target.legacyPath",
+                    $"[ModifierService] Modifier '{modifier.id}' target '{target}' normalized to '{parsed.CanonicalPath}'. Prefer bracket form."
+                );
+                modifier.target = parsed.CanonicalPath;
+            }
+
+            target = parsed.CanonicalPath;
+
+            if (!string.IsNullOrEmpty(parsed.Suffix))
+            {
+                WarnOnce(
+                    $"{modifier.id}:target.suffix.unsupported",
+                    $"[ModifierService] Skipping modifier '{modifier.id}': target suffix '{parsed.Suffix}' is unsupported in this slice."
+                );
+                return false;
+            }
+
+            if (string.Equals(parsed.CanonicalBaseName, "nodeOutput", StringComparison.OrdinalIgnoreCase))
+            {
+                targetKind = TargetKind.NodeOutput;
+                targetResourceId = parsed.ParameterId;
+                return true;
+            }
+
+            if (string.Equals(parsed.CanonicalBaseName, "resourceGain", StringComparison.OrdinalIgnoreCase))
+            {
+                targetKind = TargetKind.ResourceGain;
+                targetResourceId = parsed.ParameterId;
+                return true;
+            }
+        }
+
         if (
             string.Equals(target, "nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
             || string.Equals(target, "node.speedMultiplier", StringComparison.OrdinalIgnoreCase)
@@ -887,18 +924,6 @@ public sealed class ModifierService : IDisposable
             return true;
         }
 
-        if (
-            target.StartsWith("nodeOutput.", StringComparison.OrdinalIgnoreCase)
-            || target.StartsWith("node.outputMultiplier.", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            targetKind = TargetKind.NodeOutput;
-            var dot = target.LastIndexOf('.');
-            if (dot >= 0 && dot < target.Length - 1)
-                targetResourceId = target.Substring(dot + 1).Trim();
-            return true;
-        }
-
         if (string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase))
         {
             targetKind = TargetKind.AutomationPolicy;
@@ -911,26 +936,6 @@ public sealed class ModifierService : IDisposable
         )
         {
             targetKind = TargetKind.AutomationPolicy;
-            return true;
-        }
-
-        if (target.StartsWith("resourceGain.", StringComparison.OrdinalIgnoreCase))
-        {
-            targetKind = TargetKind.ResourceGain;
-            var dot = target.IndexOf('.');
-            if (dot >= 0 && dot < target.Length - 1)
-                targetResourceId = target.Substring(dot + 1).Trim();
-            return true;
-        }
-
-        if (
-            target.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase)
-            && target.EndsWith("]")
-        )
-        {
-            targetKind = TargetKind.ResourceGain;
-            targetResourceId = target.Substring("resourceGain[".Length);
-            targetResourceId = targetResourceId.Substring(0, targetResourceId.Length - 1).Trim();
             return true;
         }
 
