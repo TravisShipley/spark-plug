@@ -387,6 +387,18 @@ RectTransform:
     type: 3}
   m_PrefabInstance: {fileID: 6065628833239432590}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &532607151 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1170436821433665304, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2583a5ee6323c4985814727492f4bbe8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AdBoostButtonView
 --- !u!1 &634886347
 GameObject:
   m_ObjectHideFlags: 0
@@ -434,6 +446,7 @@ MonoBehaviour:
   currencyViews:
   - {fileID: 190678306}
   bottomBarView: {fileID: 939591483}
+  adBoostButton: {fileID: 532607151}
 --- !u!1 &720326203
 GameObject:
   m_ObjectHideFlags: 0
@@ -670,6 +683,9 @@ MonoBehaviour:
       type: 3}
   - Id: OFFLINE_EARNINGS
     Prefab: {fileID: -3593859944293834060, guid: 2b4fdca78bd234560ba02240dea15163,
+      type: 3}
+  - Id: AD_BOOST
+    Prefab: {fileID: 9008322863671493908, guid: a1a10fe777e7e4e6d800f345ffda0a06,
       type: 3}
 --- !u!1 &1263566856
 GameObject:
