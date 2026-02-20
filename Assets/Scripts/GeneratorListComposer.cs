@@ -40,6 +40,7 @@ public class GeneratorListComposer
         WalletViewModel walletViewModel,
         TickService tickService,
         ModifierService modifierService,
+        BuffService buffService,
         UiServiceRegistry uiService,
         SaveService saveService,
         GameDefinitionService gameDefinitionService,
@@ -56,8 +57,8 @@ public class GeneratorListComposer
         this.walletViewModel = walletViewModel;
         this.tickService = tickService;
         this.modifierService = modifierService;
+        this.buffService = buffService;
         this.uiService = uiService;
-        this.buffService = uiService != null ? uiService.BuffService : null;
         this.saveService = saveService;
         this.gameDefinitionService = gameDefinitionService;
         this.unlockService = unlockService;

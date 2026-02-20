@@ -117,6 +117,7 @@ public class GameCompositionRoot : MonoBehaviour
             walletViewModel,
             tickService,
             modifierService,
+            buffService,
             uiService,
             saveService,
             gameDefinitionService,
