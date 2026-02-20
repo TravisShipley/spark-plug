@@ -14,6 +14,7 @@ public class GeneratorListComposer
     private readonly TickService tickService;
     private readonly ModifierService modifierService;
     private readonly UiServiceRegistry uiService;
+    private readonly BuffService buffService;
     private readonly SaveService saveService;
     private readonly GameDefinitionService gameDefinitionService;
     private readonly UnlockService unlockService;
@@ -56,6 +57,7 @@ public class GeneratorListComposer
         this.tickService = tickService;
         this.modifierService = modifierService;
         this.uiService = uiService;
+        this.buffService = uiService != null ? uiService.BuffService : null;
         this.saveService = saveService;
         this.gameDefinitionService = gameDefinitionService;
         this.unlockService = unlockService;
@@ -190,7 +192,8 @@ public class GeneratorListComposer
             model,
             generatorDefinition,
             service,
-            walletViewModel
+            walletViewModel,
+            buffService
         );
 
         generatorServices.Add(service);

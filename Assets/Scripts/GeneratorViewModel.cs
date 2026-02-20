@@ -36,6 +36,7 @@ public class GeneratorViewModel : IDisposable
     public IReadOnlyReactiveProperty<bool> ShowBuild { get; }
     public IReadOnlyReactiveProperty<bool> ShowLevelUp { get; }
     public IReadOnlyReactiveProperty<bool> ShowCollect { get; }
+    public IReadOnlyReactiveProperty<bool> IsOutputBoosted { get; }
     public UiCommand BuildCommand { get; }
     public UiCommand LevelUpCommand { get; }
     public UiCommand CollectCommand { get; }
@@ -45,7 +46,8 @@ public class GeneratorViewModel : IDisposable
         GeneratorModel model,
         GeneratorDefinition definition,
         GeneratorService generatorService,
-        WalletViewModel walletViewModel
+        WalletViewModel walletViewModel,
+        BuffService buffService
     )
     {
         _ = model;
@@ -86,6 +88,11 @@ public class GeneratorViewModel : IDisposable
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
+
+        IsOutputBoosted =
+            buffService != null
+                ? buffService.IsActive
+                : Observable.Return(false).ToReadOnlyReactiveProperty().AddTo(disposables);
 
         // Build and level-up share the same service-authored purchasing rule.
         CanBuild = generatorService.CanBuyLevelReactive;

@@ -702,6 +702,8 @@ MonoBehaviour:
   levelText: {fileID: 1658580769019928539}
   nextMilestoneText: {fileID: 7084641906482584269}
   ownedContainer: {fileID: 3868922060306876761}
+  outputColor: {r: 1, g: 1, b: 1, a: 1}
+  boostedOutputColor: {r: 0.23137255, g: 0.7647059, b: 0.1882353, a: 1}
   buildButtonView: {fileID: 7145942611360081324}
   levelUpButtonView: {fileID: 3635495772463640559}
   collectButtonView: {fileID: 3735389938016155667}

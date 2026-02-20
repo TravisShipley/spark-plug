@@ -24,6 +24,12 @@ public class GeneratorView : MonoBehaviour
     [SerializeField]
     private GameObject ownedContainer;
 
+    [SerializeField]
+    private Color outputColor = Color.white;
+
+    [SerializeField]
+    private Color boostedOutputColor = Color.white;
+
     [Header("Buttons")]
     [SerializeField]
     private ReactiveButtonView buildButtonView;
@@ -186,6 +192,15 @@ public class GeneratorView : MonoBehaviour
         vm.OutputPerCycle.DistinctUntilChanged()
             .Subscribe(output => outputText.text = $"{Format.Currency(output)}")
             .AddTo(disposables);
+
+        if (outputText != null)
+        {
+            outputText.color = outputColor;
+            vm.IsOutputBoosted
+                .DistinctUntilChanged()
+                .Subscribe(isBoosted => outputText.color = isBoosted ? boostedOutputColor : outputColor)
+                .AddTo(disposables);
+        }
 
         // levelText displays the MilestoneRank + 1
         if (levelText != null)
