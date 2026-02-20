@@ -633,6 +633,17 @@ PrefabInstance:
       propertyPath: m_fontSize
       value: 36
       objectReference: {fileID: 0}
+    - target: {fileID: 7690916286192062735, guid: 960024c1a972046cda045d075b0e5340,
+        type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 70721ff0ad70640c68e2d27ab2824529,
+        type: 3}
+    - target: {fileID: 7690916286192062735, guid: 960024c1a972046cda045d075b0e5340,
+        type: 3}
+      propertyPath: m_PreserveAspect
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
