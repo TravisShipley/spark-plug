@@ -136,7 +136,7 @@
 
       "requirements": [
         {
-          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked",
+          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
           "args": {}
         }
       ]
@@ -188,7 +188,7 @@
       "valueFromVar": "varId?",
       "conditions": [
         {
-          "type": "phaseAtLeast|zone|nodeEnabled|hasUpgrade|randomChance",
+          "type": "phaseAtLeast|zone|nodeEnabled|hasUpgrade|buffActive|randomChance",
           "args": {}
         }
       ]
@@ -253,7 +253,56 @@
           "id": "string"
         }
       ],
-      "requirements": []
+      "requirements": [
+        {
+          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
+          "args": {}
+        }
+      ]
+    }
+  ],
+
+  "triggers": [
+    {
+      "id": "triggerId",
+      "zoneId": "zone.main",
+      "event": "node.cycleComplete|node.collect|node.start|node.levelPurchased|resource.gained|offline.claim|ad.rewarded|session.tick|prestige.reset|upgrade.purchased",
+      "scope": {
+        "kind": "global|zone|node|nodeTag|resource",
+        "zoneId": "zone.main?",
+        "nodeId": "nodeTypeId?",
+        "nodeTag": "string?",
+        "resource": "resourceId?"
+      },
+
+      "conditions": [
+        {
+          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
+          "args": {}
+        }
+      ],
+
+      "chance": "numberString?",
+      "cooldownSeconds": "numberString?",
+      "maxActivationsPerSession": 0,
+
+      "actions": [
+        {
+          "type": "grantResource|applyBuff|removeBuff|timeWarp|completeCycle|startNode|rollRewardPool|incrementCounter",
+
+          "resourceId": "resourceId?",
+          "amount": "bigNumberString?",
+          "buffId": "buffId?",
+          "durationSeconds": "numberString?",
+
+          "seconds": "numberString?",
+          "mode": "simulate|creditOffline?",
+
+          "nodeInstanceId": "instanceId?",
+          "rewardPoolId": "rewardPoolId?",
+          "counterId": "string?"
+        }
+      ]
     }
   ],
 
@@ -265,6 +314,29 @@
       "durationSeconds": 600,
       "stacking": "refresh|extend|ignore|stack",
       "effects": [{ "modifierId": "modifierId" }]
+    }
+  ],
+
+  "rewardPools": [
+    {
+      "id": "rewardPoolId",
+      "entries": [
+        {
+          "weight": 1,
+          "action": {
+            "type": "grantResource|applyBuff|removeBuff|timeWarp|completeCycle|startNode|rollRewardPool|incrementCounter",
+            "resourceId": "resourceId?",
+            "amount": "bigNumberString?",
+            "buffId": "buffId?",
+            "durationSeconds": "numberString?",
+            "seconds": "numberString?",
+            "mode": "simulate|creditOffline?",
+            "nodeInstanceId": "instanceId?",
+            "rewardPoolId": "rewardPoolId?",
+            "counterId": "string?"
+          }
+        }
+      ]
     }
   ],
 
