@@ -4,12 +4,13 @@ Use this folder to understand how the runtime is structured and where behavior s
 
 ## Recommended Read Order
 
-1. `Overview.md`
-2. `SystemMap.md`
-3. `ArchitectureRules.md`
-4. `ServiceResponsibilities.md`
-5. `SimulationModel.md`
-6. `AntiPatterns.md`
+1. `MentalModel.md`
+2. `Overview.md`
+3. `SystemMap.md`
+4. `ArchitectureRules.md`
+5. `ServiceResponsibilities.md`
+6. `SimulationModel.md`
+7. `AntiPatterns.md`
 
 ## Also Here
 

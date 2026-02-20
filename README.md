@@ -28,6 +28,11 @@ Primary doc sections:
 - Docs/Policies
 - Docs/Process
 
+Key references:
+
+- `Docs/Architecture/MentalModel.md` core runtime/economy mental model
+- `Docs/Data/DatasheetGuide.md` Google Sheets authoring and table mapping guide
+
 ## Root Docs
 
 - `CONTRIBUTING.md` contribution workflow and repository expectations

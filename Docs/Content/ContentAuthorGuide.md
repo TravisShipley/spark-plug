@@ -1,7 +1,7 @@
 ---
 document_role: process
 topic: content
-audience: ai, developers
+audience: designers, developers
 scope: content
 status: active
 ---
@@ -30,6 +30,58 @@ This guide explains how to safely edit the Spark Plug Google Sheets.
   - `nodeType.business.lemonade`
   - `upgrade.manager.lemonade`
 - IDs are permanent. Treat them like database keys.
+
+---
+
+## Bracket Syntax (Resource Paths)
+
+Some fields reference a **resource-specific property** using bracket syntax.
+
+Format:
+
+```
+baseName[resourceId]
+```
+
+Examples:
+
+- `nodeOutput[currencySoft]`
+- `resourceGain[currencySoft]`
+- `resource[currencyMeta]`
+- `lifetimeEarnings[currencySoft]`
+
+### When to Use Brackets
+
+Use bracket syntax when:
+
+- A field represents a **path or target**
+- The value depends on a specific `resourceId`
+- Examples include:
+  - `Modifiers.target`
+  - Formula fields such as `basedOn`
+  - Any column that references a resource-specific stat
+
+### When NOT to Use Brackets
+
+Do **not** use bracket syntax for normal ID fields:
+
+- `nodeId`
+- `resource`
+- `zoneId`
+- `upgradeId`
+- Any column that directly stores an ID value
+
+Those should remain plain IDs (no brackets).
+
+### Rule of Thumb
+
+If the column describes **what property to modify or read**, use:
+
+```
+propertyName[resourceId]
+```
+
+If the column describes **which object**, use the ID directly.
 
 ---
 
