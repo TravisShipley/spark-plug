@@ -515,7 +515,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 5336514393454278652}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 33e4b4f1af5fe47ce8874f3a68669458, type: 3}
+  m_Script: {fileID: 11500000, guid: fec2958d399fc426a954f692c19f4b49, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   resourceId: currencySoft
@@ -879,7 +879,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.47767347, g: 0.4912245, b: 0.498, a: 0.7882353}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1471,7 +1471,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 2433299988549468602}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 42623f347ef214dde85db8d6314abd4e, type: 3}
+  m_Script: {fileID: 11500000, guid: 1eb9a1b54e5784f41aed4c9e316ef6e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   buttonView: {fileID: 6073767051947491762}
