@@ -135,4 +135,9 @@ public class GeneratorViewModel : IDisposable
     {
         generatorService.HandleCollectPressed(cashGenerated);
     }
+
+    public int TryLevelUpMany(int maxToBuy)
+    {
+        return generatorService.TryBuyLevels(maxToBuy);
+    }
 }

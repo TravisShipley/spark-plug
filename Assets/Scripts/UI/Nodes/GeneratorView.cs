@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -38,6 +39,9 @@ public class GeneratorView : MonoBehaviour
     private ReactiveButtonView levelUpButtonView;
 
     [SerializeField]
+    private HoldRepeatButtonBinder levelHoldBinder;
+
+    [SerializeField]
     private ReactiveButtonView collectButtonView;
 
     [Header("Progress")]
@@ -55,6 +59,11 @@ public class GeneratorView : MonoBehaviour
 
     private float cycleStartTime;
     private float lastCycleDuration;
+    private bool canLevelUpCached;
+    private int currentLevelCached;
+    private int nextMilestoneLevelCached;
+    private int holdBuyBudgetRemaining;
+    private int levelsPerPurchase = 1;
 
     private enum ProgressState
     {
@@ -75,6 +84,20 @@ public class GeneratorView : MonoBehaviour
 
         lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
         progressState = ProgressState.Idle;
+        canLevelUpCached = vm.CanLevelUp.Value;
+        currentLevelCached = vm.Level.Value;
+        nextMilestoneLevelCached = vm.NextMilestoneAtLevel.Value;
+        holdBuyBudgetRemaining = int.MaxValue;
+
+        vm.CanLevelUp.DistinctUntilChanged()
+            .Subscribe(value => canLevelUpCached = value)
+            .AddTo(disposables);
+        vm.Level.DistinctUntilChanged()
+            .Subscribe(value => currentLevelCached = value)
+            .AddTo(disposables);
+        vm.NextMilestoneAtLevel.DistinctUntilChanged()
+            .Subscribe(value => nextMilestoneLevelCached = value)
+            .AddTo(disposables);
 
         if (progressFill == null)
         {
@@ -146,7 +169,39 @@ public class GeneratorView : MonoBehaviour
                     .DistinctUntilChanged(),
                 interactable: vm.LevelUpCommand.CanExecute,
                 visible: vm.LevelUpCommand.IsVisible,
-                onClick: vm.LevelUpCommand.Execute
+                onClick: () =>
+                {
+                    if (levelHoldBinder != null && levelHoldBinder.ConsumeSuppressNextClick())
+                        return;
+
+                    vm.LevelUpCommand.Execute();
+                }
+            );
+        }
+
+        if (levelHoldBinder != null)
+        {
+            levelHoldBinder.Bind(
+                canRepeat: () => canLevelUpCached && holdBuyBudgetRemaining > 0,
+                onRepeat: () =>
+                {
+                    var purchased = vm.TryLevelUpMany(levelsPerPurchase);
+                    if (purchased <= 0)
+                        return;
+
+                    if (holdBuyBudgetRemaining != int.MaxValue)
+                        holdBuyBudgetRemaining = Math.Max(0, holdBuyBudgetRemaining - purchased);
+                },
+                onPressStarted: () =>
+                {
+                    if (nextMilestoneLevelCached > currentLevelCached)
+                    {
+                        holdBuyBudgetRemaining = nextMilestoneLevelCached - currentLevelCached;
+                        return;
+                    }
+
+                    holdBuyBudgetRemaining = int.MaxValue;
+                }
             );
         }
 
@@ -196,9 +251,10 @@ public class GeneratorView : MonoBehaviour
         if (outputText != null)
         {
             outputText.color = outputColor;
-            vm.IsOutputBoosted
-                .DistinctUntilChanged()
-                .Subscribe(isBoosted => outputText.color = isBoosted ? boostedOutputColor : outputColor)
+            vm.IsOutputBoosted.DistinctUntilChanged()
+                .Subscribe(isBoosted =>
+                    outputText.color = isBoosted ? boostedOutputColor : outputColor
+                )
                 .AddTo(disposables);
         }
 

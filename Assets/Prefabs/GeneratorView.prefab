@@ -706,6 +706,7 @@ MonoBehaviour:
   boostedOutputColor: {r: 0.23137255, g: 0.7647059, b: 0.1882353, a: 1}
   buildButtonView: {fileID: 7145942611360081324}
   levelUpButtonView: {fileID: 3635495772463640559}
+  levelHoldBinder: {fileID: 425567639847358693}
   collectButtonView: {fileID: 3735389938016155667}
   progressBar: {fileID: 7556280380556630028}
   progressFill: {fileID: 2698592441231946483}
@@ -1656,7 +1657,11 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2150937678114895606, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 425567639847358693}
   m_SourcePrefab: {fileID: 100100000, guid: 8f956f11e8ebf49bb86224e5b93ba01f, type: 3}
 --- !u!114 &3635495772463640559 stripped
 MonoBehaviour:
@@ -1664,12 +1669,33 @@ MonoBehaviour:
     type: 3}
   m_PrefabInstance: {fileID: 6495529653763234065}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 5187420689977077735}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 39038fb79df3b447fbaf832b642823f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &5187420689977077735 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2150937678114895606, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
+    type: 3}
+  m_PrefabInstance: {fileID: 6495529653763234065}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &425567639847358693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5187420689977077735}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac19a05807979437488b62fef54c0e54, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HoldRepeatButtonBinder
+  pointerEventSource: {fileID: 5187420689977077735}
+  initialDelaySeconds: 0.5
+  repeatIntervalSeconds: 0.1
 --- !u!224 &7901820003965642240 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,

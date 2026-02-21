@@ -303,6 +303,24 @@ public class GeneratorService : IDisposable
         return true;
     }
 
+    public int TryBuyLevels(int maxToBuy)
+    {
+        int purchaseLimit = Math.Max(0, maxToBuy);
+        if (purchaseLimit <= 0)
+            return 0;
+
+        int purchased = 0;
+        for (int i = 0; i < purchaseLimit; i++)
+        {
+            if (!TryBuyLevel())
+                break;
+
+            purchased++;
+        }
+
+        return purchased;
+    }
+
     public void StartRun()
     {
         if (!isOwned.Value)
