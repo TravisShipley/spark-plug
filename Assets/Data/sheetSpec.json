@@ -295,7 +295,7 @@
 
       {
         "name": "UnlockGraph",
-        "required": false,
+        "required": true,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [
@@ -308,7 +308,7 @@
 
       {
         "name": "Triggers",
-        "required": false,
+        "required": true,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [
@@ -342,7 +342,7 @@
 
       {
         "name": "RewardPools",
-        "required": false,
+        "required": true,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [
@@ -375,7 +375,13 @@
       "capacityMode": ["capacity", "throughputPerSecond"],
       "scopeKind": ["global", "zone", "node", "nodeTag", "resource"],
       "modifierOperation": ["add", "multiply", "set", "clampMin", "clampMax"],
-      "upgradeCategory": ["node", "global", "automation", "prestige", "progression"],
+      "upgradeCategory": [
+        "node",
+        "global",
+        "automation",
+        "prestige",
+        "progression"
+      ],
       "buffStacking": ["none", "refresh", "extend", "ignore", "stack"],
       "triggerEvent": [
         "node.cycleComplete",
