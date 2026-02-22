@@ -311,7 +311,7 @@
 
       {
         "name": "Triggers",
-        "required": false,
+        "required": true,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [
@@ -345,12 +345,12 @@
 
       {
         "name": "RewardPools",
-        "required": false,
+        "required": true,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [
           { "name": "id", "required": true, "type": "rewardPoolId" },
-          { "name": "entries_json", "required": true, "type": "json" }
+          { "name": "rewards_json", "required": true, "type": "json" }
         ],
         "notes": [
           "A RewardPool is a weighted list of actions. The JSON shape is validated by GameDefinitionValidator."
@@ -719,7 +719,7 @@
   "rewardPools": [
     {
       "id": "rewardPoolId",
-      "entries": [
+      "rewards": [
         {
           "weight": 1,
           "action": {
