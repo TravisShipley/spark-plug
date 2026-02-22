@@ -1,6 +1,6 @@
 {
   "sheetSpec": {
-    "version": "1.0",
+    "version": "0.2",
     "notes": "Spreadsheet contract used to ensure tabs + headers exist. Does not validate row values.",
     "settings": {
       "headerRowIndex": 1,
