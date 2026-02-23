@@ -15,7 +15,72 @@ public sealed class GameDefinition
     public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
     public List<MilestoneEntry> milestones = new List<MilestoneEntry>();
     public List<BuffDefinition> buffs = new List<BuffDefinition>();
+    public List<TriggerDefinition> triggers = new List<TriggerDefinition>();
+    public List<RewardPoolDefinition> rewardPools = new List<RewardPoolDefinition>();
     public PrestigeDefinition prestige;
+}
+
+[Serializable]
+public sealed class TriggerDefinition
+{
+    public string id;
+    public string @event;
+    public string eventType;
+    public TriggerScopeDefinition scope;
+    public TriggerConditionDefinition[] conditions;
+    public TriggerActionDefinition[] actions;
+}
+
+[Serializable]
+public sealed class TriggerScopeDefinition
+{
+    public string kind;
+    public string zoneId;
+    public string nodeId;
+    public string nodeTag;
+    public string resource;
+}
+
+[Serializable]
+public sealed class TriggerConditionDefinition
+{
+    public string type;
+    public TriggerConditionArgsDefinition args;
+}
+
+[Serializable]
+public sealed class TriggerConditionArgsDefinition
+{
+    public string milestoneId;
+}
+
+[Serializable]
+public sealed class TriggerActionDefinition
+{
+    public string type;
+    public string rewardPoolId;
+}
+
+[Serializable]
+public sealed class RewardPoolDefinition
+{
+    public string id;
+    public RewardEntryDefinition[] rewards;
+}
+
+[Serializable]
+public sealed class RewardEntryDefinition
+{
+    public float weight;
+    public RewardActionDefinition action;
+}
+
+[Serializable]
+public sealed class RewardActionDefinition
+{
+    public string type;
+    public string resourceId;
+    public double amount;
 }
 
 [Serializable]

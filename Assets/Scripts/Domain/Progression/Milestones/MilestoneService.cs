@@ -123,6 +123,14 @@ public sealed class MilestoneService : IDisposable
                 continue;
 
             saveService.MarkMilestoneFired(milestoneId, requestSave: false);
+            EventSystem.OnMilestoneFired.OnNext(
+                new EventSystem.MilestoneFiredEvent(
+                    milestoneId,
+                    (milestone.nodeId ?? string.Empty).Trim(),
+                    (milestone.zoneId ?? string.Empty).Trim(),
+                    milestone.atLevel
+                )
+            );
             var modifierIds = new List<string>();
             for (int e = 0; e < milestone.grantEffects.Length; e++)
             {
@@ -132,7 +140,7 @@ public sealed class MilestoneService : IDisposable
             }
 
             Debug.Log(
-                $"Milestone '{milestoneId}' reached at level {currentLevel}. Applying modifier(s): {string.Join(", ", modifierIds)}"
+                $"[Milestone] Fired '{milestoneId}' at level {currentLevel}. Applying modifier(s): {string.Join(", ", modifierIds)}"
             );
             firedAny = true;
         }

@@ -654,7 +654,7 @@
       ],
       "requirements": [
         {
-          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
+          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|milestoneIdEquals|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
           "args": {}
         }
       ]
@@ -676,7 +676,7 @@
 
       "conditions": [
         {
-          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
+          "type": "resourceAtLeast|unlock|nodeLevelAtLeast|milestoneIdEquals|phaseAtLeast|zoneUnlocked|upgradePurchased|buffActive",
           "args": {}
         }
       ],

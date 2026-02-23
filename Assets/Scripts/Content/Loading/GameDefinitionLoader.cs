@@ -52,6 +52,12 @@ public static class GameDefinitionLoader
             if (gd.buffs == null)
                 gd.buffs = new List<BuffDefinition>();
 
+            if (gd.triggers == null)
+                gd.triggers = new List<TriggerDefinition>();
+
+            if (gd.rewardPools == null)
+                gd.rewardPools = new List<RewardPoolDefinition>();
+
             if (gd.computedVars == null)
                 gd.computedVars = new List<ComputedVarDefinition>();
 

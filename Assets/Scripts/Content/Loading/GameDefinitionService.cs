@@ -50,6 +50,10 @@ public sealed class GameDefinitionService
     public IReadOnlyList<BuffDefinition> Buffs => buffCatalog?.Buffs ?? new List<BuffDefinition>();
     public IReadOnlyList<MilestoneEntry> Milestones =>
         definition?.milestones ?? new List<MilestoneEntry>();
+    public IReadOnlyList<TriggerDefinition> Triggers =>
+        definition?.triggers ?? new List<TriggerDefinition>();
+    public IReadOnlyList<RewardPoolDefinition> RewardPools =>
+        definition?.rewardPools ?? new List<RewardPoolDefinition>();
 
     public bool TryGetNode(string id, out NodeDefinition node)
     {

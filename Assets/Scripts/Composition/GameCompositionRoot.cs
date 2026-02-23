@@ -56,6 +56,7 @@ public class GameCompositionRoot : MonoBehaviour
     private BuffService buffService;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
+    private TriggerService triggerService;
     private UnlockService unlockService;
     private OfflineProgressCalculator offlineProgressCalculator;
     private GameDefinitionService gameDefinitionService;
@@ -140,10 +141,9 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             modifierService
         );
+        triggerService = new TriggerService(gameDefinitionService, walletService);
 
-        EventSystem
-            .OnResetSaveRequested.Subscribe(_ => HandleResetRequested())
-            .AddTo(disposables);
+        EventSystem.OnResetSaveRequested.Subscribe(_ => HandleResetRequested()).AddTo(disposables);
     }
 
     private void InitializeCoreServices(out UiScreenService uiScreenService)
@@ -309,6 +309,7 @@ public class GameCompositionRoot : MonoBehaviour
         foreach (var s in generatorServices)
             s?.Dispose();
         milestoneService?.Dispose();
+        triggerService?.Dispose();
         buffService?.Dispose();
         unlockService?.Dispose();
         modifierService?.Dispose();

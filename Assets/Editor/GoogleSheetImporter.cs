@@ -1268,6 +1268,7 @@ public static class GoogleSheetImporter
             }
 
             raw = raw.Trim();
+            raw = RemoveWhitespaceOutsideJsonStrings(raw);
 
             return ParseJsonLikeValue(raw);
         }
@@ -1282,6 +1283,59 @@ public static class GoogleSheetImporter
             return null;
 
         return s;
+    }
+
+    private static string RemoveWhitespaceOutsideJsonStrings(string s)
+    {
+        if (string.IsNullOrEmpty(s))
+            return s;
+
+        // Removes spaces/newlines/tabs outside of JSON strings.
+        // Keeps whitespace inside quoted strings intact.
+        var sb = new StringBuilder(s.Length);
+        var inStr = false;
+        var escape = false;
+
+        for (int i = 0; i < s.Length; i++)
+        {
+            var c = s[i];
+
+            if (escape)
+            {
+                sb.Append(c);
+                escape = false;
+                continue;
+            }
+
+            if (inStr)
+            {
+                sb.Append(c);
+                if (c == '\\')
+                {
+                    escape = true;
+                }
+                else if (c == '"')
+                {
+                    inStr = false;
+                }
+                continue;
+            }
+
+            if (c == '"')
+            {
+                inStr = true;
+                sb.Append(c);
+                continue;
+            }
+
+            // Outside strings: drop all whitespace (space, tab, CR, LF, etc.).
+            if (char.IsWhiteSpace(c))
+                continue;
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
     }
 
     // Minimal JSON-like parser suitable for cells containing simple arrays/objects.
@@ -2146,6 +2200,13 @@ public static class GoogleSheetImporter
                 AddSchemaError(errors, $"{path}: expected object.");
                 return;
             }
+
+            // Treat an empty object in the schema as an "open object".
+            // This allows schema sections like `args: {}` to accept arbitrary keys
+            // (where the key set is determined by the runtime `type` field), without
+            // requiring schema updates for every new arg.
+            if (schemaObj.Count == 0)
+                return;
 
             foreach (var dataKv in dataObj)
             {
