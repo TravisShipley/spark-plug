@@ -269,7 +269,7 @@ public class GeneratorListComposer
         NodeInstanceDefinition nodeInstance
     )
     {
-        var definition = ScriptableObject.CreateInstance<GeneratorDefinition>();
+        var definition = new GeneratorDefinition();
 
         definition.Id = (nodeInstance.id ?? string.Empty).Trim();
 
