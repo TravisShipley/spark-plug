@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class RewardActionDefinition
+public sealed class RewardAction
 {
     public string type;
     public string resourceId;

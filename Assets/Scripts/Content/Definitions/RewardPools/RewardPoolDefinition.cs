@@ -4,5 +4,5 @@ using System;
 public sealed class RewardPoolDefinition
 {
     public string id;
-    public RewardEntryDefinition[] rewards;
+    public RewardEntry[] rewards;
 }

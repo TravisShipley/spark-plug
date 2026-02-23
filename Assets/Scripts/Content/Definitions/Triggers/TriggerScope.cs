@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class TriggerScopeDefinition
+public sealed class TriggerScope
 {
     public string kind;
     public string zoneId;

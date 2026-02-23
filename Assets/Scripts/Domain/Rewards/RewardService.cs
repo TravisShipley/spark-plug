@@ -64,7 +64,7 @@ public sealed class RewardService
         ExecuteAction(id, chosenEntry.action);
     }
 
-    private void ExecuteAction(string rewardPoolId, RewardActionDefinition action)
+    private void ExecuteAction(string rewardPoolId, RewardAction action)
     {
         var actionType = NormalizeId(action.type);
         if (string.IsNullOrEmpty(actionType))
@@ -104,7 +104,7 @@ public sealed class RewardService
         );
     }
 
-    private static int RollWeightedIndex(RewardEntryDefinition[] rewards, string rewardPoolId)
+    private static int RollWeightedIndex(RewardEntry[] rewards, string rewardPoolId)
     {
         var totalWeight = 0f;
         for (int i = 0; i < rewards.Length; i++)

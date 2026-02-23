@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class TriggerActionDefinition
+public sealed class TriggerAction
 {
     public string type;
     public string rewardPoolId;
