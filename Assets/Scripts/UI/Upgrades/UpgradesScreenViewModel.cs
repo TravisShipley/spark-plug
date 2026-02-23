@@ -15,7 +15,7 @@ public sealed class UpgradesScreenViewModel : IDisposable
         entries = new List<UpgradeEntryViewModel>(builder.BuildEntries(IsRelevantUpgrade));
     }
 
-    private static bool IsRelevantUpgrade(UpgradeEntry upgrade)
+    private static bool IsRelevantUpgrade(UpgradeDefinition upgrade)
     {
         var category = (upgrade?.category ?? string.Empty).Trim();
         return string.Equals(category, "node", StringComparison.OrdinalIgnoreCase);

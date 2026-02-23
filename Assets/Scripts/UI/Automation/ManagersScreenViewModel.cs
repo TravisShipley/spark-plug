@@ -25,7 +25,7 @@ public sealed class ManagersScreenViewModel : IDisposable
         entries.Clear();
     }
 
-    private static bool IsAutomationUpgrade(UpgradeEntry upgrade)
+    private static bool IsAutomationUpgrade(UpgradeDefinition upgrade)
     {
         var category = (upgrade?.category ?? string.Empty).Trim();
         return string.Equals(category, "Automation", StringComparison.OrdinalIgnoreCase);

@@ -4,14 +4,14 @@ using System.Linq;
 
 public sealed class UpgradeCatalog
 {
-    private readonly Dictionary<string, UpgradeEntry> byId;
-    public IReadOnlyList<UpgradeEntry> Upgrades { get; }
+    private readonly Dictionary<string, UpgradeDefinition> byId;
+    public IReadOnlyList<UpgradeDefinition> Upgrades { get; }
 
-    public UpgradeCatalog(IEnumerable<UpgradeEntry> upgrades)
+    public UpgradeCatalog(IEnumerable<UpgradeDefinition> upgrades)
     {
-        var list = (upgrades ?? Enumerable.Empty<UpgradeEntry>()).ToList();
+        var list = (upgrades ?? Enumerable.Empty<UpgradeDefinition>()).ToList();
         // Normalize: trim ids and dedupe (first wins)
-        byId = new Dictionary<string, UpgradeEntry>(StringComparer.Ordinal);
+        byId = new Dictionary<string, UpgradeDefinition>(StringComparer.Ordinal);
         foreach (var u in list)
         {
             if (u == null)
@@ -26,7 +26,7 @@ public sealed class UpgradeCatalog
         Upgrades = byId.Values.ToList();
     }
 
-    public bool TryGet(string id, out UpgradeEntry entry)
+    public bool TryGet(string id, out UpgradeDefinition entry)
     {
         id = (id ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(id))
@@ -38,7 +38,7 @@ public sealed class UpgradeCatalog
         return byId.TryGetValue(id, out entry);
     }
 
-    public UpgradeEntry GetRequired(string id)
+    public UpgradeDefinition GetRequired(string id)
     {
         if (!TryGet(id, out var e) || e == null)
             throw new KeyNotFoundException($"UpgradeCatalog: No upgrade found for id '{id}'.");

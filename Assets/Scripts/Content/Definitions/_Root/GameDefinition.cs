@@ -9,10 +9,10 @@ public sealed class GameDefinition
     public List<NodeDefinition> nodes = new List<NodeDefinition>();
     public List<NodeInputDefinition> nodeInputs = new List<NodeInputDefinition>();
     public List<NodeInstanceDefinition> nodeInstances = new List<NodeInstanceDefinition>();
-    public List<UnlockGraphEntry> unlockGraph = new List<UnlockGraphEntry>();
-    public List<ModifierEntry> modifiers = new List<ModifierEntry>();
-    public List<UpgradeEntry> upgrades = new List<UpgradeEntry>();
-    public List<MilestoneEntry> milestones = new List<MilestoneEntry>();
+    public List<UnlockGraphDefinition> unlockGraph = new List<UnlockGraphDefinition>();
+    public List<ModifierDefinition> modifiers = new List<ModifierDefinition>();
+    public List<UpgradeDefinition> upgrades = new List<UpgradeDefinition>();
+    public List<MilestoneDefinition> milestones = new List<MilestoneDefinition>();
     public List<BuffDefinition> buffs = new List<BuffDefinition>();
     public List<TriggerDefinition> triggers = new List<TriggerDefinition>();
     public List<RewardPoolDefinition> rewardPools = new List<RewardPoolDefinition>();

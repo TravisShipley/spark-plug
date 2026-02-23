@@ -28,7 +28,7 @@ public sealed class UpgradeEntryViewModel : IDisposable
     public UiCommand Purchase => PurchaseCommand;
 
     public UpgradeEntryViewModel(
-        UpgradeEntry upgrade,
+        UpgradeDefinition upgrade,
         UpgradeService upgradeService,
         string summary,
         string costResourceId,

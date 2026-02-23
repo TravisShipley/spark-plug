@@ -208,7 +208,7 @@ public static class GameDefinitionValidator
     }
 
     private static void ValidateUpgradeEffectsReferences(
-        UpgradeEntry upgrade,
+        UpgradeDefinition upgrade,
         int upgradeIndex,
         HashSet<string> modifierIds,
         List<string> errors
@@ -372,7 +372,7 @@ public static class GameDefinitionValidator
     }
 
     private static void ValidateUpgradeCostResources(
-        UpgradeEntry upgrade,
+        UpgradeDefinition upgrade,
         int upgradeIndex,
         HashSet<string> resourceIds,
         List<string> errors
@@ -483,7 +483,7 @@ public static class GameDefinitionValidator
     }
 
     private static void ValidateModifierVerticalSlice(
-        ModifierEntry modifier,
+        ModifierDefinition modifier,
         int modifierIndex,
         HashSet<string> nodeIds,
         HashSet<string> nodeTags,
@@ -708,7 +708,7 @@ public static class GameDefinitionValidator
 
     private static void ValidateModifierSource(
         string source,
-        ModifierEntry modifier,
+        ModifierDefinition modifier,
         int modifierIndex,
         HashSet<string> upgradeIds,
         HashSet<string> buffIds,

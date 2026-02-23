@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class ModifierEntry
+public sealed class ModifierDefinition
 {
     public string id;
     public string source;

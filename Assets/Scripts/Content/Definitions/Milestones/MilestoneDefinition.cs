@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class MilestoneEntry
+public sealed class MilestoneDefinition
 {
     public string id;
     public string nodeId;

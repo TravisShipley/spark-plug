@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class UpgradeEntry
+public sealed class UpgradeDefinition
 {
     public string id;
     public string displayName;

@@ -424,8 +424,8 @@ public class GeneratorListComposer
         return false;
     }
 
-    private static ModifierEntry FindModifierById(
-        IReadOnlyList<ModifierEntry> modifiers,
+    private static ModifierDefinition FindModifierById(
+        IReadOnlyList<ModifierDefinition> modifiers,
         string modifierId
     )
     {
@@ -446,8 +446,8 @@ public class GeneratorListComposer
         return null;
     }
 
-    private static ModifierEntry FindModifierBySource(
-        IReadOnlyList<ModifierEntry> modifiers,
+    private static ModifierDefinition FindModifierBySource(
+        IReadOnlyList<ModifierDefinition> modifiers,
         string sourceUpgradeId,
         string nodeId
     )
@@ -490,7 +490,7 @@ public class GeneratorListComposer
     }
 
     private static bool TryGetUpgradeCost(
-        UpgradeEntry upgrade,
+        UpgradeDefinition upgrade,
         out double cost,
         out string resourceId
     )

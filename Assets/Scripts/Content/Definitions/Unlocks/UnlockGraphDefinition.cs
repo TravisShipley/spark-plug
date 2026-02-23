@@ -1,7 +1,7 @@
 using System;
 
 [Serializable]
-public sealed class UnlockGraphEntry
+public sealed class UnlockGraphDefinition
 {
     public string id;
     public string zoneId;

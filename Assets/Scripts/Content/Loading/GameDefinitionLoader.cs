@@ -35,19 +35,19 @@ public static class GameDefinitionLoader
 
             // Optional roots (may be empty, but should not be null if present in schema).
             if (gd.upgrades == null)
-                gd.upgrades = new List<UpgradeEntry>();
+                gd.upgrades = new List<UpgradeDefinition>();
 
             if (gd.modifiers == null)
-                gd.modifiers = new List<ModifierEntry>();
+                gd.modifiers = new List<ModifierDefinition>();
 
             if (gd.nodeInputs == null)
                 gd.nodeInputs = new List<NodeInputDefinition>();
 
             if (gd.unlockGraph == null)
-                gd.unlockGraph = new List<UnlockGraphEntry>();
+                gd.unlockGraph = new List<UnlockGraphDefinition>();
 
             if (gd.milestones == null)
-                gd.milestones = new List<MilestoneEntry>();
+                gd.milestones = new List<MilestoneDefinition>();
 
             if (gd.buffs == null)
                 gd.buffs = new List<BuffDefinition>();

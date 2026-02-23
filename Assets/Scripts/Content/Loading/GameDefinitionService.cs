@@ -41,15 +41,15 @@ public sealed class GameDefinitionService
         nodeInputCatalog?.NodeInputs ?? new List<NodeInputDefinition>();
     public IReadOnlyList<NodeInstanceDefinition> NodeInstances =>
         nodeInstanceCatalog?.NodeInstances ?? new List<NodeInstanceDefinition>();
-    public IReadOnlyList<UnlockGraphEntry> UnlockGraph =>
-        definition?.unlockGraph ?? new List<UnlockGraphEntry>();
-    public IReadOnlyList<ModifierEntry> Modifiers =>
-        definition?.modifiers ?? new List<ModifierEntry>();
-    public IReadOnlyList<UpgradeEntry> Upgrades =>
-        upgradeCatalog?.Upgrades ?? new List<UpgradeEntry>();
+    public IReadOnlyList<UnlockGraphDefinition> UnlockGraph =>
+        definition?.unlockGraph ?? new List<UnlockGraphDefinition>();
+    public IReadOnlyList<ModifierDefinition> Modifiers =>
+        definition?.modifiers ?? new List<ModifierDefinition>();
+    public IReadOnlyList<UpgradeDefinition> Upgrades =>
+        upgradeCatalog?.Upgrades ?? new List<UpgradeDefinition>();
     public IReadOnlyList<BuffDefinition> Buffs => buffCatalog?.Buffs ?? new List<BuffDefinition>();
-    public IReadOnlyList<MilestoneEntry> Milestones =>
-        definition?.milestones ?? new List<MilestoneEntry>();
+    public IReadOnlyList<MilestoneDefinition> Milestones =>
+        definition?.milestones ?? new List<MilestoneDefinition>();
     public IReadOnlyList<TriggerDefinition> Triggers =>
         definition?.triggers ?? new List<TriggerDefinition>();
     public IReadOnlyList<RewardPoolDefinition> RewardPools =>
@@ -77,7 +77,7 @@ public sealed class GameDefinitionService
         return nodeInstanceCatalog.TryGet(id, out nodeInstance);
     }
 
-    public bool TryGetUpgrade(string id, out UpgradeEntry entry)
+    public bool TryGetUpgrade(string id, out UpgradeDefinition entry)
     {
         if (upgradeCatalog == null)
         {
@@ -88,16 +88,16 @@ public sealed class GameDefinitionService
         return upgradeCatalog.TryGet(id, out entry);
     }
 
-    public IReadOnlyList<ModifierEntry> ResolveUpgradeModifiers(string upgradeId)
+    public IReadOnlyList<ModifierDefinition> ResolveUpgradeModifiers(string upgradeId)
     {
         var id = (upgradeId ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(id))
-            return Array.Empty<ModifierEntry>();
+            return Array.Empty<ModifierDefinition>();
 
         if (!TryGetUpgrade(id, out var upgrade) || upgrade == null)
-            return Array.Empty<ModifierEntry>();
+            return Array.Empty<ModifierDefinition>();
 
-        var modifiers = definition?.modifiers ?? new List<ModifierEntry>();
+        var modifiers = definition?.modifiers ?? new List<ModifierDefinition>();
         var modifiersById = modifiers
             .Where(m => m != null && !string.IsNullOrWhiteSpace(m.id))
             .GroupBy(m => m.id.Trim(), StringComparer.Ordinal)
@@ -115,13 +115,13 @@ public sealed class GameDefinitionService
     public BuffCatalog BuffCatalog => buffCatalog;
     public GameDefinition Definition => definition;
 
-    private static List<ModifierEntry> ResolveModifiersForUpgrade(
-        UpgradeEntry upgrade,
-        IReadOnlyDictionary<string, ModifierEntry> modifiersById,
-        IReadOnlyList<ModifierEntry> allModifiers
+    private static List<ModifierDefinition> ResolveModifiersForUpgrade(
+        UpgradeDefinition upgrade,
+        IReadOnlyDictionary<string, ModifierDefinition> modifiersById,
+        IReadOnlyList<ModifierDefinition> allModifiers
     )
     {
-        var resolved = new List<ModifierEntry>();
+        var resolved = new List<ModifierDefinition>();
 
         var effects = upgrade.effects;
         if (effects != null)

@@ -28,7 +28,7 @@ public class GameData : ISerializationCallbackReceiver
     [Serializable]
     public class UpgradeStateData
     {
-        // Stable upgrade identifier (matches UpgradeEntry.id in game definition content)
+        // Stable upgrade identifier (matches UpgradeDefinition.id in game definition content)
         public string Id;
 
         // Number of times purchased. For one-time upgrades, this will be 0 or 1.

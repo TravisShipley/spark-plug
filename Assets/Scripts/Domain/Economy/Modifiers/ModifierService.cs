@@ -12,19 +12,19 @@ public sealed class ModifierService : IDisposable
     private readonly UpgradeService upgradeService;
     private readonly SaveService saveService;
 
-    private readonly Dictionary<string, ModifierEntry> modifiersById = new(StringComparer.Ordinal);
-    private readonly List<ModifierEntry> modifiers = new();
-    private readonly Dictionary<string, MilestoneEntry> milestonesById = new(
+    private readonly Dictionary<string, ModifierDefinition> modifiersById = new(StringComparer.Ordinal);
+    private readonly List<ModifierDefinition> modifiers = new();
+    private readonly Dictionary<string, MilestoneDefinition> milestonesById = new(
         StringComparer.Ordinal
     );
 
-    private readonly Dictionary<string, List<ModifierEntry>> resolvedModifiersByUpgradeId = new(
+    private readonly Dictionary<string, List<ModifierDefinition>> resolvedModifiersByUpgradeId = new(
         StringComparer.Ordinal
     );
-    private readonly Dictionary<string, List<ModifierEntry>> resolvedModifiersByMilestoneId = new(
+    private readonly Dictionary<string, List<ModifierDefinition>> resolvedModifiersByMilestoneId = new(
         StringComparer.Ordinal
     );
-    private readonly Dictionary<string, List<ModifierEntry>> activeBuffModifiersBySourceKey = new(
+    private readonly Dictionary<string, List<ModifierDefinition>> activeBuffModifiersBySourceKey = new(
         StringComparer.Ordinal
     );
 
@@ -47,13 +47,13 @@ public sealed class ModifierService : IDisposable
     private readonly CompositeDisposable disposables = new();
 
     public ModifierService(
-        IReadOnlyList<ModifierEntry> modifiers,
+        IReadOnlyList<ModifierDefinition> modifiers,
         UpgradeCatalog upgradeCatalog,
         NodeCatalog nodeCatalog,
         NodeInstanceCatalog nodeInstanceCatalog,
         UpgradeService upgradeService,
         SaveService saveService,
-        IReadOnlyList<MilestoneEntry> milestones
+        IReadOnlyList<MilestoneDefinition> milestones
     )
     {
         this.upgradeCatalog =
@@ -176,7 +176,7 @@ public sealed class ModifierService : IDisposable
             );
         }
 
-        var resolved = new List<ModifierEntry>();
+        var resolved = new List<ModifierDefinition>();
         for (int i = 0; i < effects.Count; i++)
         {
             var effect = effects[i];
@@ -412,7 +412,7 @@ public sealed class ModifierService : IDisposable
 
     private struct ActiveModifier
     {
-        public ModifierEntry Modifier;
+        public ModifierDefinition Modifier;
         public int PurchaseCount;
     }
 
@@ -428,7 +428,7 @@ public sealed class ModifierService : IDisposable
                 if (!purchased.TryGetValue(upgradeId, out var count) || count <= 0)
                     continue;
 
-                UpgradeEntry upgrade;
+                UpgradeDefinition upgrade;
                 try
                 {
                     upgrade = upgradeCatalog.GetRequired(upgradeId);
@@ -498,9 +498,9 @@ public sealed class ModifierService : IDisposable
         return active;
     }
 
-    private List<ModifierEntry> ResolveModifiersForUpgrade(UpgradeEntry upgrade)
+    private List<ModifierDefinition> ResolveModifiersForUpgrade(UpgradeDefinition upgrade)
     {
-        var resolved = new List<ModifierEntry>();
+        var resolved = new List<ModifierDefinition>();
         if (upgrade == null)
             return resolved;
 
@@ -593,9 +593,9 @@ public sealed class ModifierService : IDisposable
         return resolved;
     }
 
-    private List<ModifierEntry> ResolveModifiersForMilestone(MilestoneEntry milestone)
+    private List<ModifierDefinition> ResolveModifiersForMilestone(MilestoneDefinition milestone)
     {
-        var resolved = new List<ModifierEntry>();
+        var resolved = new List<ModifierDefinition>();
         if (milestone == null)
             return resolved;
 
@@ -664,7 +664,7 @@ public sealed class ModifierService : IDisposable
         return resolved;
     }
 
-    private void ValidateBuffModifierOrThrow(string buffId, ModifierEntry modifier)
+    private void ValidateBuffModifierOrThrow(string buffId, ModifierDefinition modifier)
     {
         if (modifier == null)
             throw new InvalidOperationException($"ModifierService: buff '{buffId}' has null modifier.");
@@ -692,7 +692,7 @@ public sealed class ModifierService : IDisposable
     }
 
     private bool TryResolveTargetInstanceIds(
-        ModifierEntry modifier,
+        ModifierDefinition modifier,
         TargetKind targetKind,
         out List<string> instanceIds
     )
@@ -803,7 +803,7 @@ public sealed class ModifierService : IDisposable
     }
 
     private bool TryResolveOperation(
-        ModifierEntry modifier,
+        ModifierDefinition modifier,
         TargetKind targetKind,
         out ModifierOp op
     )
@@ -850,7 +850,7 @@ public sealed class ModifierService : IDisposable
     }
 
     private bool TryParseTarget(
-        ModifierEntry modifier,
+        ModifierDefinition modifier,
         out TargetKind targetKind,
         out string targetResourceId
     )
@@ -946,7 +946,7 @@ public sealed class ModifierService : IDisposable
         return false;
     }
 
-    private static bool IsGlobalOrResourceScope(ModifierEntry modifier)
+    private static bool IsGlobalOrResourceScope(ModifierDefinition modifier)
     {
         var kind = (modifier.scope?.kind ?? string.Empty).Trim();
         return string.Equals(kind, "global", StringComparison.OrdinalIgnoreCase)
@@ -1019,7 +1019,7 @@ public sealed class ModifierService : IDisposable
     }
 
     private void ApplyAutomationSet(
-        ModifierEntry modifier,
+        ModifierDefinition modifier,
         IReadOnlyList<string> instanceIds,
         IDictionary<string, bool> automationByKey
     )

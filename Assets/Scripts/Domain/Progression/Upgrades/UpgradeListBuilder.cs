@@ -9,7 +9,7 @@ public sealed class UpgradeListBuilder
     private readonly UpgradeCatalog upgradeCatalog;
     private readonly UpgradeService upgradeService;
     private readonly GameDefinitionService gameDefinitionService;
-    private readonly Dictionary<string, ModifierEntry> modifiersById;
+    private readonly Dictionary<string, ModifierDefinition> modifiersById;
 
     public UpgradeListBuilder(
         UpgradeCatalog upgradeCatalog,
@@ -24,7 +24,7 @@ public sealed class UpgradeListBuilder
         this.gameDefinitionService =
             gameDefinitionService ?? throw new ArgumentNullException(nameof(gameDefinitionService));
 
-        modifiersById = new Dictionary<string, ModifierEntry>(StringComparer.Ordinal);
+        modifiersById = new Dictionary<string, ModifierDefinition>(StringComparer.Ordinal);
         var modifiers = gameDefinitionService.Modifiers;
         if (modifiers == null)
             return;
@@ -41,7 +41,7 @@ public sealed class UpgradeListBuilder
     }
 
     public IReadOnlyList<UpgradeEntryViewModel> BuildEntries(
-        Func<UpgradeEntry, bool> includeFilter = null
+        Func<UpgradeDefinition, bool> includeFilter = null
     )
     {
         includeFilter ??= _ => true;
@@ -111,12 +111,12 @@ public sealed class UpgradeListBuilder
         return entries;
     }
 
-    private List<ModifierEntry> ResolveModifiersFromEffectsStrict(
-        UpgradeEntry upgrade,
+    private List<ModifierDefinition> ResolveModifiersFromEffectsStrict(
+        UpgradeDefinition upgrade,
         ref bool isValidDefinition
     )
     {
-        var resolved = new List<ModifierEntry>();
+        var resolved = new List<ModifierDefinition>();
         var upgradeId = (upgrade?.id ?? string.Empty).Trim();
         var effects = upgrade?.effects;
 
@@ -162,7 +162,7 @@ public sealed class UpgradeListBuilder
         return resolved;
     }
 
-    private string BuildUpgradeSummary(IReadOnlyList<ModifierEntry> modifiers)
+    private string BuildUpgradeSummary(IReadOnlyList<ModifierDefinition> modifiers)
     {
         if (modifiers == null || modifiers.Count == 0)
             return "modifier-driven";
@@ -183,7 +183,7 @@ public sealed class UpgradeListBuilder
         return builder.Length > 0 ? builder.ToString() : "modifier-driven";
     }
 
-    private string BuildModifierSummary(ModifierEntry modifier)
+    private string BuildModifierSummary(ModifierDefinition modifier)
     {
         var target = (modifier.target ?? string.Empty).Trim();
         var hasParameterizedTarget = ParameterizedPathParser.TryParseModifierParameterizedPath(
@@ -262,7 +262,7 @@ public sealed class UpgradeListBuilder
     }
 
     private static bool TryGetPrimaryCost(
-        UpgradeEntry upgrade,
+        UpgradeDefinition upgrade,
         out string costResourceId,
         out double costAmount
     )

@@ -10,10 +10,10 @@ public sealed class MilestoneService : IDisposable
     private readonly ModifierService modifierService;
 
     private readonly Dictionary<string, string> nodeIdByGeneratorId = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, List<MilestoneEntry>> milestonesByNodeId = new(
+    private readonly Dictionary<string, List<MilestoneDefinition>> milestonesByNodeId = new(
         StringComparer.Ordinal
     );
-    private readonly Dictionary<string, ModifierEntry> modifiersById = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ModifierDefinition> modifiersById = new(StringComparer.Ordinal);
     private readonly HashSet<string> warnedMilestones = new(StringComparer.Ordinal);
     private readonly CompositeDisposable disposables = new();
 
@@ -152,7 +152,7 @@ public sealed class MilestoneService : IDisposable
         }
     }
 
-    private bool ValidateMilestone(MilestoneEntry milestone)
+    private bool ValidateMilestone(MilestoneDefinition milestone)
     {
         var milestoneId = (milestone?.id ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(milestoneId))
@@ -184,7 +184,7 @@ public sealed class MilestoneService : IDisposable
         return true;
     }
 
-    private void IndexMilestones(IReadOnlyList<MilestoneEntry> milestones)
+    private void IndexMilestones(IReadOnlyList<MilestoneDefinition> milestones)
     {
         if (milestones == null)
             return;
@@ -213,7 +213,7 @@ public sealed class MilestoneService : IDisposable
 
             if (!milestonesByNodeId.TryGetValue(nodeId, out var list) || list == null)
             {
-                list = new List<MilestoneEntry>();
+                list = new List<MilestoneDefinition>();
                 milestonesByNodeId[nodeId] = list;
             }
 
@@ -233,7 +233,7 @@ public sealed class MilestoneService : IDisposable
         }
     }
 
-    private void IndexModifiers(IReadOnlyList<ModifierEntry> modifiers)
+    private void IndexModifiers(IReadOnlyList<ModifierDefinition> modifiers)
     {
         if (modifiers == null)
             return;

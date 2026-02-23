@@ -153,7 +153,7 @@ public sealed class UnlockService : IDisposable
         unlockedById.Clear();
     }
 
-    private IObservable<bool> BuildRequirementsObservable(UnlockGraphEntry entry)
+    private IObservable<bool> BuildRequirementsObservable(UnlockGraphDefinition entry)
     {
         var requirements = entry?.requirements;
         if (requirements == null || requirements.Length == 0)
@@ -179,7 +179,7 @@ public sealed class UnlockService : IDisposable
     }
 
     private IObservable<bool> ObserveRequirement(
-        UnlockGraphEntry entry,
+        UnlockGraphDefinition entry,
         int requirementIndex,
         UnlockRequirement requirement
     )
@@ -328,10 +328,10 @@ public sealed class UnlockService : IDisposable
         return unlockProperty;
     }
 
-    private List<UnlockGraphEntry> GetUnlockEntriesForZone(string zoneId)
+    private List<UnlockGraphDefinition> GetUnlockEntriesForZone(string zoneId)
     {
         var allEntries = gameDefinitionService.UnlockGraph;
-        var zoneEntries = new List<UnlockGraphEntry>();
+        var zoneEntries = new List<UnlockGraphDefinition>();
 
         if (allEntries == null || allEntries.Count == 0)
             return zoneEntries;
@@ -368,7 +368,7 @@ public sealed class UnlockService : IDisposable
         return zoneEntries;
     }
 
-    private static HashSet<string> CollectTargetIds(IReadOnlyList<UnlockGraphEntry> entries)
+    private static HashSet<string> CollectTargetIds(IReadOnlyList<UnlockGraphDefinition> entries)
     {
         var targetIds = new HashSet<string>(StringComparer.Ordinal);
         if (entries == null)
@@ -410,7 +410,7 @@ public sealed class UnlockService : IDisposable
         return false;
     }
 
-    private static string ResolveTargetNodeInstanceId(UnlockGraphEntry entry)
+    private static string ResolveTargetNodeInstanceId(UnlockGraphDefinition entry)
     {
         var direct = NormalizeId(entry?.targetNodeInstanceId);
         if (!string.IsNullOrEmpty(direct))

@@ -10,7 +10,7 @@ public sealed class UpgradeService : IDisposable
     private readonly WalletService wallet;
     private readonly SaveService saveService;
     private readonly CompositeDisposable disposables = new();
-    private readonly Dictionary<string, ModifierEntry> modifiersById;
+    private readonly Dictionary<string, ModifierDefinition> modifiersById;
     private readonly HashSet<string> invalidUpgradeErrorsLogged = new(StringComparer.Ordinal);
     private readonly HashSet<string> affordabilityScanErrorsLogged = new(StringComparer.Ordinal);
     private readonly Subject<string> purchasedStateChanged = new();
@@ -27,13 +27,13 @@ public sealed class UpgradeService : IDisposable
         UpgradeCatalog catalog,
         WalletService wallet,
         SaveService saveService,
-        IReadOnlyList<ModifierEntry> modifiers
+        IReadOnlyList<ModifierDefinition> modifiers
     )
     {
         this.catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
-        modifiersById = new Dictionary<string, ModifierEntry>(StringComparer.Ordinal);
+        modifiersById = new Dictionary<string, ModifierDefinition>(StringComparer.Ordinal);
         if (modifiers != null)
         {
             for (int i = 0; i < modifiers.Count; i++)
@@ -219,7 +219,7 @@ public sealed class UpgradeService : IDisposable
         return true;
     }
 
-    private static CostItem[] GetRequiredCost(UpgradeEntry def)
+    private static CostItem[] GetRequiredCost(UpgradeDefinition def)
     {
         if (def?.cost == null || def.cost.Length == 0)
         {
@@ -231,7 +231,7 @@ public sealed class UpgradeService : IDisposable
         return def.cost;
     }
 
-    private static int GetMaxPurchases(UpgradeEntry def)
+    private static int GetMaxPurchases(UpgradeDefinition def)
     {
         if (def == null)
             return 0;
@@ -246,7 +246,7 @@ public sealed class UpgradeService : IDisposable
         return def.maxRank;
     }
 
-    private static bool IsAtMaxRank(UpgradeEntry def, int purchasedCount)
+    private static bool IsAtMaxRank(UpgradeDefinition def, int purchasedCount)
     {
         int maxPurchases = GetMaxPurchases(def);
         if (maxPurchases <= 0)
@@ -381,7 +381,7 @@ public sealed class UpgradeService : IDisposable
         return streams.Count > 0 ? Observable.Merge(streams) : Observable.Empty<Unit>();
     }
 
-    private bool HasAnyAffordableUpgrade(Func<UpgradeEntry, bool> includeFilter)
+    private bool HasAnyAffordableUpgrade(Func<UpgradeDefinition, bool> includeFilter)
     {
         var upgrades = catalog.Upgrades;
         if (upgrades == null || upgrades.Count == 0)
@@ -425,13 +425,13 @@ public sealed class UpgradeService : IDisposable
         }
     }
 
-    private static bool IsAutomationUpgrade(UpgradeEntry upgrade)
+    private static bool IsAutomationUpgrade(UpgradeDefinition upgrade)
     {
         var category = (upgrade?.category ?? string.Empty).Trim();
         return string.Equals(category, "Automation", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsNonAutomationUpgrade(UpgradeEntry upgrade) =>
+    private static bool IsNonAutomationUpgrade(UpgradeDefinition upgrade) =>
         !IsAutomationUpgrade(upgrade);
 
     private void LogAffordabilityScanError(string upgradeId, string details)
