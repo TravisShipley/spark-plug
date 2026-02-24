@@ -10,6 +10,7 @@ public class GeneratorService : IDisposable
     private readonly WalletService wallet;
     private readonly TickService tickService;
     private readonly ModifierService modifierService;
+    private readonly GameEventStream gameEventStream;
 
     private double lastIntervalSeconds;
 
@@ -80,7 +81,8 @@ public class GeneratorService : IDisposable
         GeneratorDefinition definition,
         WalletService wallet,
         TickService tickService,
-        ModifierService modifierService
+        ModifierService modifierService,
+        GameEventStream gameEventStream
     )
     {
         this.model = model;
@@ -102,6 +104,8 @@ public class GeneratorService : IDisposable
         this.tickService = tickService;
         this.modifierService =
             modifierService ?? throw new ArgumentNullException(nameof(modifierService));
+        this.gameEventStream =
+            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
         ValidateMilestoneLevels(definition.MilestoneLevels);
         RefreshFromModifiers();
@@ -228,7 +232,7 @@ public class GeneratorService : IDisposable
 
     public void HandleCollectPressed(double cashGenerated)
     {
-        EventSystem.OnIncrementBalance.OnNext((definition.OutputResourceId, cashGenerated));
+        gameEventStream.PublishIncrementBalance(definition.OutputResourceId, cashGenerated);
     }
 
     private double CalculateOutput()

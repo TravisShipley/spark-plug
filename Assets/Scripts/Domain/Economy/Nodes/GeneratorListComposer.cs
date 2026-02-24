@@ -13,6 +13,7 @@ public class GeneratorListComposer
     private readonly WalletViewModel walletViewModel;
     private readonly TickService tickService;
     private readonly ModifierService modifierService;
+    private readonly GameEventStream gameEventStream;
     private readonly UiServiceRegistry uiService;
     private readonly BuffService buffService;
     private readonly SaveService saveService;
@@ -40,6 +41,7 @@ public class GeneratorListComposer
         WalletViewModel walletViewModel,
         TickService tickService,
         ModifierService modifierService,
+        GameEventStream gameEventStream,
         BuffService buffService,
         UiServiceRegistry uiService,
         SaveService saveService,
@@ -57,6 +59,7 @@ public class GeneratorListComposer
         this.walletViewModel = walletViewModel;
         this.tickService = tickService;
         this.modifierService = modifierService;
+        this.gameEventStream = gameEventStream;
         this.buffService = buffService;
         this.uiService = uiService;
         this.saveService = saveService;
@@ -186,7 +189,8 @@ public class GeneratorListComposer
             generatorDefinition,
             walletService,
             tickService,
-            modifierService
+            modifierService,
+            gameEventStream
         );
 
         var generatorViewModel = new GeneratorViewModel(

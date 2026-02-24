@@ -47,6 +47,10 @@ public class GameCompositionRoot : MonoBehaviour
     [SerializeField]
     private Transform generatorUIContainer;
 
+    [Header("Debug UI")]
+    [SerializeField]
+    private ClearSaveButton clearSaveButton;
+
     private WalletService walletService;
     private UpgradeService upgradeService;
     private UpgradeListBuilder upgradeListBuilder;
@@ -63,6 +67,7 @@ public class GameCompositionRoot : MonoBehaviour
     private TickService tickService;
     private WalletViewModel walletViewModel;
     private SaveService saveService;
+    private GameEventStream gameEventStream;
 
     // Timing
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
@@ -109,6 +114,7 @@ public class GameCompositionRoot : MonoBehaviour
         unlockService.LoadUnlockedIds(saveService.Data?.UnlockedNodeInstanceIds);
 
         BindSceneUi(uiScreenService);
+        BindDebugUi();
         TryShowOfflineEarnings(uiScreenService);
 
         var generatorComposer = new GeneratorListComposer(
@@ -118,6 +124,7 @@ public class GameCompositionRoot : MonoBehaviour
             walletViewModel,
             tickService,
             modifierService,
+            gameEventStream,
             buffService,
             uiService,
             saveService,
@@ -139,11 +146,12 @@ public class GameCompositionRoot : MonoBehaviour
             gameDefinitionService,
             generatorServices,
             saveService,
-            modifierService
+            modifierService,
+            gameEventStream
         );
-        triggerService = new TriggerService(gameDefinitionService, walletService);
+        triggerService = new TriggerService(gameDefinitionService, walletService, gameEventStream);
 
-        EventSystem.OnResetSaveRequested.Subscribe(_ => HandleResetRequested()).AddTo(disposables);
+        gameEventStream.ResetSaveRequested.Subscribe(_ => HandleResetRequested()).AddTo(disposables);
     }
 
     private void InitializeCoreServices(out UiScreenService uiScreenService)
@@ -156,8 +164,13 @@ public class GameCompositionRoot : MonoBehaviour
         // Load content-driven definitions and build catalogs first.
         gameDefinitionService = new GameDefinitionService();
         saveService.Load(gameDefinitionService.Definition);
+        gameEventStream = new GameEventStream();
 
-        walletService = new WalletService(saveService, gameDefinitionService.ResourceCatalog);
+        walletService = new WalletService(
+            saveService,
+            gameDefinitionService.ResourceCatalog,
+            gameEventStream
+        );
         walletViewModel = new WalletViewModel(walletService);
 
         // Time source for simulation
@@ -251,6 +264,14 @@ public class GameCompositionRoot : MonoBehaviour
         uiRoot.Bind(uiCtx);
     }
 
+    private void BindDebugUi()
+    {
+        if (clearSaveButton == null)
+            return;
+
+        clearSaveButton.Bind(gameEventStream);
+    }
+
     private bool ValidateReferences()
     {
         if (generatorUIRootPrefab == null)
@@ -328,6 +349,7 @@ public class GameCompositionRoot : MonoBehaviour
         // Dispose core state last
         upgradeService?.Dispose();
         walletService?.Dispose();
+        gameEventStream?.Dispose();
     }
 
     private void OnApplicationPause(bool pauseStatus)

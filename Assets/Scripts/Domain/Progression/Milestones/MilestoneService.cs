@@ -8,6 +8,7 @@ public sealed class MilestoneService : IDisposable
     private readonly GameDefinitionService gameDefinitionService;
     private readonly SaveService saveService;
     private readonly ModifierService modifierService;
+    private readonly GameEventStream gameEventStream;
 
     private readonly Dictionary<string, string> nodeIdByGeneratorId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<MilestoneDefinition>> milestonesByNodeId = new(
@@ -21,7 +22,8 @@ public sealed class MilestoneService : IDisposable
         GameDefinitionService gameDefinitionService,
         IReadOnlyList<GeneratorService> generators,
         SaveService saveService,
-        ModifierService modifierService
+        ModifierService modifierService,
+        GameEventStream gameEventStream
     )
     {
         this.gameDefinitionService =
@@ -29,6 +31,8 @@ public sealed class MilestoneService : IDisposable
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
         this.modifierService =
             modifierService ?? throw new ArgumentNullException(nameof(modifierService));
+        this.gameEventStream =
+            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
         IndexMilestones(gameDefinitionService.Milestones);
         IndexModifiers(gameDefinitionService.Modifiers);
@@ -123,8 +127,8 @@ public sealed class MilestoneService : IDisposable
                 continue;
 
             saveService.MarkMilestoneFired(milestoneId, requestSave: false);
-            EventSystem.OnMilestoneFired.OnNext(
-                new EventSystem.MilestoneFiredEvent(
+            gameEventStream.PublishMilestoneFired(
+                new GameEventStream.MilestoneFiredEvent(
                     milestoneId,
                     (milestone.nodeId ?? string.Empty).Trim(),
                     (milestone.zoneId ?? string.Empty).Trim(),

@@ -20,19 +20,26 @@ public sealed class TriggerService : IDisposable
         StringComparer.Ordinal
     );
     private readonly RewardService rewardService;
+    private readonly GameEventStream gameEventStream;
     private readonly CompositeDisposable disposables = new();
 
-    public TriggerService(GameDefinitionService gameDefinitionService, WalletService walletService)
+    public TriggerService(
+        GameDefinitionService gameDefinitionService,
+        WalletService walletService,
+        GameEventStream gameEventStream
+    )
     {
         if (gameDefinitionService == null)
             throw new ArgumentNullException(nameof(gameDefinitionService));
         if (walletService == null)
             throw new ArgumentNullException(nameof(walletService));
+        this.gameEventStream =
+            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
         rewardService = new RewardService(gameDefinitionService, walletService);
         IndexTriggers(gameDefinitionService.Triggers);
 
-        EventSystem.OnMilestoneFired.Subscribe(OnMilestoneFired).AddTo(disposables);
+        this.gameEventStream.MilestoneFired.Subscribe(OnMilestoneFired).AddTo(disposables);
     }
 
     public void Dispose()
@@ -77,7 +84,7 @@ public sealed class TriggerService : IDisposable
         }
     }
 
-    private void OnMilestoneFired(EventSystem.MilestoneFiredEvent evt)
+    private void OnMilestoneFired(GameEventStream.MilestoneFiredEvent evt)
     {
         if (!triggersByEventType.TryGetValue(MilestoneFiredEventType, out var triggers))
             return;
@@ -97,7 +104,10 @@ public sealed class TriggerService : IDisposable
         }
     }
 
-    private bool EvaluateConditions(TriggerDefinition trigger, EventSystem.MilestoneFiredEvent evt)
+    private bool EvaluateConditions(
+        TriggerDefinition trigger,
+        GameEventStream.MilestoneFiredEvent evt
+    )
     {
         var conditions = trigger.conditions;
         if (conditions == null || conditions.Length == 0)

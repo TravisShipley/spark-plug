@@ -9,23 +9,30 @@ public class WalletService : IDisposable
     private readonly CompositeDisposable disposables = new();
     private readonly SaveService saveService;
     private readonly ResourceCatalog resourceCatalog;
+    private readonly GameEventStream gameEventStream;
     private ModifierService modifierService;
     private readonly Dictionary<string, ReactiveProperty<double>> balancesByResourceId = new(
         StringComparer.Ordinal
     );
 
-    public WalletService(SaveService saveService, ResourceCatalog resourceCatalog)
+    public WalletService(
+        SaveService saveService,
+        ResourceCatalog resourceCatalog,
+        GameEventStream gameEventStream
+    )
     {
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
         this.resourceCatalog =
             resourceCatalog ?? throw new ArgumentNullException(nameof(resourceCatalog));
+        this.gameEventStream =
+            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
         InitializeBalances();
         LoadFromSave();
         WirePersistence();
 
-        EventSystem
-            .OnIncrementBalance.Subscribe(tuple => Add(tuple.resourceId, tuple.amount))
+        this.gameEventStream
+            .IncrementBalance.Subscribe(tuple => Add(tuple.resourceId, tuple.amount))
             .AddTo(disposables);
     }
 
