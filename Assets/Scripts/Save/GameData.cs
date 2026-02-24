@@ -13,6 +13,13 @@ public class GameData : ISerializationCallbackReceiver
     }
 
     [Serializable]
+    public class LifetimeEarningData
+    {
+        public string ResourceId;
+        public double Amount;
+    }
+
+    [Serializable]
     public class GeneratorStateData
     {
         public string Id;
@@ -38,6 +45,7 @@ public class GameData : ISerializationCallbackReceiver
     public List<GeneratorStateData> Generators = new();
     public List<UpgradeStateData> Upgrades = new();
     public List<ResourceBalanceData> Resources = new();
+    public List<LifetimeEarningData> LifetimeEarnings = new();
     public string ActiveBuffId;
     public long ActiveBuffExpiresAtUnixSeconds;
     public long lastSeenUnixSeconds;
@@ -62,6 +70,7 @@ public class GameData : ISerializationCallbackReceiver
         Generators ??= new List<GeneratorStateData>();
         Upgrades ??= new List<UpgradeStateData>();
         Resources ??= new List<ResourceBalanceData>();
+        LifetimeEarnings ??= new List<LifetimeEarningData>();
         ActiveBuffId = (ActiveBuffId ?? string.Empty).Trim();
         if (ActiveBuffExpiresAtUnixSeconds < 0)
             ActiveBuffExpiresAtUnixSeconds = 0;

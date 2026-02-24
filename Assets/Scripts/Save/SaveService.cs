@@ -12,6 +12,7 @@ public sealed class SaveService : IDisposable
     private readonly CompositeDisposable disposables = new();
     private readonly Subject<Unit> saveRequests = new();
     private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(250);
+    private bool hasPendingScopedResetReload;
 
     public GameData Data { get; private set; }
     public long LastSeenUnixSeconds => Data?.lastSeenUnixSeconds ?? 0;
@@ -40,6 +41,7 @@ public sealed class SaveService : IDisposable
 
         bool changed;
         Data = BuildFromDefaults(definition, loaded, out changed);
+        hasPendingScopedResetReload = false;
 
         if (!hadSave || loaded == null || changed)
             SaveNow();
@@ -51,6 +53,7 @@ public sealed class SaveService : IDisposable
             throw new ArgumentNullException(nameof(definition));
 
         Data = CreateDefaultSaveData(definition);
+        hasPendingScopedResetReload = false;
         SaveSystem.DeleteSaveFile();
         SaveNow();
     }
@@ -157,6 +160,58 @@ public sealed class SaveService : IDisposable
             return;
 
         entry.Amount = amount;
+        if (requestSave)
+            RequestSave();
+    }
+
+    public double GetLifetimeEarnings(string resourceId)
+    {
+        var id = NormalizeId(resourceId);
+        if (string.IsNullOrEmpty(id))
+            return 0d;
+
+        EnsureDataInitialized();
+        Data.LifetimeEarnings ??= new List<GameData.LifetimeEarningData>();
+
+        var entry = Data.LifetimeEarnings.Find(
+            e => e != null && string.Equals(NormalizeId(e.ResourceId), id, StringComparison.Ordinal)
+        );
+
+        return entry?.Amount ?? 0d;
+    }
+
+    public void AddLifetimeEarnings(string resourceId, double amount, bool requestSave = true)
+    {
+        var id = NormalizeId(resourceId);
+        if (string.IsNullOrEmpty(id))
+            return;
+
+        if (double.IsNaN(amount) || double.IsInfinity(amount))
+            throw new InvalidOperationException(
+                $"SaveService.AddLifetimeEarnings: invalid amount '{amount}' for resource '{id}'."
+            );
+
+        if (amount <= 0d)
+            return;
+
+        EnsureDataInitialized();
+        Data.LifetimeEarnings ??= new List<GameData.LifetimeEarningData>();
+
+        var entry = Data.LifetimeEarnings.Find(
+            e => e != null && string.Equals(NormalizeId(e.ResourceId), id, StringComparison.Ordinal)
+        );
+
+        if (entry == null)
+        {
+            Data.LifetimeEarnings.Add(
+                new GameData.LifetimeEarningData { ResourceId = id, Amount = amount }
+            );
+            if (requestSave)
+                RequestSave();
+            return;
+        }
+
+        entry.Amount += amount;
         if (requestSave)
             RequestSave();
     }
@@ -440,6 +495,223 @@ public sealed class SaveService : IDisposable
             RequestSave();
     }
 
+    public bool ConsumePendingScopedResetReload()
+    {
+        var pending = hasPendingScopedResetReload;
+        hasPendingScopedResetReload = false;
+        return pending;
+    }
+
+    public void ApplyPrestigeResetScopes(
+        GameDefinition definition,
+        PrestigeDefinition prestige,
+        ResourceCatalog resourceCatalog,
+        bool requestSave = true
+    )
+    {
+        if (definition == null)
+            throw new ArgumentNullException(nameof(definition));
+        if (prestige == null)
+            throw new ArgumentNullException(nameof(prestige));
+        if (resourceCatalog == null)
+            throw new ArgumentNullException(nameof(resourceCatalog));
+        if (prestige.resetScopes == null)
+            throw new InvalidOperationException("SaveService: prestige.resetScopes is missing.");
+
+        if (prestige.resetScopes.keepUnlocks != null && prestige.resetScopes.keepUnlocks.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "SaveService: prestige.resetScopes.keepUnlocks is not supported in this slice."
+            );
+        }
+
+        if (
+            prestige.resetScopes.keepUpgrades != null
+            && prestige.resetScopes.keepUpgrades.Length > 0
+        )
+        {
+            throw new InvalidOperationException(
+                "SaveService: prestige.resetScopes.keepUpgrades is not supported in this slice."
+            );
+        }
+
+        if (
+            prestige.resetScopes.keepProjects != null
+            && prestige.resetScopes.keepProjects.Length > 0
+        )
+        {
+            throw new InvalidOperationException(
+                "SaveService: prestige.resetScopes.keepProjects is not supported in this slice."
+            );
+        }
+
+        EnsureDataInitialized();
+        var defaults = CreateDefaultSaveData(definition);
+
+        var resourceKindById = new Dictionary<string, string>(StringComparer.Ordinal);
+        var resources = resourceCatalog.Resources;
+        if (resources != null)
+        {
+            for (int i = 0; i < resources.Count; i++)
+            {
+                var resource = resources[i];
+                var resourceId = NormalizeId(resource?.id);
+                if (string.IsNullOrEmpty(resourceId))
+                    continue;
+
+                if (!resourceKindById.ContainsKey(resourceId))
+                    resourceKindById[resourceId] = NormalizeId(resource?.kind);
+            }
+        }
+
+        if (prestige.resetScopes.resetNodes)
+        {
+            Data.Generators.Clear();
+            for (int i = 0; i < defaults.Generators.Count; i++)
+            {
+                var entry = defaults.Generators[i];
+                if (entry == null)
+                    continue;
+
+                Data.Generators.Add(
+                    new GameData.GeneratorStateData
+                    {
+                        Id = entry.Id,
+                        IsOwned = entry.IsOwned,
+                        IsEnabled = entry.IsEnabled,
+                        Level = entry.Level,
+                        IsAutomationPurchased = entry.IsAutomationPurchased,
+                        IsAutomated = entry.IsAutomated,
+                    }
+                );
+            }
+
+            Data.UnlockedNodeInstanceIds.Clear();
+            foreach (var id in defaults.UnlockedNodeInstanceIds)
+                Data.UnlockedNodeInstanceIds.Add(id);
+        }
+        else
+        {
+            Data.UnlockedNodeInstanceIds.Clear();
+        }
+
+        Data.Upgrades.Clear();
+        Data.FiredMilestoneIds.Clear();
+        ClearActiveBuffState(requestSave: false);
+
+        if (Data.Resources == null)
+            Data.Resources = new List<GameData.ResourceBalanceData>();
+
+        for (int i = 0; i < defaults.Resources.Count; i++)
+        {
+            var defaultEntry = defaults.Resources[i];
+            var resourceId = NormalizeId(defaultEntry?.ResourceId);
+            if (string.IsNullOrEmpty(resourceId))
+                continue;
+
+            var exists = Data.Resources.Exists(
+                r => r != null && string.Equals(NormalizeId(r.ResourceId), resourceId, StringComparison.Ordinal)
+            );
+            if (exists)
+                continue;
+
+            Data.Resources.Add(
+                new GameData.ResourceBalanceData { ResourceId = resourceId, Amount = 0d }
+            );
+        }
+
+        for (int i = 0; i < Data.Resources.Count; i++)
+        {
+            var balance = Data.Resources[i];
+            if (balance == null)
+                continue;
+
+            var resourceId = NormalizeId(balance.ResourceId);
+            if (string.IsNullOrEmpty(resourceId))
+                continue;
+
+            var kind = resourceKindById.TryGetValue(resourceId, out var resolvedKind)
+                ? resolvedKind
+                : string.Empty;
+
+            if (
+                string.Equals(
+                    resourceId,
+                    NormalizeId(prestige.prestigeResource),
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                continue;
+            }
+
+            if (
+                prestige.resetScopes.resetSoftCurrencies
+                && string.Equals(kind, "softCurrency", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                balance.Amount = 0d;
+                continue;
+            }
+
+            if (
+                !prestige.resetScopes.keepHardCurrencies
+                && string.Equals(kind, "hardCurrency", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                balance.Amount = 0d;
+            }
+        }
+
+        if (Data.LifetimeEarnings == null)
+            Data.LifetimeEarnings = new List<GameData.LifetimeEarningData>();
+
+        for (int i = 0; i < defaults.LifetimeEarnings.Count; i++)
+        {
+            var defaultEntry = defaults.LifetimeEarnings[i];
+            var resourceId = NormalizeId(defaultEntry?.ResourceId);
+            if (string.IsNullOrEmpty(resourceId))
+                continue;
+
+            var exists = Data.LifetimeEarnings.Exists(
+                r => r != null && string.Equals(NormalizeId(r.ResourceId), resourceId, StringComparison.Ordinal)
+            );
+            if (exists)
+                continue;
+
+            Data.LifetimeEarnings.Add(
+                new GameData.LifetimeEarningData { ResourceId = resourceId, Amount = 0d }
+            );
+        }
+
+        if (prestige.resetScopes.resetSoftCurrencies)
+        {
+            for (int i = 0; i < Data.LifetimeEarnings.Count; i++)
+            {
+                var entry = Data.LifetimeEarnings[i];
+                if (entry == null)
+                    continue;
+
+                var resourceId = NormalizeId(entry.ResourceId);
+                if (string.IsNullOrEmpty(resourceId))
+                    continue;
+
+                var kind = resourceKindById.TryGetValue(resourceId, out var resolvedKind)
+                    ? resolvedKind
+                    : string.Empty;
+
+                if (string.Equals(kind, "softCurrency", StringComparison.OrdinalIgnoreCase))
+                    entry.Amount = 0d;
+            }
+        }
+
+        SortFactLists();
+        hasPendingScopedResetReload = true;
+
+        if (requestSave)
+            SaveNow();
+    }
+
     public GameData CreateDefaultSaveData(GameDefinition definition)
     {
         if (definition == null)
@@ -449,6 +721,7 @@ public sealed class SaveService : IDisposable
         data.EnsureInitialized();
         data.lastSeenUnixSeconds = GetCurrentUnixSeconds();
         data.Resources.Clear();
+        data.LifetimeEarnings.Clear();
         data.Generators.Clear();
         data.Upgrades.Clear();
         data.ActiveBuffId = string.Empty;
@@ -467,6 +740,9 @@ public sealed class SaveService : IDisposable
 
                 data.Resources.Add(
                     new GameData.ResourceBalanceData { ResourceId = resourceId, Amount = 0d }
+                );
+                data.LifetimeEarnings.Add(
+                    new GameData.LifetimeEarningData { ResourceId = resourceId, Amount = 0d }
                 );
             }
         }
@@ -634,6 +910,52 @@ public sealed class SaveService : IDisposable
 
             var id = NormalizeId(entry.ResourceId);
             if (resourceMap.TryGetValue(id, out var amount))
+                entry.Amount = amount;
+            else
+                changed = true;
+        }
+
+        var lifetimeMap = new Dictionary<string, double>(StringComparer.Ordinal);
+        if (loaded.LifetimeEarnings != null)
+        {
+            for (int i = 0; i < loaded.LifetimeEarnings.Count; i++)
+            {
+                var entry = loaded.LifetimeEarnings[i];
+                var id = NormalizeId(entry?.ResourceId);
+                if (string.IsNullOrEmpty(id))
+                {
+                    changed = true;
+                    continue;
+                }
+
+                if (!validResourceIds.Contains(id))
+                {
+                    Debug.LogWarning(
+                        $"SaveService: Save references missing lifetimeEarnings resource id '{id}'. Skipping."
+                    );
+                    changed = true;
+                    continue;
+                }
+
+                var amount = Math.Max(0d, entry?.Amount ?? 0d);
+                if (!lifetimeMap.TryAdd(id, amount))
+                {
+                    Debug.LogWarning(
+                        $"SaveService: Duplicate lifetimeEarnings resource id '{id}'. Using first value."
+                    );
+                    changed = true;
+                }
+            }
+        }
+
+        for (int i = 0; i < merged.LifetimeEarnings.Count; i++)
+        {
+            var entry = merged.LifetimeEarnings[i];
+            if (entry == null)
+                continue;
+
+            var id = NormalizeId(entry.ResourceId);
+            if (lifetimeMap.TryGetValue(id, out var amount))
                 entry.Amount = amount;
             else
                 changed = true;
@@ -855,6 +1177,14 @@ public sealed class SaveService : IDisposable
             return;
 
         data.Resources?.Sort(
+            (a, b) =>
+                string.Compare(
+                    NormalizeId(a?.ResourceId),
+                    NormalizeId(b?.ResourceId),
+                    StringComparison.Ordinal
+                )
+        );
+        data.LifetimeEarnings?.Sort(
             (a, b) =>
                 string.Compare(
                     NormalizeId(a?.ResourceId),

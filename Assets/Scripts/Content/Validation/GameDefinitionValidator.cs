@@ -178,6 +178,7 @@ public static class GameDefinitionValidator
         var buffIds = new HashSet<string>(StringComparer.Ordinal);
         ValidateBuffEntries(gd.buffs, modifierIds, buffIds, errors);
         ValidateFormulaPaths(gd, resourceIds, errors);
+        ValidatePrestigeConfiguration(gd, resourceIds, errors);
 
         // Optional reference check: when modifier.source is set, it should point to a known content id.
         if (gd.modifiers != null)
@@ -753,6 +754,114 @@ public static class GameDefinitionValidator
         {
             errors.Add(
                 $"modifiers[{modifierIndex}] ('{modifier.id}') source '{source}' does not match any buffs.id."
+            );
+        }
+    }
+
+    private static void ValidatePrestigeConfiguration(
+        GameDefinition definition,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        var prestige = definition?.prestige;
+        if (prestige == null || !prestige.enabled)
+            return;
+
+        var prestigeResource = (prestige.prestigeResource ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(prestigeResource))
+        {
+            errors.Add("prestige.enabled is true but prestige.prestigeResource is empty.");
+        }
+        else if (!resourceIds.Contains(prestigeResource))
+        {
+            errors.Add(
+                $"prestige.prestigeResource '{prestigeResource}' does not match any resources.id."
+            );
+        }
+
+        var formula = prestige.formula;
+        if (formula == null)
+        {
+            errors.Add("prestige.enabled is true but prestige.formula is missing.");
+        }
+        else
+        {
+            var formulaType = (formula.type ?? string.Empty).Trim();
+            if (!string.Equals(formulaType, "sqrt", StringComparison.Ordinal))
+            {
+                errors.Add(
+                    $"prestige.formula.type '{formulaType}' is unsupported. Only 'sqrt' is supported in this slice."
+                );
+            }
+
+            var formulaBasedOn = (formula.basedOn ?? string.Empty).Trim();
+            if (!string.Equals(formulaBasedOn, "lifetimeEarnings[currencySoft]", StringComparison.Ordinal))
+            {
+                errors.Add(
+                    $"prestige.formula.basedOn '{formulaBasedOn}' is unsupported. Expected 'lifetimeEarnings[currencySoft]' in this slice."
+                );
+            }
+        }
+
+        var resetScopes = prestige.resetScopes;
+        if (resetScopes == null)
+        {
+            errors.Add("prestige.enabled is true but prestige.resetScopes is missing.");
+        }
+        else
+        {
+            if (resetScopes.keepUnlocks != null && resetScopes.keepUnlocks.Length > 0)
+            {
+                errors.Add(
+                    "prestige.resetScopes.keepUnlocks is not supported in this slice. Expected empty array."
+                );
+            }
+
+            if (resetScopes.keepUpgrades != null && resetScopes.keepUpgrades.Length > 0)
+            {
+                errors.Add(
+                    "prestige.resetScopes.keepUpgrades is not supported in this slice. Expected empty array."
+                );
+            }
+
+            if (resetScopes.keepProjects != null && resetScopes.keepProjects.Length > 0)
+            {
+                errors.Add(
+                    "prestige.resetScopes.keepProjects is not supported in this slice. Expected empty array."
+                );
+            }
+        }
+
+        var metaUpgrades = prestige.metaUpgrades;
+        if (metaUpgrades == null || metaUpgrades.Length == 0 || metaUpgrades[0] == null)
+        {
+            errors.Add(
+                "prestige.enabled is true but prestige.metaUpgrades[0] is missing. One linear meta upgrade is required in this slice."
+            );
+            return;
+        }
+
+        var computed = metaUpgrades[0].computed;
+        if (computed == null)
+        {
+            errors.Add("prestige.metaUpgrades[0].computed is missing.");
+            return;
+        }
+
+        var computedType = (computed.type ?? string.Empty).Trim();
+        if (!string.Equals(computedType, "linear", StringComparison.Ordinal))
+        {
+            errors.Add(
+                $"prestige.metaUpgrades[0].computed.type '{computedType}' is unsupported. Only 'linear' is supported in this slice."
+            );
+        }
+
+        var computedBasedOn = (computed.basedOn ?? string.Empty).Trim();
+        if (!string.Equals(computedBasedOn, "resource[currencyMeta]", StringComparison.Ordinal))
+        {
+            errors.Add(
+                $"prestige.metaUpgrades[0].computed.basedOn '{computedBasedOn}' is unsupported. Expected 'resource[currencyMeta]' in this slice."
             );
         }
     }

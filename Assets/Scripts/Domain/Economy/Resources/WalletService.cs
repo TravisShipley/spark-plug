@@ -266,7 +266,23 @@ public class WalletService : IDisposable
         if (amount > 0d && applyResourceGainMultiplier && modifierService != null)
             amount *= modifierService.GetResourceGainMultiplier(resourceId);
 
-        var balance = GetBalancePropertyInternal(resourceId);
+        var normalizedResourceId = NormalizeResourceId(resourceId);
+        if (amount > 0d && IsSoftCurrency(normalizedResourceId))
+            saveService.AddLifetimeEarnings(normalizedResourceId, amount, requestSave: false);
+
+        var balance = GetBalancePropertyInternal(normalizedResourceId);
         balance.Value += amount;
+    }
+
+    private bool IsSoftCurrency(string resourceId)
+    {
+        if (!resourceCatalog.TryGet(resourceId, out var definition) || definition == null)
+            return false;
+
+        return string.Equals(
+            (definition.kind ?? string.Empty).Trim(),
+            "softCurrency",
+            StringComparison.OrdinalIgnoreCase
+        );
     }
 }

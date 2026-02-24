@@ -57,11 +57,13 @@ public class GameCompositionRoot : MonoBehaviour
     private UpgradesScreenViewModel upgradesScreenViewModel;
     private ManagersScreenViewModel managersScreenViewModel;
     private AdBoostScreenViewModel adBoostScreenViewModel;
+    private PrestigeScreenViewModel prestigeScreenViewModel;
     private BuffService buffService;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
     private TriggerService triggerService;
     private UnlockService unlockService;
+    private PrestigeService prestigeService;
     private OfflineProgressCalculator offlineProgressCalculator;
     private GameDefinitionService gameDefinitionService;
     private TickService tickService;
@@ -186,6 +188,12 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             gameDefinitionService.Modifiers
         );
+        prestigeService = new PrestigeService(
+            gameDefinitionService,
+            saveService,
+            walletService,
+            gameEventStream
+        );
         modifierService = new ModifierService(
             gameDefinitionService.Modifiers,
             gameDefinitionService.Catalog,
@@ -193,7 +201,8 @@ public class GameCompositionRoot : MonoBehaviour
             gameDefinitionService.NodeInstanceCatalog,
             upgradeService,
             saveService,
-            gameDefinitionService.Milestones
+            gameDefinitionService.Milestones,
+            prestigeService
         );
         buffService = new BuffService(
             saveService,
@@ -226,9 +235,11 @@ public class GameCompositionRoot : MonoBehaviour
             gameDefinitionService.BuffCatalog,
             CloseTopScreen
         );
+        prestigeScreenViewModel = new PrestigeScreenViewModel(prestigeService, CloseTopScreen);
         uiScreenManager.UpgradesScreenViewModel = upgradesScreenViewModel;
         uiScreenManager.ManagersScreenViewModel = managersScreenViewModel;
         uiScreenManager.AdBoostScreenViewModel = adBoostScreenViewModel;
+        uiScreenManager.PrestigeScreenViewModel = prestigeScreenViewModel;
 
         // Domain-facing screen API (intent-based)
         uiScreenService = new UiScreenService(uiScreenManager, walletService);
@@ -344,10 +355,12 @@ public class GameCompositionRoot : MonoBehaviour
         upgradesScreenViewModel?.Dispose();
         managersScreenViewModel?.Dispose();
         adBoostScreenViewModel?.Dispose();
+        prestigeScreenViewModel?.Dispose();
         walletViewModel?.Dispose();
 
         // Dispose core state last
         upgradeService?.Dispose();
+        prestigeService?.Dispose();
         walletService?.Dispose();
         gameEventStream?.Dispose();
     }
@@ -370,7 +383,10 @@ public class GameCompositionRoot : MonoBehaviour
         if (saveService == null || gameDefinitionService?.Definition == null)
             return;
 
-        saveService.Reset(gameDefinitionService.Definition);
+        if (!saveService.ConsumePendingScopedResetReload())
+            saveService.Reset(gameDefinitionService.Definition);
+        else
+            saveService.SaveNow();
 
         // For testing: a full scene reload guarantees all services, models, and views reset cleanly
         // without needing every ViewModel/View to support re-initialization.
@@ -427,4 +443,16 @@ public class GameCompositionRoot : MonoBehaviour
     {
         uiScreenManager?.CloseTop();
     }
+
+    /*
+    Prestige smoke checklist:
+    - Earn currencySoft and verify lifetime earnings increase.
+    - Open Prestige and confirm preview gain is > 0.
+    - Perform prestige and confirm:
+      nodes + upgrades + milestones/unlocks reset,
+      currencySoft resets,
+      currencyHard is preserved,
+      currencyMeta increases.
+    - After reload, verify currencySoft income is higher from prestige multiplier.
+    */
 }

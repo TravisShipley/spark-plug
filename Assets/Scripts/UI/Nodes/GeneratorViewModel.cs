@@ -60,7 +60,8 @@ public class GeneratorViewModel : IDisposable
             .CombineLatest(
                 generatorService.Level.DistinctUntilChanged(),
                 generatorService.OutputMultiplier.DistinctUntilChanged(),
-                (level, mult) => definition.BaseOutputPerCycle * level * mult
+                generatorService.ResourceGainMultiplier.DistinctUntilChanged(),
+                (level, outputMult, gainMult) => definition.BaseOutputPerCycle * level * outputMult * gainMult
             )
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);

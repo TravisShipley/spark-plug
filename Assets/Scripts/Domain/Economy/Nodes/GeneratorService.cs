@@ -20,6 +20,8 @@ public class GeneratorService : IDisposable
 
     private readonly ReactiveProperty<double> outputMultiplier = new(1.0);
     public IReadOnlyReactiveProperty<double> OutputMultiplier => outputMultiplier;
+    private readonly ReactiveProperty<double> resourceGainMultiplier = new(1.0);
+    public IReadOnlyReactiveProperty<double> ResourceGainMultiplier => resourceGainMultiplier;
 
     private readonly ReactiveProperty<double> speedMultiplier = new(1.0);
     public IReadOnlyReactiveProperty<double> SpeedMultiplier => speedMultiplier;
@@ -244,11 +246,11 @@ public class GeneratorService : IDisposable
     private void QueueCompletedCyclePayout()
     {
         var payout = CalculateOutput();
-        var resourceGain = modifierService.GetResourceGainMultiplier(definition.OutputResourceId);
-        if (double.IsNaN(resourceGain) || double.IsInfinity(resourceGain) || resourceGain <= 0)
-            resourceGain = 1.0;
+        var gainMultiplier = resourceGainMultiplier.Value;
+        if (double.IsNaN(gainMultiplier) || double.IsInfinity(gainMultiplier) || gainMultiplier <= 0)
+            gainMultiplier = 1.0;
 
-        model.PendingPayout += payout * resourceGain;
+        model.PendingPayout += payout * gainMultiplier;
         model.HasPendingPayout = model.PendingPayout > 0;
         RefreshCanCollectState();
     }
@@ -352,6 +354,7 @@ public class GeneratorService : IDisposable
         milestoneProgressRatio.Dispose();
         isRunning.Dispose();
         outputMultiplier.Dispose();
+        resourceGainMultiplier.Dispose();
         speedMultiplier.Dispose();
         cycleDurationSeconds.Dispose();
         nextLevelCost.Dispose();
@@ -391,6 +394,17 @@ public class GeneratorService : IDisposable
         if (double.IsNaN(newOutputMult) || double.IsInfinity(newOutputMult) || newOutputMult <= 0)
             newOutputMult = 1.0;
         outputMultiplier.Value = newOutputMult;
+
+        var newResourceGainMult = modifierService.GetResourceGainMultiplier(definition.OutputResourceId);
+        if (
+            double.IsNaN(newResourceGainMult)
+            || double.IsInfinity(newResourceGainMult)
+            || newResourceGainMult <= 0
+        )
+        {
+            newResourceGainMult = 1.0;
+        }
+        resourceGainMultiplier.Value = newResourceGainMult;
 
         var previousSpeedMult = speedMultiplier.Value;
         var newSpeedMult = modifierService.GetNodeSpeedMultiplier(definition.Id);

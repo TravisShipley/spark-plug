@@ -31,6 +31,9 @@ public sealed class UiScreenService
     public void ShowAdBoost() =>
         uiScreenManager.Show("AD_BOOST", uiScreenManager.AdBoostScreenViewModel);
 
+    public void ShowPrestige() =>
+        uiScreenManager.Show("PRESTIGE", uiScreenManager.PrestigeScreenViewModel);
+
     public void ShowOfflineEarnings(OfflineSessionResult result)
     {
         var viewModel = new OfflineEarningsViewModel(result, walletService, CloseTop);

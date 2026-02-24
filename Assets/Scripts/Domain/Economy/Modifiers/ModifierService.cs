@@ -11,6 +11,7 @@ public sealed class ModifierService : IDisposable
     private readonly NodeInstanceCatalog nodeInstanceCatalog;
     private readonly UpgradeService upgradeService;
     private readonly SaveService saveService;
+    private readonly PrestigeService prestigeService;
 
     private readonly Dictionary<string, ModifierDefinition> modifiersById = new(StringComparer.Ordinal);
     private readonly List<ModifierDefinition> modifiers = new();
@@ -53,7 +54,8 @@ public sealed class ModifierService : IDisposable
         NodeInstanceCatalog nodeInstanceCatalog,
         UpgradeService upgradeService,
         SaveService saveService,
-        IReadOnlyList<MilestoneDefinition> milestones
+        IReadOnlyList<MilestoneDefinition> milestones,
+        PrestigeService prestigeService
     )
     {
         this.upgradeCatalog =
@@ -64,6 +66,7 @@ public sealed class ModifierService : IDisposable
         this.upgradeService =
             upgradeService ?? throw new ArgumentNullException(nameof(upgradeService));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
+        this.prestigeService = prestigeService;
 
         if (modifiers != null)
         {
@@ -116,6 +119,11 @@ public sealed class ModifierService : IDisposable
             .Subscribe(triggerUpgradeId => RebuildActiveModifiers(triggerUpgradeId))
             .AddTo(disposables);
 
+        if (this.prestigeService != null)
+        {
+            this.prestigeService.Changed.Subscribe(_ => changed.OnNext(Unit.Default)).AddTo(disposables);
+        }
+
         RebuildActiveModifiers("startup");
     }
 
@@ -151,7 +159,21 @@ public sealed class ModifierService : IDisposable
     public double GetResourceGainMultiplier(string resourceId)
     {
         var key = NormalizeId(resourceId, nameof(resourceId));
-        return resourceGainByResourceId.TryGetValue(key, out var value) ? value : 1.0;
+        var value = resourceGainByResourceId.TryGetValue(key, out var baseValue) ? baseValue : 1.0;
+        if (prestigeService == null)
+            return value;
+
+        var prestigeMultiplier = prestigeService.GetIncomeMultiplierForResource(key);
+        if (
+            double.IsNaN(prestigeMultiplier)
+            || double.IsInfinity(prestigeMultiplier)
+            || prestigeMultiplier <= 0d
+        )
+        {
+            prestigeMultiplier = 1d;
+        }
+
+        return value * prestigeMultiplier;
     }
 
     public bool IsNodeAutomationEnabled(string nodeInstanceId)

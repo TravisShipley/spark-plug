@@ -57,6 +57,7 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     public UpgradesScreenViewModel UpgradesScreenViewModel { get; set; }
     public ManagersScreenViewModel ManagersScreenViewModel { get; set; }
     public AdBoostScreenViewModel AdBoostScreenViewModel { get; set; }
+    public PrestigeScreenViewModel PrestigeScreenViewModel { get; set; }
 
     public void Initialize(UpgradeService upgradeService)
     {
