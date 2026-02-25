@@ -26,6 +26,22 @@ public static class GameDefinitionValidator
         "extend",
         "stack",
     };
+    private static readonly string[] SupportedTriggerEvents =
+    {
+        "milestone.fired",
+    };
+    private static readonly string[] SupportedTriggerConditionTypes =
+    {
+        "milestoneIdEquals",
+    };
+    private static readonly string[] SupportedTriggerActionTypes =
+    {
+        "rollRewardPool",
+    };
+    private static readonly string[] SupportedRewardActionTypes =
+    {
+        "grantResource",
+    };
 
     public static void Validate(GameDefinition gd)
     {
@@ -175,6 +191,33 @@ public static class GameDefinitionValidator
             }
         }
 
+        var milestoneIds = new HashSet<string>(StringComparer.Ordinal);
+        if (gd.milestones != null)
+        {
+            for (int i = 0; i < gd.milestones.Count; i++)
+            {
+                var milestone = gd.milestones[i];
+                if (milestone == null)
+                {
+                    errors.Add($"milestones[{i}] is null.");
+                    continue;
+                }
+
+                var milestoneId = (milestone.id ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(milestoneId))
+                {
+                    errors.Add($"milestones[{i}].id is empty.");
+                    continue;
+                }
+
+                if (!milestoneIds.Add(milestoneId))
+                    errors.Add($"Duplicate milestone id '{milestoneId}'.");
+            }
+        }
+
+        var rewardPoolIds = ValidateRewardPools(gd.rewardPools, resourceIds, errors);
+        ValidateTriggers(gd.triggers, nodeIds, milestoneIds, rewardPoolIds, errors);
+
         var buffIds = new HashSet<string>(StringComparer.Ordinal);
         ValidateBuffEntries(gd.buffs, modifierIds, buffIds, errors);
         ValidateFormulaPaths(gd, resourceIds, errors);
@@ -246,6 +289,328 @@ public static class GameDefinitionValidator
                 );
             }
         }
+    }
+
+    private static HashSet<string> ValidateRewardPools(
+        IReadOnlyList<RewardPoolDefinition> rewardPools,
+        HashSet<string> resourceIds,
+        List<string> errors
+    )
+    {
+        var rewardPoolIds = new HashSet<string>(StringComparer.Ordinal);
+        if (rewardPools == null)
+        {
+            errors.Add("rewardPools is null. Use [] when no reward pools are defined.");
+            return rewardPoolIds;
+        }
+
+        for (int i = 0; i < rewardPools.Count; i++)
+        {
+            var rewardPool = rewardPools[i];
+            if (rewardPool == null)
+            {
+                errors.Add($"rewardPools[{i}] is null.");
+                continue;
+            }
+
+            var rewardPoolId = (rewardPool.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(rewardPoolId))
+            {
+                errors.Add($"rewardPools[{i}].id is empty.");
+                continue;
+            }
+
+            if (!rewardPoolIds.Add(rewardPoolId))
+                errors.Add($"Duplicate rewardPool id '{rewardPoolId}'.");
+
+            if (rewardPool.rewards == null)
+            {
+                errors.Add($"rewardPools[{i}] ('{rewardPoolId}') rewards is null.");
+                continue;
+            }
+
+            for (int r = 0; r < rewardPool.rewards.Length; r++)
+            {
+                var reward = rewardPool.rewards[r];
+                if (reward == null)
+                {
+                    errors.Add($"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}] is null.");
+                    continue;
+                }
+
+                if (reward.weight <= 0f)
+                {
+                    errors.Add(
+                        $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].weight must be > 0."
+                    );
+                }
+
+                var action = reward.action;
+                if (action == null)
+                {
+                    errors.Add($"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action is null.");
+                    continue;
+                }
+
+                var actionType = (action.type ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(actionType))
+                {
+                    errors.Add(
+                        $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action.type is empty."
+                    );
+                    continue;
+                }
+
+                if (!ContainsIgnoreCase(SupportedRewardActionTypes, actionType))
+                {
+                    errors.Add(
+                        $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action.type '{actionType}' is unsupported."
+                    );
+                    continue;
+                }
+
+                if (string.Equals(actionType, "grantResource", StringComparison.OrdinalIgnoreCase))
+                {
+                    var resourceId = (action.resourceId ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(resourceId))
+                    {
+                        errors.Add(
+                            $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action.resourceId is empty."
+                        );
+                    }
+                    else if (!resourceIds.Contains(resourceId))
+                    {
+                        errors.Add(
+                            $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action.resourceId '{resourceId}' references missing resources.id."
+                        );
+                    }
+
+                    if (
+                        double.IsNaN(action.amount)
+                        || double.IsInfinity(action.amount)
+                        || action.amount <= 0d
+                    )
+                    {
+                        errors.Add(
+                            $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action.amount must be > 0."
+                        );
+                    }
+                }
+            }
+        }
+
+        return rewardPoolIds;
+    }
+
+    private static void ValidateTriggers(
+        IReadOnlyList<TriggerDefinition> triggers,
+        HashSet<string> nodeIds,
+        HashSet<string> milestoneIds,
+        HashSet<string> rewardPoolIds,
+        List<string> errors
+    )
+    {
+        if (triggers == null)
+        {
+            errors.Add("triggers is null. Use [] when no triggers are defined.");
+            return;
+        }
+
+        var triggerIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < triggers.Count; i++)
+        {
+            var trigger = triggers[i];
+            if (trigger == null)
+            {
+                errors.Add($"triggers[{i}] is null.");
+                continue;
+            }
+
+            var triggerId = (trigger.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(triggerId))
+            {
+                errors.Add($"triggers[{i}].id is empty.");
+            }
+            else if (!triggerIds.Add(triggerId))
+            {
+                errors.Add($"Duplicate trigger id '{triggerId}'.");
+            }
+
+            var eventType = ResolveTriggerEventType(trigger, i, errors);
+            if (
+                !string.IsNullOrEmpty(eventType)
+                && !ContainsIgnoreCase(SupportedTriggerEvents, eventType)
+            )
+            {
+                errors.Add(
+                    $"triggers[{i}] ('{triggerId}') event '{eventType}' is unsupported."
+                );
+            }
+
+            var scopeNodeId = (trigger.scope?.nodeId ?? string.Empty).Trim();
+            if (!string.IsNullOrEmpty(scopeNodeId) && !nodeIds.Contains(scopeNodeId))
+            {
+                errors.Add(
+                    $"triggers[{i}] ('{triggerId}') scope.nodeId '{scopeNodeId}' references missing nodes.id."
+                );
+            }
+
+            if (trigger.conditions == null)
+            {
+                errors.Add(
+                    $"triggers[{i}] ('{triggerId}') conditions is null. Use [] when no conditions are needed."
+                );
+            }
+            else
+            {
+                for (int c = 0; c < trigger.conditions.Length; c++)
+                {
+                    var condition = trigger.conditions[c];
+                    if (condition == null)
+                    {
+                        errors.Add($"triggers[{i}] ('{triggerId}') conditions[{c}] is null.");
+                        continue;
+                    }
+
+                    var conditionType = (condition.type ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(conditionType))
+                    {
+                        errors.Add(
+                            $"triggers[{i}] ('{triggerId}') conditions[{c}].type is empty."
+                        );
+                        continue;
+                    }
+
+                    if (!ContainsIgnoreCase(SupportedTriggerConditionTypes, conditionType))
+                    {
+                        errors.Add(
+                            $"triggers[{i}] ('{triggerId}') conditions[{c}].type '{conditionType}' is unsupported."
+                        );
+                        continue;
+                    }
+
+                    if (
+                        string.Equals(
+                            conditionType,
+                            "milestoneIdEquals",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
+                    {
+                        if (condition.args == null)
+                        {
+                            errors.Add(
+                                $"triggers[{i}] ('{triggerId}') conditions[{c}].args is required for '{conditionType}'."
+                            );
+                            continue;
+                        }
+
+                        var milestoneId = (condition.args.milestoneId ?? string.Empty).Trim();
+                        if (string.IsNullOrEmpty(milestoneId))
+                        {
+                            errors.Add(
+                                $"triggers[{i}] ('{triggerId}') conditions[{c}].args.milestoneId is empty."
+                            );
+                        }
+                        else if (!milestoneIds.Contains(milestoneId))
+                        {
+                            errors.Add(
+                                $"triggers[{i}] ('{triggerId}') conditions[{c}].args.milestoneId '{milestoneId}' references missing milestones.id."
+                            );
+                        }
+                    }
+                }
+            }
+
+            if (trigger.actions == null)
+            {
+                errors.Add($"triggers[{i}] ('{triggerId}') actions is null.");
+                continue;
+            }
+
+            if (trigger.actions.Length == 0)
+            {
+                errors.Add($"triggers[{i}] ('{triggerId}') actions must contain at least one item.");
+                continue;
+            }
+
+            for (int a = 0; a < trigger.actions.Length; a++)
+            {
+                var action = trigger.actions[a];
+                if (action == null)
+                {
+                    errors.Add($"triggers[{i}] ('{triggerId}') actions[{a}] is null.");
+                    continue;
+                }
+
+                var actionType = (action.type ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(actionType))
+                {
+                    errors.Add(
+                        $"triggers[{i}] ('{triggerId}') actions[{a}].type is empty."
+                    );
+                    continue;
+                }
+
+                if (!ContainsIgnoreCase(SupportedTriggerActionTypes, actionType))
+                {
+                    errors.Add(
+                        $"triggers[{i}] ('{triggerId}') actions[{a}].type '{actionType}' is unsupported."
+                    );
+                    continue;
+                }
+
+                if (string.Equals(actionType, "rollRewardPool", StringComparison.OrdinalIgnoreCase))
+                {
+                    var rewardPoolId = (action.rewardPoolId ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(rewardPoolId))
+                    {
+                        errors.Add(
+                            $"triggers[{i}] ('{triggerId}') actions[{a}].rewardPoolId is empty."
+                        );
+                        continue;
+                    }
+
+                    if (!rewardPoolIds.Contains(rewardPoolId))
+                    {
+                        errors.Add(
+                            $"triggers[{i}] ('{triggerId}') actions[{a}].rewardPoolId '{rewardPoolId}' references missing rewardPools.id."
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    private static string ResolveTriggerEventType(
+        TriggerDefinition trigger,
+        int triggerIndex,
+        List<string> errors
+    )
+    {
+        var eventType = (trigger?.eventType ?? string.Empty).Trim();
+        var eventAlias = (trigger?.@event ?? string.Empty).Trim();
+
+        if (
+            !string.IsNullOrEmpty(eventType)
+            && !string.IsNullOrEmpty(eventAlias)
+            && !string.Equals(eventType, eventAlias, StringComparison.Ordinal)
+        )
+        {
+            var triggerId = (trigger?.id ?? string.Empty).Trim();
+            errors.Add(
+                $"triggers[{triggerIndex}] ('{triggerId}') has mismatched eventType '{eventType}' and event '{eventAlias}'."
+            );
+        }
+
+        var resolved = !string.IsNullOrEmpty(eventType) ? eventType : eventAlias;
+        if (string.IsNullOrEmpty(resolved))
+        {
+            var triggerId = (trigger?.id ?? string.Empty).Trim();
+            errors.Add($"triggers[{triggerIndex}] ('{triggerId}') event is empty.");
+        }
+
+        return resolved;
     }
 
     private static void ValidateBuffEntries(
