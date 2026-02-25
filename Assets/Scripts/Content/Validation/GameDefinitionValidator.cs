@@ -42,6 +42,12 @@ public static class GameDefinitionValidator
     {
         "grantResource",
     };
+    private static readonly string[] SupportedBuyModeKinds =
+    {
+        "fixed",
+        "nextMilestone",
+        "maxAffordable",
+    };
 
     public static void Validate(GameDefinition gd)
     {
@@ -220,6 +226,7 @@ public static class GameDefinitionValidator
 
         var buffIds = new HashSet<string>(StringComparer.Ordinal);
         ValidateBuffEntries(gd.buffs, modifierIds, buffIds, errors);
+        ValidateBuyModes(gd.buyModes, errors);
         ValidateFormulaPaths(gd, resourceIds, errors);
         ValidatePrestigeConfiguration(gd, resourceIds, errors);
 
@@ -688,6 +695,63 @@ public static class GameDefinitionValidator
                         $"buffs[{i}] ('{buffId}') references missing modifierId '{modifierId}'."
                     );
                 }
+            }
+        }
+    }
+
+    private static void ValidateBuyModes(
+        IReadOnlyList<BuyModeDefinition> buyModes,
+        List<string> errors
+    )
+    {
+        if (buyModes == null || buyModes.Count == 0)
+            return;
+
+        var buyModeIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < buyModes.Count; i++)
+        {
+            var buyMode = buyModes[i];
+            if (buyMode == null)
+            {
+                errors.Add($"buyModes[{i}] is null.");
+                continue;
+            }
+
+            var id = (buyMode.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(id))
+            {
+                errors.Add($"buyModes[{i}].id is empty.");
+            }
+            else if (!buyModeIds.Add(id))
+            {
+                errors.Add($"Duplicate buyMode id '{id}'.");
+            }
+
+            var displayName = (buyMode.displayName ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(displayName))
+                errors.Add($"buyModes[{i}] ('{id}') displayName is empty.");
+
+            var kind = (buyMode.kind ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(kind))
+            {
+                errors.Add($"buyModes[{i}] ('{id}') kind is empty.");
+                continue;
+            }
+
+            if (!ContainsIgnoreCase(SupportedBuyModeKinds, kind))
+            {
+                errors.Add(
+                    $"buyModes[{i}] ('{id}') kind '{kind}' is unsupported. Allowed: fixed, nextMilestone, maxAffordable."
+                );
+                continue;
+            }
+
+            if (
+                string.Equals(kind, "fixed", StringComparison.OrdinalIgnoreCase)
+                && buyMode.fixedCount < 1
+            )
+            {
+                errors.Add($"buyModes[{i}] ('{id}') fixedCount must be >= 1 for fixed mode.");
             }
         }
     }

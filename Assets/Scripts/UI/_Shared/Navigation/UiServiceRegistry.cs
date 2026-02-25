@@ -13,6 +13,7 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
 
     public WalletService Wallet { get; private set; }
     public BuffService BuffService { get; private set; }
+    public BuyModeService BuyModeService { get; private set; }
 
     public static UiServiceRegistry Instance { get; private set; }
 
@@ -38,6 +39,11 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
     public void RegisterBuffService(BuffService buffService)
     {
         BuffService = buffService;
+    }
+
+    public void RegisterBuyModeService(BuyModeService buyModeService)
+    {
+        BuyModeService = buyModeService;
     }
 
     public void RegisterGenerator(string generatorId, GeneratorService generator)

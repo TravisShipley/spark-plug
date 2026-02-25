@@ -3,6 +3,7 @@ public readonly struct UiBindingsContext
     public readonly WalletService WalletService;
     public readonly WalletViewModel WalletViewModel;
     public readonly UpgradeService UpgradeService;
+    public readonly BuyModeService BuyModeService;
     public readonly UiScreenService UiScreenService;
     public readonly UiServiceRegistry UiServices;
 
@@ -10,6 +11,7 @@ public readonly struct UiBindingsContext
         UiScreenService uiScreenService,
         UiServiceRegistry uiServices,
         UpgradeService upgradeService,
+        BuyModeService buyModeService,
         WalletService walletService,
         WalletViewModel walletViewModel
     )
@@ -17,6 +19,7 @@ public readonly struct UiBindingsContext
         UiScreenService = uiScreenService;
         UiServices = uiServices;
         UpgradeService = upgradeService;
+        BuyModeService = buyModeService;
         WalletService = walletService;
         WalletViewModel = walletViewModel;
     }

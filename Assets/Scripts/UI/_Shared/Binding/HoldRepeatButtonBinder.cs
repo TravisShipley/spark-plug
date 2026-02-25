@@ -24,6 +24,7 @@ public sealed class HoldRepeatButtonBinder
     private Func<bool> canRepeat;
     private Action onRepeat;
     private Action onPressStarted;
+    private Action onPressEnded;
     private IDisposable repeatLoop;
     private bool isPressed;
     private bool suppressNextClick;
@@ -31,11 +32,17 @@ public sealed class HoldRepeatButtonBinder
     private HoldRepeatPointerRelay pointerRelay;
     private GameObject pointerRelaySource;
 
-    public void Bind(Func<bool> canRepeat, Action onRepeat, Action onPressStarted = null)
+    public void Bind(
+        Func<bool> canRepeat,
+        Action onRepeat,
+        Action onPressStarted = null,
+        Action onPressEnded = null
+    )
     {
         this.canRepeat = canRepeat;
         this.onRepeat = onRepeat;
         this.onPressStarted = onPressStarted;
+        this.onPressEnded = onPressEnded;
         EndPress(clearSuppressedClick: true);
         hasRepeatedThisPress = false;
         EnsurePointerRelay();
@@ -106,8 +113,11 @@ public sealed class HoldRepeatButtonBinder
 
     private void EndPress(bool clearSuppressedClick)
     {
+        var wasPressed = isPressed;
         isPressed = false;
         StopRepeatLoop();
+        if (wasPressed)
+            onPressEnded?.Invoke();
 
         if (clearSuppressedClick)
             suppressNextClick = false;

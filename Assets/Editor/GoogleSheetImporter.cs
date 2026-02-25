@@ -141,8 +141,11 @@ public static class GoogleSheetImporter
             var importedTableNames = tables
                 .Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var importedTableSummary = importedTableNames
+                .Select(name => $"{name}({tables[name].Count})")
+                .ToList();
             Debug.Log(
-                $"[GoogleSheetImporter] Imported {importedTableNames.Count} table(s): {string.Join(", ", importedTableNames)}"
+                $"[GoogleSheetImporter] Imported {importedTableNames.Count} table(s): {string.Join(", ", importedTableSummary)}"
             );
 
             var pack = BuildPack(tables, sheetSpec);
@@ -1152,10 +1155,22 @@ public static class GoogleSheetImporter
         if (row == null || row.Count == 0)
             return true;
 
-        var first = (row[0] ?? "").Trim();
-        return string.IsNullOrWhiteSpace(first)
-            || first.StartsWith("_", StringComparison.Ordinal)
-            || first.StartsWith("//", StringComparison.Ordinal);
+        var firstNonEmpty = string.Empty;
+        for (int i = 0; i < row.Count; i++)
+        {
+            var cell = (row[i] ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(cell))
+                continue;
+
+            firstNonEmpty = cell;
+            break;
+        }
+
+        if (string.IsNullOrEmpty(firstNonEmpty))
+            return true;
+
+        return firstNonEmpty.StartsWith("_", StringComparison.Ordinal)
+            || firstNonEmpty.StartsWith("//", StringComparison.Ordinal);
     }
 
     // ----------------------------
@@ -1563,6 +1578,7 @@ public static class GoogleSheetImporter
             ["projects"] = new List<object>(),
             ["unlockGraph"] = new List<object>(),
             ["buffs"] = new List<object>(),
+            ["buyModes"] = new List<object>(),
             ["triggers"] = new List<object>(),
             ["rewardPools"] = new List<object>(),
         };
@@ -1673,6 +1689,9 @@ public static class GoogleSheetImporter
 
         if (tables.TryGetValue("Buffs", out var buffRows))
             pack["buffs"] = buffRows.Select(FlattenBuff).Cast<object>().ToList();
+
+        if (tables.TryGetValue("BuyModes", out var buyModeRows))
+            pack["buyModes"] = buyModeRows.Select(FlattenBuyMode).Cast<object>().ToList();
 
         if (tables.TryGetValue("UnlockGraph", out var ugRows))
             pack["unlockGraph"] = ugRows
@@ -1803,6 +1822,11 @@ public static class GoogleSheetImporter
         var d = FlattenNestedWithArrays(flat, "tags");
         RenameKey(d, "effects_json", "effects");
         return d;
+    }
+
+    private static Dictionary<string, object> FlattenBuyMode(Dictionary<string, object> flat)
+    {
+        return FlattenNestedWithArrays(flat, "tags");
     }
 
     private static Dictionary<string, object> FlattenMilestone(Dictionary<string, object> flat)
@@ -2064,6 +2088,7 @@ public static class GoogleSheetImporter
             "Milestones",
             "UnlockGraph",
             "Buffs",
+            "BuyModes",
             "Prestige",
             "Triggers",
             "RewardPools",

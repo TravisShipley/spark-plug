@@ -59,6 +59,7 @@ public class GameCompositionRoot : MonoBehaviour
     private AdBoostScreenViewModel adBoostScreenViewModel;
     private PrestigeScreenViewModel prestigeScreenViewModel;
     private BuffService buffService;
+    private BuyModeService buyModeService;
     private ModifierService modifierService;
     private MilestoneService milestoneService;
     private TriggerService triggerService;
@@ -128,6 +129,7 @@ public class GameCompositionRoot : MonoBehaviour
             modifierService,
             gameEventStream,
             buffService,
+            buyModeService,
             uiService,
             saveService,
             gameDefinitionService,
@@ -210,7 +212,9 @@ public class GameCompositionRoot : MonoBehaviour
             modifierService,
             tickService
         );
+        buyModeService = new BuyModeService(gameDefinitionService.BuyModeCatalog);
         uiService.RegisterBuffService(buffService);
+        uiService.RegisterBuyModeService(buyModeService);
         walletService.SetModifierService(modifierService);
         offlineProgressCalculator = new OfflineProgressCalculator(
             gameDefinitionService,
@@ -268,6 +272,7 @@ public class GameCompositionRoot : MonoBehaviour
             uiScreenService,
             uiService,
             upgradeService,
+            buyModeService,
             walletService,
             walletViewModel
         );
@@ -343,6 +348,7 @@ public class GameCompositionRoot : MonoBehaviour
         milestoneService?.Dispose();
         triggerService?.Dispose();
         buffService?.Dispose();
+        buyModeService?.Dispose();
         unlockService?.Dispose();
         modifierService?.Dispose();
 

@@ -31,7 +31,11 @@ public sealed class UiCompositionRoot : MonoBehaviour
     [SerializeField]
     private AdBoostButtonView[] adBoostButtons;
 
+    [SerializeField]
+    private BuyModeButtonView[] buyModeButtons;
+
     private bool hasBound;
+    private BuyModeViewModel buyModeViewModel;
 
     public void Bind(in UiBindingsContext context)
     {
@@ -44,6 +48,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
         BindWalletHud(context);
         BindBottomBar(context);
         BindAdBoostButtons(context);
+        BindBuyModeButtons(context);
     }
 
     private bool TryBeginBind()
@@ -126,5 +131,35 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
             buttonView.Bind(context.UiScreenService);
         }
+    }
+
+    private void BindBuyModeButtons(in UiBindingsContext context)
+    {
+        if (buyModeButtons == null || buyModeButtons.Length == 0)
+            return;
+
+        if (context.BuyModeService == null)
+        {
+            Debug.LogError(
+                "UiCompositionRoot: BuyModeService is null in UiBindingsContext.",
+                this
+            );
+            return;
+        }
+
+        buyModeViewModel ??= new BuyModeViewModel(context.BuyModeService);
+        for (int i = 0; i < buyModeButtons.Length; i++)
+        {
+            var buttonView = buyModeButtons[i];
+            if (buttonView == null)
+                continue;
+
+            buttonView.Bind(buyModeViewModel);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        buyModeViewModel?.Dispose();
     }
 }

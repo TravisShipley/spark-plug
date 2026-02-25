@@ -294,6 +294,25 @@
       },
 
       {
+        "name": "BuyModes",
+        "required": false,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "buyModeId" },
+          { "name": "displayName", "required": true, "type": "string" },
+          {
+            "name": "kind",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.buyModeKind"
+          },
+          { "name": "fixedCount", "required": false, "type": "int" },
+          { "name": "tags", "required": false, "type": "stringList" }
+        ]
+      },
+
+      {
         "name": "UnlockGraph",
         "required": true,
         "kind": "entity",
@@ -383,6 +402,7 @@
         "progression"
       ],
       "buffStacking": ["none", "refresh", "extend", "ignore", "stack"],
+      "buyModeKind": ["fixed", "nextMilestone", "maxAffordable"],
       "triggerEvent": [
         "node.cycleComplete",
         "node.collect",

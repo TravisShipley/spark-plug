@@ -14,6 +14,7 @@ public sealed class GameDefinition
     public List<UpgradeDefinition> upgrades = new List<UpgradeDefinition>();
     public List<MilestoneDefinition> milestones = new List<MilestoneDefinition>();
     public List<BuffDefinition> buffs = new List<BuffDefinition>();
+    public List<BuyModeDefinition> buyModes = new List<BuyModeDefinition>();
     public List<TriggerDefinition> triggers = new List<TriggerDefinition>();
     public List<RewardPoolDefinition> rewardPools = new List<RewardPoolDefinition>();
     public PrestigeDefinition prestige;

@@ -16,6 +16,7 @@ public class GeneratorListComposer
     private readonly GameEventStream gameEventStream;
     private readonly UiServiceRegistry uiService;
     private readonly BuffService buffService;
+    private readonly BuyModeService buyModeService;
     private readonly SaveService saveService;
     private readonly GameDefinitionService gameDefinitionService;
     private readonly UnlockService unlockService;
@@ -43,6 +44,7 @@ public class GeneratorListComposer
         ModifierService modifierService,
         GameEventStream gameEventStream,
         BuffService buffService,
+        BuyModeService buyModeService,
         UiServiceRegistry uiService,
         SaveService saveService,
         GameDefinitionService gameDefinitionService,
@@ -61,6 +63,7 @@ public class GeneratorListComposer
         this.modifierService = modifierService;
         this.gameEventStream = gameEventStream;
         this.buffService = buffService;
+        this.buyModeService = buyModeService;
         this.uiService = uiService;
         this.saveService = saveService;
         this.gameDefinitionService = gameDefinitionService;
@@ -198,7 +201,8 @@ public class GeneratorListComposer
             generatorDefinition,
             service,
             walletViewModel,
-            buffService
+            buffService,
+            buyModeService
         );
 
         generatorServices.Add(service);

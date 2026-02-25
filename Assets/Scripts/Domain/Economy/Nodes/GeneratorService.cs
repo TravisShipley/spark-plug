@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class GeneratorService : IDisposable
 {
+    private const int MaxAffordableProbeLevels = 5000;
     private readonly GeneratorModel model;
     private readonly GeneratorDefinition definition;
     private readonly WalletService wallet;
@@ -252,16 +253,22 @@ public class GeneratorService : IDisposable
 
     private double CalculateNextLevelCost()
     {
+        return CalculateLevelCostForCurrentLevel(level.Value);
+    }
+
+    private double CalculateLevelCostForCurrentLevel(int currentLevel)
+    {
         // Cost to buy the *next* level (current level -> level+1)
         double baseCost = Math.Max(0, definition.BaseLevelCost);
         double growth = Math.Max(1.0, definition.LevelCostGrowth);
+        int rawCurrentLevel = currentLevel;
 
-        // Use the reactive level as the authoritative value.
-        int currentLevel = Math.Max(1, level.Value);
+        // Cost equation uses at least level 1 for the exponent base.
+        currentLevel = Math.Max(1, currentLevel);
 
         baseCost =
             (baseCost > 0) ? baseCost
-            : (level.Value == 0) ? 0
+            : (rawCurrentLevel == 0) ? 0
             : 1;
 
         return baseCost * Math.Pow(growth, currentLevel - 1);
@@ -322,6 +329,20 @@ public class GeneratorService : IDisposable
         return purchased;
     }
 
+    public int TryBuyByMode(BuyModeDefinition mode)
+    {
+        return TryBuyByMode(mode, int.MaxValue);
+    }
+
+    public int TryBuyByMode(BuyModeDefinition mode, int maxToBuy)
+    {
+        var plannedCount = CalculatePlannedPurchaseCount(mode, maxToBuy);
+        if (plannedCount <= 0)
+            return 0;
+
+        return TryBuyLevels(plannedCount);
+    }
+
     public void StartRun()
     {
         if (!isOwned.Value)
@@ -332,6 +353,161 @@ public class GeneratorService : IDisposable
 
         // Start a single cycle
         isRunning.Value = true;
+    }
+
+    private int ResolveLevelsToNextMilestone()
+    {
+        var milestoneLevels = definition.MilestoneLevels ?? Array.Empty<int>();
+        if (milestoneLevels.Length == 0)
+            return 1;
+
+        var current = level.Value;
+        for (int i = 0; i < milestoneLevels.Length; i++)
+        {
+            var milestoneLevel = milestoneLevels[i];
+            if (milestoneLevel <= current)
+                continue;
+
+            return Math.Max(1, milestoneLevel - current);
+        }
+
+        return 1;
+    }
+
+    public int CalculatePlannedPurchaseCount(BuyModeDefinition mode, int maxToBuy = int.MaxValue)
+    {
+        if (mode == null)
+            throw new InvalidOperationException("GeneratorService: BuyMode is null.");
+
+        var cappedMaxToBuy = Math.Max(0, maxToBuy);
+        if (cappedMaxToBuy <= 0)
+            return 0;
+
+        var requestedCount = ResolveRequestedCountForMode(mode, cappedMaxToBuy);
+        if (requestedCount <= 0)
+            return 0;
+
+        var affordableCount = CalculateAffordableLevels(requestedCount);
+        if (IsFixedMode(mode))
+            return affordableCount >= requestedCount ? requestedCount : 0;
+
+        return affordableCount;
+    }
+
+    public double CalculatePlannedPurchaseCost(BuyModeDefinition mode, int maxToBuy = int.MaxValue)
+    {
+        if (mode == null)
+            throw new InvalidOperationException("GeneratorService: BuyMode is null.");
+
+        var cappedMaxToBuy = Math.Max(0, maxToBuy);
+        if (cappedMaxToBuy <= 0)
+            return 0d;
+
+        var requestedCount = ResolveRequestedCountForMode(mode, cappedMaxToBuy);
+        if (requestedCount <= 0)
+            return 0d;
+
+        if (IsFixedMode(mode))
+            return CalculateTotalCostForLevels(requestedCount);
+
+        var plannedCount = CalculatePlannedPurchaseCount(mode, cappedMaxToBuy);
+        if (plannedCount <= 0)
+            return 0d;
+
+        return CalculateTotalCostForLevels(plannedCount);
+    }
+
+    private int ResolveRequestedCountForMode(BuyModeDefinition mode, int cappedMaxToBuy)
+    {
+        var kind = (mode.kind ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(kind))
+            throw new InvalidOperationException(
+                $"GeneratorService: BuyMode '{mode.id}' has empty kind."
+            );
+
+        if (string.Equals(kind, "fixed", StringComparison.OrdinalIgnoreCase))
+        {
+            var fixedCount = mode.fixedCount;
+            if (fixedCount < 1)
+            {
+                throw new InvalidOperationException(
+                    $"GeneratorService: BuyMode '{mode.id}' fixedCount must be >= 1."
+                );
+            }
+
+            return Math.Min(fixedCount, cappedMaxToBuy);
+        }
+
+        if (string.Equals(kind, "nextMilestone", StringComparison.OrdinalIgnoreCase))
+        {
+            var levelsToNextMilestone = ResolveLevelsToNextMilestone();
+            return Math.Min(Math.Max(1, levelsToNextMilestone), cappedMaxToBuy);
+        }
+
+        if (string.Equals(kind, "maxAffordable", StringComparison.OrdinalIgnoreCase))
+        {
+            return cappedMaxToBuy;
+        }
+
+        throw new InvalidOperationException(
+            $"GeneratorService: Unsupported BuyMode kind '{kind}' for mode '{mode.id}'."
+        );
+    }
+
+    private static bool IsFixedMode(BuyModeDefinition mode)
+    {
+        var kind = (mode?.kind ?? string.Empty).Trim();
+        return string.Equals(kind, "fixed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private int CalculateAffordableLevels(int requestedCount)
+    {
+        if (requestedCount <= 0)
+            return 0;
+
+        var remaining = wallet.GetBalance(definition.LevelCostResourceId);
+        if (remaining <= 0d)
+            return 0;
+
+        // TODO: Replace this probe loop with a closed-form/binary-search approach for large levels.
+        var probeLimit = Math.Min(requestedCount, MaxAffordableProbeLevels);
+        int affordable = 0;
+        int currentLevel = level.Value;
+        for (int i = 0; i < probeLimit; i++)
+        {
+            var levelForCost = currentLevel + i;
+            var cost = CalculateLevelCostForCurrentLevel(levelForCost);
+            if (double.IsNaN(cost) || double.IsInfinity(cost) || cost <= 0d)
+                break;
+
+            if (remaining + double.Epsilon < cost)
+                break;
+
+            remaining -= cost;
+            affordable++;
+        }
+
+        return affordable;
+    }
+
+    private double CalculateTotalCostForLevels(int count)
+    {
+        if (count <= 0)
+            return 0d;
+
+        double total = 0d;
+        int currentLevel = level.Value;
+        for (int i = 0; i < count; i++)
+        {
+            var levelForCost = currentLevel + i;
+            var cost = CalculateLevelCostForCurrentLevel(levelForCost);
+            if (double.IsNaN(cost) || double.IsInfinity(cost) || cost <= 0d)
+                break;
+
+            total += cost;
+        }
+
+        return total;
     }
 
     public void Dispose()

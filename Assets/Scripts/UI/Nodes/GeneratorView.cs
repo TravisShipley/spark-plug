@@ -1,4 +1,3 @@
-using System;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -60,10 +59,6 @@ public class GeneratorView : MonoBehaviour
     private float cycleStartTime;
     private float lastCycleDuration;
     private bool canLevelUpCached;
-    private int currentLevelCached;
-    private int nextMilestoneLevelCached;
-    private int holdBuyBudgetRemaining;
-    private int levelsPerPurchase = 1;
 
     private enum ProgressState
     {
@@ -85,18 +80,9 @@ public class GeneratorView : MonoBehaviour
         lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
         progressState = ProgressState.Idle;
         canLevelUpCached = vm.CanLevelUp.Value;
-        currentLevelCached = vm.Level.Value;
-        nextMilestoneLevelCached = vm.NextMilestoneAtLevel.Value;
-        holdBuyBudgetRemaining = int.MaxValue;
 
         vm.CanLevelUp.DistinctUntilChanged()
             .Subscribe(value => canLevelUpCached = value)
-            .AddTo(disposables);
-        vm.Level.DistinctUntilChanged()
-            .Subscribe(value => currentLevelCached = value)
-            .AddTo(disposables);
-        vm.NextMilestoneAtLevel.DistinctUntilChanged()
-            .Subscribe(value => nextMilestoneLevelCached = value)
             .AddTo(disposables);
 
         if (progressFill == null)
@@ -165,7 +151,12 @@ public class GeneratorView : MonoBehaviour
         if (levelUpButtonView != null)
         {
             levelUpButtonView.Bind(
-                labelText: vm.NextLevelCost.Select(cost => $"Level Up\n{Format.Currency(cost)}")
+                labelText: Observable
+                    .CombineLatest(
+                        vm.BuyModeDisplayName.DistinctUntilChanged(),
+                        vm.LevelUpCost.DistinctUntilChanged(),
+                        (modeLabel, cost) => $"Level Up {modeLabel}\n{Format.Currency(cost)}"
+                    )
                     .DistinctUntilChanged(),
                 interactable: vm.LevelUpCommand.CanExecute,
                 visible: vm.LevelUpCommand.IsVisible,
@@ -182,26 +173,15 @@ public class GeneratorView : MonoBehaviour
         if (levelHoldBinder != null)
         {
             levelHoldBinder.Bind(
-                canRepeat: () => canLevelUpCached && holdBuyBudgetRemaining > 0,
+                canRepeat: () => canLevelUpCached && vm.CanContinueHoldLevelUp(),
                 onRepeat: () =>
                 {
-                    var purchased = vm.TryLevelUpMany(levelsPerPurchase);
+                    var purchased = vm.TryLevelUpByModeCapped(int.MaxValue);
                     if (purchased <= 0)
                         return;
-
-                    if (holdBuyBudgetRemaining != int.MaxValue)
-                        holdBuyBudgetRemaining = Math.Max(0, holdBuyBudgetRemaining - purchased);
                 },
-                onPressStarted: () =>
-                {
-                    if (nextMilestoneLevelCached > currentLevelCached)
-                    {
-                        holdBuyBudgetRemaining = nextMilestoneLevelCached - currentLevelCached;
-                        return;
-                    }
-
-                    holdBuyBudgetRemaining = int.MaxValue;
-                }
+                onPressStarted: vm.BeginHoldLevelUp,
+                onPressEnded: vm.EndHoldLevelUp
             );
         }
 

@@ -5,6 +5,8 @@ public class GeneratorViewModel : IDisposable
 {
     private readonly GeneratorDefinition definition;
     private readonly GeneratorService generatorService;
+    private readonly BuyModeService buyModeService;
+    private int holdBuyBudgetRemaining = int.MaxValue;
 
     private readonly CompositeDisposable disposables = new();
 
@@ -30,6 +32,8 @@ public class GeneratorViewModel : IDisposable
 
     public IReadOnlyReactiveProperty<double> OutputPerCycle { get; }
     public IReadOnlyReactiveProperty<double> NextLevelCost { get; }
+    public IReadOnlyReactiveProperty<double> LevelUpCost { get; }
+    public IReadOnlyReactiveProperty<string> BuyModeDisplayName { get; }
     public IReadOnlyReactiveProperty<bool> CanBuild { get; }
     public IReadOnlyReactiveProperty<bool> CanLevelUp { get; }
     public IReadOnlyReactiveProperty<bool> CanCollect { get; }
@@ -47,27 +51,70 @@ public class GeneratorViewModel : IDisposable
         GeneratorDefinition definition,
         GeneratorService generatorService,
         WalletViewModel walletViewModel,
-        BuffService buffService
+        BuffService buffService,
+        BuyModeService buyModeService
     )
     {
         _ = model;
         _ = walletViewModel ?? throw new ArgumentNullException(nameof(walletViewModel));
+        this.buyModeService =
+            buyModeService ?? throw new ArgumentNullException(nameof(buyModeService));
 
         this.definition = definition;
         this.generatorService = generatorService;
+
+        BuyModeDisplayName = buyModeService
+            .SelectedBuyMode.Select(mode =>
+            {
+                if (mode == null)
+                    return "x1";
+
+                var displayName = (mode.displayName ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(displayName))
+                    return displayName;
+
+                var id = (mode.id ?? string.Empty).Trim();
+                return string.IsNullOrEmpty(id) ? "x1" : id;
+            })
+            .DistinctUntilChanged()
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
 
         OutputPerCycle = Observable
             .CombineLatest(
                 generatorService.Level.DistinctUntilChanged(),
                 generatorService.OutputMultiplier.DistinctUntilChanged(),
                 generatorService.ResourceGainMultiplier.DistinctUntilChanged(),
-                (level, outputMult, gainMult) => definition.BaseOutputPerCycle * level * outputMult * gainMult
+                (level, outputMult, gainMult) =>
+                    definition.BaseOutputPerCycle * level * outputMult * gainMult
             )
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
         // Source-of-truth cost stream is owned by GeneratorService.
         NextLevelCost = generatorService.NextLevelCostReactive;
+        LevelUpCost = Observable
+            .CombineLatest(
+                generatorService.Level.DistinctUntilChanged(),
+                buyModeService.SelectedBuyMode.DistinctUntilChanged(),
+                walletViewModel.Balance(definition.LevelCostResourceId).DistinctUntilChanged(),
+                (_, mode, __) => generatorService.CalculatePlannedPurchaseCost(mode)
+            )
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
+
+        var canLevelUpByMode = Observable
+            .CombineLatest(
+                generatorService.CanBuyLevelReactive.DistinctUntilChanged(),
+                generatorService.Level.DistinctUntilChanged(),
+                buyModeService.SelectedBuyMode.DistinctUntilChanged(),
+                walletViewModel.Balance(definition.LevelCostResourceId).DistinctUntilChanged(),
+                (canBuyAny, _, mode, __) =>
+                    canBuyAny && generatorService.CalculatePlannedPurchaseCount(mode) > 0
+            )
+            .DistinctUntilChanged()
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
 
         ShowBuild = IsOwned
             .Select(owned => !owned)
@@ -97,7 +144,7 @@ public class GeneratorViewModel : IDisposable
 
         // Build and level-up share the same service-authored purchasing rule.
         CanBuild = generatorService.CanBuyLevelReactive;
-        CanLevelUp = generatorService.CanBuyLevelReactive;
+        CanLevelUp = canLevelUpByMode;
         CanCollect = generatorService.CanCollectReactive;
 
         BuildCommand = new UiCommand(
@@ -110,11 +157,7 @@ public class GeneratorViewModel : IDisposable
             ShowBuild
         );
 
-        LevelUpCommand = new UiCommand(
-            () => generatorService.TryBuyLevel(),
-            CanLevelUp,
-            ShowLevelUp
-        );
+        LevelUpCommand = new UiCommand(() => TryLevelUpByMode(), CanLevelUp, ShowLevelUp);
 
         CollectCommand = new UiCommand(
             () =>
@@ -132,8 +175,47 @@ public class GeneratorViewModel : IDisposable
         disposables.Dispose();
     }
 
-    public int TryLevelUpMany(int maxToBuy)
+    public int TryLevelUpByMode()
     {
-        return generatorService.TryBuyLevels(maxToBuy);
+        return generatorService.TryBuyByMode(buyModeService.SelectedBuyMode.Value);
+    }
+
+    public int TryLevelUpByModeCapped(int maxToBuy)
+    {
+        var capped = Math.Max(0, maxToBuy);
+        if (holdBuyBudgetRemaining != int.MaxValue)
+            capped = Math.Min(capped, holdBuyBudgetRemaining);
+
+        if (capped <= 0)
+            return 0;
+
+        var purchased = generatorService.TryBuyByMode(buyModeService.SelectedBuyMode.Value, capped);
+        if (holdBuyBudgetRemaining != int.MaxValue && purchased > 0)
+            holdBuyBudgetRemaining = Math.Max(0, holdBuyBudgetRemaining - purchased);
+
+        return purchased;
+    }
+
+    public void BeginHoldLevelUp()
+    {
+        var nextMilestoneLevel = NextMilestoneAtLevel.Value;
+        var currentLevel = Level.Value;
+        if (nextMilestoneLevel > currentLevel)
+        {
+            holdBuyBudgetRemaining = nextMilestoneLevel - currentLevel;
+            return;
+        }
+
+        holdBuyBudgetRemaining = int.MaxValue;
+    }
+
+    public void EndHoldLevelUp()
+    {
+        holdBuyBudgetRemaining = int.MaxValue;
+    }
+
+    public bool CanContinueHoldLevelUp()
+    {
+        return holdBuyBudgetRemaining > 0;
     }
 }

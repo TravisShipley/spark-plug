@@ -52,6 +52,9 @@ public static class GameDefinitionLoader
             if (gd.buffs == null)
                 gd.buffs = new List<BuffDefinition>();
 
+            if (gd.buyModes == null)
+                gd.buyModes = new List<BuyModeDefinition>();
+
             if (gd.triggers == null)
                 gd.triggers = new List<TriggerDefinition>();
 
