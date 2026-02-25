@@ -71,6 +71,9 @@ public class GeneratorView : MonoBehaviour
 
     public void Bind(GeneratorViewModel vm)
     {
+        if (!ValidateRefs())
+            return;
+
         // Allow safe re-binding (e.g., scene reload / reuse) by clearing previous subscriptions.
         disposables.Dispose();
         disposables = new CompositeDisposable();
@@ -85,12 +88,51 @@ public class GeneratorView : MonoBehaviour
             .Subscribe(value => canLevelUpCached = value)
             .AddTo(disposables);
 
-        if (progressFill == null)
-        {
-            Debug.LogError("GeneratorView: progressFill is not assigned.", this);
-            return;
-        }
+        BindProgress(vm);
+        BindButtons(vm);
+        BindOptionalUi(vm);
+    }
 
+    public void Initialize(GeneratorViewModel vm)
+    {
+        viewModel = vm;
+
+        nameText.text = vm.DisplayName;
+
+        // Output: react to BOTH output and duration changes
+        vm.OutputPerCycle.DistinctUntilChanged()
+            .Subscribe(output => outputText.text = $"{Format.Currency(output)}")
+            .AddTo(disposables);
+    }
+
+    #region Private Helper Methods
+
+    private bool ValidateRefs()
+    {
+        if (nameText == null)
+            return Fail(nameof(nameText));
+        if (outputText == null)
+            return Fail(nameof(outputText));
+        if (progressFill == null)
+            return Fail(nameof(progressFill));
+        if (buildButtonView == null)
+            return Fail(nameof(buildButtonView));
+        if (levelUpButtonView == null)
+            return Fail(nameof(levelUpButtonView));
+        if (collectButtonView == null)
+            return Fail(nameof(collectButtonView));
+
+        return true;
+    }
+
+    private bool Fail(string fieldName)
+    {
+        Debug.LogError($"GeneratorView: Missing required ref '{fieldName}'.", this);
+        return false;
+    }
+
+    private void BindProgress(GeneratorViewModel vm)
+    {
         // Start the progress bar running
         vm.IsRunning.DistinctUntilChanged()
             .Where(running => running)
@@ -137,64 +179,6 @@ public class GeneratorView : MonoBehaviour
             })
             .AddTo(disposables);
 
-        if (buildButtonView != null)
-        {
-            buildButtonView.Bind(
-                labelText: vm.NextLevelCost.Select(cost => $"Build\n{Format.Currency(cost)}")
-                    .DistinctUntilChanged(),
-                interactable: vm.BuildCommand.CanExecute,
-                visible: vm.BuildCommand.IsVisible,
-                onClick: vm.BuildCommand.Execute
-            );
-        }
-
-        if (levelUpButtonView != null)
-        {
-            levelUpButtonView.Bind(
-                labelText: Observable
-                    .CombineLatest(
-                        vm.BuyModeDisplayName.DistinctUntilChanged(),
-                        vm.LevelUpCost.DistinctUntilChanged(),
-                        (modeLabel, cost) => $"Level Up {modeLabel}\n{Format.Currency(cost)}"
-                    )
-                    .DistinctUntilChanged(),
-                interactable: vm.LevelUpCommand.CanExecute,
-                visible: vm.LevelUpCommand.IsVisible,
-                onClick: () =>
-                {
-                    if (levelHoldBinder != null && levelHoldBinder.ConsumeSuppressNextClick())
-                        return;
-
-                    vm.LevelUpCommand.Execute();
-                }
-            );
-        }
-
-        if (levelHoldBinder != null)
-        {
-            levelHoldBinder.Bind(
-                canRepeat: () => canLevelUpCached && vm.CanContinueHoldLevelUp(),
-                onRepeat: () =>
-                {
-                    var purchased = vm.TryLevelUpByModeCapped(int.MaxValue);
-                    if (purchased <= 0)
-                        return;
-                },
-                onPressStarted: vm.BeginHoldLevelUp,
-                onPressEnded: vm.EndHoldLevelUp
-            );
-        }
-
-        if (collectButtonView != null)
-        {
-            collectButtonView.Bind(
-                labelText: Observable.Return("Collect"),
-                interactable: vm.CollectCommand.CanExecute,
-                visible: vm.CollectCommand.IsVisible,
-                onClick: vm.CollectCommand.Execute
-            );
-        }
-
         // Visual sync on cycle completion:
         // - Manual mode: animate to full and wait for Collect
         // - Automated mode: immediately restart from 0
@@ -217,17 +201,60 @@ public class GeneratorView : MonoBehaviour
             .AddTo(disposables);
     }
 
-    public void Initialize(GeneratorViewModel vm)
+    private void BindButtons(GeneratorViewModel vm)
     {
-        viewModel = vm;
+        buildButtonView.Bind(
+            labelText: vm.NextLevelCost.Select(cost => $"Build\n{Format.Currency(cost)}")
+                .DistinctUntilChanged(),
+            interactable: vm.BuildCommand.CanExecute,
+            visible: vm.BuildCommand.IsVisible,
+            onClick: vm.BuildCommand.Execute
+        );
 
-        nameText.text = vm.DisplayName;
+        levelUpButtonView.Bind(
+            labelText: Observable
+                .CombineLatest(
+                    vm.BuyModeDisplayName.DistinctUntilChanged(),
+                    vm.LevelUpCost.DistinctUntilChanged(),
+                    (modeLabel, cost) => $"Level Up {modeLabel}\n{Format.Currency(cost)}"
+                )
+                .DistinctUntilChanged(),
+            interactable: vm.LevelUpCommand.CanExecute,
+            visible: vm.LevelUpCommand.IsVisible,
+            onClick: () =>
+            {
+                if (levelHoldBinder != null && levelHoldBinder.ConsumeSuppressNextClick())
+                    return;
 
-        // Output: react to BOTH output and duration changes
-        vm.OutputPerCycle.DistinctUntilChanged()
-            .Subscribe(output => outputText.text = $"{Format.Currency(output)}")
-            .AddTo(disposables);
+                vm.LevelUpCommand.Execute();
+            }
+        );
 
+        if (levelHoldBinder != null)
+        {
+            levelHoldBinder.Bind(
+                canRepeat: () => canLevelUpCached && vm.CanContinueHoldLevelUp(),
+                onRepeat: () =>
+                {
+                    var purchased = vm.TryLevelUpByModeCapped(int.MaxValue);
+                    if (purchased <= 0)
+                        return;
+                },
+                onPressStarted: vm.BeginHoldLevelUp,
+                onPressEnded: vm.EndHoldLevelUp
+            );
+        }
+
+        collectButtonView.Bind(
+            labelText: Observable.Return("Collect"),
+            interactable: vm.CollectCommand.CanExecute,
+            visible: vm.CollectCommand.IsVisible,
+            onClick: vm.CollectCommand.Execute
+        );
+    }
+
+    private void BindOptionalUi(GeneratorViewModel vm)
+    {
         if (outputText != null)
         {
             outputText.color = outputColor;
@@ -238,7 +265,6 @@ public class GeneratorView : MonoBehaviour
                 .AddTo(disposables);
         }
 
-        // levelText displays the MilestoneRank + 1
         if (levelText != null)
         {
             vm.MilestoneRank.DistinctUntilChanged()
@@ -279,6 +305,8 @@ public class GeneratorView : MonoBehaviour
             })
             .AddTo(disposables);
     }
+
+    #endregion
 
     private void Update()
     {
