@@ -177,7 +177,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BottomBarView
   upgradesButton: {fileID: 5889509451892038771}
   managersButton: {fileID: 7188467620581140931}
-  storeButton: {fileID: 469862768329817332}
+  prestigeButton: {fileID: 469862768329817332}
   upgradesBadge: {fileID: 5290444348916506642}
   managersBadge: {fileID: 8868224869659202978}
 --- !u!1001 &1913327562790693204
@@ -301,7 +301,7 @@ PrefabInstance:
     - target: {fileID: 5995579216495726086, guid: 960024c1a972046cda045d075b0e5340,
         type: 3}
       propertyPath: m_Name
-      value: StoreButton
+      value: PrestigeButton
       objectReference: {fileID: 0}
     - target: {fileID: 6211850551998626178, guid: 960024c1a972046cda045d075b0e5340,
         type: 3}

@@ -10,7 +10,7 @@ public sealed class BottomBarView : MonoBehaviour
     private ReactiveButtonView managersButton;
 
     [SerializeField]
-    private ReactiveButtonView storeButton;
+    private ReactiveButtonView prestigeButton;
 
     [Header("Badges")]
     [SerializeField]
@@ -56,25 +56,23 @@ public sealed class BottomBarView : MonoBehaviour
             onClick: vm.ShowManagers.Execute
         );
 
-        storeButton.Bind(
-            labelText: Observable.Return("Store"),
-            interactable: Observable.Return(false),
-            visible: vm.ShowStore.IsVisible,
-            onClick: vm.ShowStore.Execute
+        prestigeButton.Bind(
+            labelText: Observable.Return("Prestige"),
+            interactable: vm.ShowPrestige.CanExecute,
+            visible: vm.ShowPrestige.IsVisible,
+            onClick: vm.ShowPrestige.Execute
         );
 
         if (upgradesBadge != null)
         {
-            vm.ShowUpgradesBadge
-                .DistinctUntilChanged()
+            vm.ShowUpgradesBadge.DistinctUntilChanged()
                 .Subscribe(show => upgradesBadge.SetActive(show))
                 .AddTo(disposables);
         }
 
         if (managersBadge != null)
         {
-            vm.ShowManagersBadge
-                .DistinctUntilChanged()
+            vm.ShowManagersBadge.DistinctUntilChanged()
                 .Subscribe(show => managersBadge.SetActive(show))
                 .AddTo(disposables);
         }

@@ -4,6 +4,7 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Canvas))]
 [RequireComponent(typeof(CanvasGroup))]
 [RequireComponent(typeof(GraphicRaycaster))]
+[DisallowMultipleComponent]
 public abstract class UiScreenView : MonoBehaviour
 {
     [SerializeField]

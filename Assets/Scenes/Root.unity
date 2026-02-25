@@ -689,6 +689,9 @@ MonoBehaviour:
   - Id: AD_BOOST
     Prefab: {fileID: 9008322863671493908, guid: a1a10fe777e7e4e6d800f345ffda0a06,
       type: 3}
+  - Id: PRESTIGE
+    Prefab: {fileID: 4134247766494976815, guid: 95c8a0fde236845d3858be03673ffa85,
+      type: 3}
 --- !u!1 &1263566856
 GameObject:
   m_ObjectHideFlags: 0
