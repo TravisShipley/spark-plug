@@ -232,11 +232,6 @@ public class GeneratorService : IDisposable
         cycleCompleted.OnNext(Unit.Default);
     }
 
-    public void HandleCollectPressed(double cashGenerated)
-    {
-        gameEventStream.PublishIncrementBalance(definition.OutputResourceId, cashGenerated);
-    }
-
     private double CalculateOutput()
     {
         // Use reactive level + multiplier as the authoritative values.

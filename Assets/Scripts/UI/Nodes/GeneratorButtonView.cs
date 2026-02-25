@@ -7,9 +7,6 @@ public class GeneratorButtonView : MonoBehaviour
     [SerializeField]
     private Button runButton;
 
-    [SerializeField]
-    private double cashGenerated;
-
     private GeneratorViewModel viewModel;
 
     public void Bind(GeneratorViewModel viewModel)
@@ -32,7 +29,7 @@ public class GeneratorButtonView : MonoBehaviour
                     return;
                 }
 
-                viewModel.Collect(cashGenerated);
+                viewModel.CollectCommand.Execute();
             })
             .AddTo(this);
     }
