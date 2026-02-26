@@ -274,6 +274,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 7116838733395768739}
   - {fileID: 684060460636426913}
   m_Father: {fileID: 3486921687433746839}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -397,12 +398,12 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4462735394293042415}
+  m_Father: {fileID: 3652503808832068059}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0.5}
-  m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -40, y: 0}
-  m_SizeDelta: {x: 476.39, y: 100}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 1, y: 0.5}
 --- !u!222 &4764157031156470752
 CanvasRenderer:
@@ -708,8 +709,7 @@ MonoBehaviour:
   levelUpButtonView: {fileID: 3635495772463640559}
   levelHoldBinder: {fileID: 425567639847358693}
   collectButtonView: {fileID: 3735389938016155667}
-  progressBar: {fileID: 7556280380556630028}
-  progressFill: {fileID: 2698592441231946483}
+  progressBarView: {fileID: 3999058076842413936}
   levelProgressFill: {fileID: 1408802814458289828}
 --- !u!114 &4492073440729659432
 MonoBehaviour:
@@ -882,8 +882,9 @@ GameObject:
   - component: {fileID: 6792276326104339056}
   - component: {fileID: 4113971277424121781}
   - component: {fileID: 746963172614414498}
+  - component: {fileID: 3999058076842413936}
   m_Layer: 5
-  m_Name: Progress
+  m_Name: GeneratorProgressBarView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -902,7 +903,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8003064987968756059}
-  - {fileID: 7116838733395768739}
   m_Father: {fileID: 3486921687433746839}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
@@ -968,6 +968,19 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &3999058076842413936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7556280380556630028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee0c87f641b034fb3aac6c5abebcec31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GeneratorProgressBarView
+  progressFill: {fileID: 2698592441231946483}
 --- !u!1 &8066754856206494034
 GameObject:
   m_ObjectHideFlags: 0

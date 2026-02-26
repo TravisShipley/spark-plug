@@ -5,9 +5,6 @@ using UnityEngine.UI;
 
 public class GeneratorView : MonoBehaviour
 {
-    private const float MinCycleDurationSeconds = 0.0001f;
-    private const float ProgressCompleteEpsilon = 0.0001f;
-
     [Header("UI")]
     [SerializeField]
     private TextMeshProUGUI nameText;
@@ -45,29 +42,14 @@ public class GeneratorView : MonoBehaviour
 
     [Header("Progress")]
     [SerializeField]
-    private GameObject progressBar;
-
-    [SerializeField]
-    private Image progressFill;
+    private GeneratorProgressBarView progressBarView;
 
     [SerializeField]
     private Image levelProgressFill;
 
     private CompositeDisposable disposables = new();
     private GeneratorViewModel viewModel;
-
-    private float cycleStartTime;
-    private float lastCycleDuration;
     private bool canLevelUpCached;
-
-    private enum ProgressState
-    {
-        Idle, // Not animating (unowned or waiting to start)
-        Animating, // Progress bar animates toward full
-        Complete, // Bar is full and held at 1.0 until player collects
-    }
-
-    private ProgressState progressState;
 
     public void Bind(GeneratorViewModel vm)
     {
@@ -79,16 +61,13 @@ public class GeneratorView : MonoBehaviour
         disposables = new CompositeDisposable();
 
         Initialize(vm);
-
-        lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
-        progressState = ProgressState.Idle;
         canLevelUpCached = vm.CanLevelUp.Value;
 
         vm.CanLevelUp.DistinctUntilChanged()
             .Subscribe(value => canLevelUpCached = value)
             .AddTo(disposables);
 
-        BindProgress(vm);
+        progressBarView.Bind(vm);
         BindButtons(vm);
         BindOptionalUi(vm);
     }
@@ -113,8 +92,8 @@ public class GeneratorView : MonoBehaviour
             return Fail(nameof(nameText));
         if (outputText == null)
             return Fail(nameof(outputText));
-        if (progressFill == null)
-            return Fail(nameof(progressFill));
+        if (progressBarView == null)
+            return Fail(nameof(progressBarView));
         if (buildButtonView == null)
             return Fail(nameof(buildButtonView));
         if (levelUpButtonView == null)
@@ -129,76 +108,6 @@ public class GeneratorView : MonoBehaviour
     {
         Debug.LogError($"GeneratorView: Missing required ref '{fieldName}'.", this);
         return false;
-    }
-
-    private void BindProgress(GeneratorViewModel vm)
-    {
-        // Start the progress bar running
-        vm.IsRunning.DistinctUntilChanged()
-            .Where(running => running)
-            .Subscribe(_ =>
-            {
-                progressState = ProgressState.Animating;
-
-                cycleStartTime = Time.time;
-                lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
-
-                progressFill.fillAmount = 0f;
-            })
-            .AddTo(disposables);
-
-        // Manual mode: when the sim stops, keep animating until the bar reaches full, then hold.
-        vm.IsRunning.DistinctUntilChanged()
-            .Where(running => !running)
-            .Subscribe(_ =>
-            {
-                if (viewModel != null && viewModel.IsOwned.Value && !viewModel.IsAutomated.Value)
-                {
-                    // Collect can become available now; we keep animating until the bar reaches full.
-                    progressState = ProgressState.Animating;
-                }
-            })
-            .AddTo(disposables);
-
-        // Handle mid-cycle speed changes by preserving elapsed percentage
-        vm.CycleDurationSeconds.DistinctUntilChanged()
-            .Subscribe(newDuration =>
-            {
-                // If we're not actively running a cycle, just update the cached duration.
-                if (!vm.IsRunning.Value)
-                {
-                    lastCycleDuration = (float)newDuration;
-                    return;
-                }
-
-                // Preserve elapsed percentage based on simulation progress to avoid drift.
-                float percent = Mathf.Clamp01((float)vm.CycleProgress.Value);
-
-                lastCycleDuration = Mathf.Max(MinCycleDurationSeconds, (float)newDuration);
-                cycleStartTime = Time.time - percent * lastCycleDuration;
-            })
-            .AddTo(disposables);
-
-        // Visual sync on cycle completion:
-        // - Manual mode: animate to full and wait for Collect
-        // - Automated mode: immediately restart from 0
-        vm.CycleCompleted.Subscribe(_ =>
-            {
-                if (viewModel.IsAutomated.Value)
-                {
-                    progressState = ProgressState.Animating;
-                    cycleStartTime = Time.time;
-                    lastCycleDuration = (float)vm.CycleDurationSeconds.Value;
-
-                    progressFill.fillAmount = 0f;
-                }
-                else
-                {
-                    // Manual: collect happened; next StartRun will restart animation.
-                    progressState = ProgressState.Idle;
-                }
-            })
-            .AddTo(disposables);
     }
 
     private void BindButtons(GeneratorViewModel vm)
@@ -300,37 +209,13 @@ public class GeneratorView : MonoBehaviour
             {
                 if (ownedContainer != null)
                     ownedContainer.SetActive(owned);
-                if (progressBar != null)
-                    progressBar.SetActive(owned);
+                if (progressBarView != null)
+                    progressBarView.SetVisible(owned);
             })
             .AddTo(disposables);
     }
 
     #endregion
-
-    private void Update()
-    {
-        if (viewModel == null || !viewModel.IsOwned.Value)
-            return;
-
-        if (progressState == ProgressState.Complete)
-            return;
-
-        bool isRunning = viewModel.IsRunning.Value;
-        if (!isRunning && progressState != ProgressState.Animating)
-            return;
-
-        float duration = Mathf.Max(MinCycleDurationSeconds, lastCycleDuration);
-        float t = (Time.time - cycleStartTime) / duration;
-        float fill = Mathf.Clamp01(t);
-        progressFill.fillAmount = fill;
-
-        if (progressState == ProgressState.Animating && fill >= 1f - ProgressCompleteEpsilon)
-        {
-            progressState = ProgressState.Complete;
-            progressFill.fillAmount = 1f;
-        }
-    }
 
     private void OnDestroy()
     {
