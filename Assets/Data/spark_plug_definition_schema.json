@@ -2,428 +2,45 @@
   "gameId": "string",
   "version": 0.2,
 
-  "sheetSpec": {
-    "version": "1.0",
-    "notes": "Spreadsheet contract used to ensure tabs + headers exist. Does not validate row values.",
-    "settings": {
-      "headerRowIndex": 1,
-      "freezeHeaderRow": true,
-      "allowExtraColumns": true,
-      "newColumnsPolicy": "append",
-      "reservedSheets": ["PackMeta", "Dropdowns", "__Index", "__Notes"]
-    },
+  "meta": {
+    "schemaVersion": "string",
+    "schemaUrl": "string",
 
-    "tables": [
-      {
-        "name": "PackMeta",
-        "required": true,
-        "kind": "meta",
-        "primaryKey": "key",
-        "columns": [
-          { "name": "key", "required": true, "type": "string" },
-          { "name": "value", "required": true, "type": "string" }
-        ],
-        "recommendedRows": [
-          { "key": "schemaVersion", "value": "0.2" },
-          { "key": "schemaUrl", "value": "" }
-        ]
-      },
+    "gameId": "string?",
+    "version": "number?",
 
-      {
-        "name": "Resources",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "resourceId" },
-          { "name": "displayName", "required": true, "type": "string" },
-          {
-            "name": "kind",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.resourceKind"
-          },
-          {
-            "name": "format.style",
-            "required": false,
-            "type": "enum",
-            "enumRef": "enums.resourceFormatStyle"
-          },
-          { "name": "format.symbol", "required": false, "type": "string" },
-          { "name": "stackLimit", "required": false, "type": "numberString" }
-        ]
-      },
-
-      {
-        "name": "Zones",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "zoneId" },
-          { "name": "displayName", "required": true, "type": "string" },
-          { "name": "startingPhaseId", "required": false, "type": "phaseId" },
-          { "name": "localResources_json", "required": false, "type": "json" },
-          { "name": "tags", "required": false, "type": "stringList" }
-        ]
-      },
-
-      {
-        "name": "Nodes",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "nodeTypeId" },
-          {
-            "name": "type",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.nodeType"
-          },
-          { "name": "displayName", "required": true, "type": "string" },
-          { "name": "zoneId", "required": true, "type": "zoneId" },
-          { "name": "tags", "required": false, "type": "stringList" },
-
-          {
-            "name": "cycle.baseDurationSeconds",
-            "required": false,
-            "type": "numberString"
-          },
-          {
-            "name": "automation.policy",
-            "required": false,
-            "type": "enum",
-            "enumRef": "enums.automationPolicy"
-          },
-
-          {
-            "name": "leveling.levelResource",
-            "required": false,
-            "type": "resourceId"
-          },
-          { "name": "leveling.baseLevel", "required": false, "type": "int" },
-          {
-            "name": "leveling.priceCurve.type",
-            "required": false,
-            "type": "enum",
-            "enumRef": "enums.priceCurveType"
-          },
-          {
-            "name": "leveling.priceCurve.basePrice",
-            "required": false,
-            "type": "bigNumberString"
-          },
-          {
-            "name": "leveling.priceCurve.growth",
-            "required": false,
-            "type": "numberString"
-          }
-        ]
-      },
-
-      {
-        "name": "NodeOutputs",
-        "required": false,
-        "kind": "subtable",
-        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
-        "columns": [
-          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
-          { "name": "resource", "required": true, "type": "resourceId" },
-          {
-            "name": "mode",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.outputMode"
-          },
-          {
-            "name": "basePerSecond",
-            "required": false,
-            "type": "bigNumberString"
-          },
-          {
-            "name": "basePayout",
-            "required": false,
-            "type": "bigNumberString"
-          },
-          {
-            "name": "amountPerCycle",
-            "required": false,
-            "type": "bigNumberString"
-          }
-        ]
-      },
-
-      {
-        "name": "NodeInputs",
-        "required": false,
-        "kind": "subtable",
-        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
-        "columns": [
-          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
-          { "name": "resource", "required": true, "type": "resourceId" },
-          {
-            "name": "amountPerCycle",
-            "required": false,
-            "type": "bigNumberString"
-          }
-        ]
-      },
-
-      {
-        "name": "NodeCapacities",
-        "required": false,
-        "kind": "subtable",
-        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
-        "columns": [
-          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
-          { "name": "resource", "required": true, "type": "resourceId" },
-          {
-            "name": "capacityMode",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.capacityMode"
-          },
-          {
-            "name": "baseCapacity",
-            "required": false,
-            "type": "bigNumberString"
-          },
-          {
-            "name": "baseCapacityPerSecond",
-            "required": false,
-            "type": "bigNumberString"
-          }
-        ]
-      },
-
-      {
-        "name": "Modifiers",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "modifierId" },
-          { "name": "source", "required": true, "type": "string" },
-          { "name": "zoneId", "required": false, "type": "zoneId" },
-
-          {
-            "name": "scope.kind",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.scopeKind"
-          },
-          { "name": "scope.zoneId", "required": false, "type": "zoneId" },
-          { "name": "scope.nodeId", "required": false, "type": "nodeTypeId" },
-          { "name": "scope.nodeTag", "required": false, "type": "string" },
-          { "name": "scope.resource", "required": false, "type": "resourceId" },
-
-          {
-            "name": "operation",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.modifierOperation"
-          },
-          { "name": "target", "required": true, "type": "string" },
-          {
-            "name": "value",
-            "required": false,
-            "type": "numberOrBigNumberString"
-          }
-        ],
-        "notes": [
-          "target uses bracket syntax for resource-param targets: nodeOutput[currencySoft], resourceGain[currencySoft], etc."
-        ]
-      },
-
-      {
-        "name": "Upgrades",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "upgradeId" },
-          { "name": "displayName", "required": true, "type": "string" },
-          {
-            "name": "category",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.upgradeCategory"
-          },
-          { "name": "zoneId", "required": true, "type": "zoneId" },
-          { "name": "cost_json", "required": true, "type": "json" },
-          { "name": "effects_json", "required": true, "type": "json" },
-          { "name": "requirements_json", "required": false, "type": "json" },
-          { "name": "tags", "required": false, "type": "stringList" }
-        ]
-      },
-
-      {
-        "name": "Milestones",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "milestoneId" },
-          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
-          { "name": "zoneId", "required": true, "type": "zoneId" },
-          { "name": "atLevel", "required": true, "type": "int" },
-          { "name": "grantEffects_json", "required": true, "type": "json" }
-        ]
-      },
-
-      {
-        "name": "Buffs",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "buffId" },
-          { "name": "displayName", "required": true, "type": "string" },
-          { "name": "zoneId", "required": true, "type": "zoneId" },
-          {
-            "name": "durationSeconds",
-            "required": true,
-            "type": "numberString"
-          },
-          {
-            "name": "stacking",
-            "required": false,
-            "type": "enum",
-            "enumRef": "enums.buffStacking"
-          },
-          { "name": "effects_json", "required": true, "type": "json" }
-        ]
-      },
-
-      {
-        "name": "BuyModes",
-        "required": false,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "buyModeId" },
-          { "name": "displayName", "required": true, "type": "string" },
-          {
-            "name": "kind",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.buyModeKind"
-          },
-          { "name": "fixedCount", "required": false, "type": "int" },
-          { "name": "tags", "required": false, "type": "stringList" }
-        ]
-      },
-
-      {
-        "name": "UnlockGraph",
-        "required": false,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "unlockId" },
-          { "name": "zoneId", "required": true, "type": "zoneId" },
-          { "name": "unlocks_json", "required": true, "type": "json" },
-          { "name": "requirements_json", "required": false, "type": "json" }
-        ]
-      },
-
-      {
-        "name": "Triggers",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "triggerId" },
-          { "name": "zoneId", "required": true, "type": "zoneId" },
-          {
-            "name": "event",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.triggerEvent"
-          },
-          { "name": "scope_json", "required": true, "type": "json" },
-          { "name": "conditions_json", "required": false, "type": "json" },
-          { "name": "chance", "required": false, "type": "numberString" },
-          {
-            "name": "cooldownSeconds",
-            "required": false,
-            "type": "numberString"
-          },
-          {
-            "name": "maxActivationsPerSession",
-            "required": false,
-            "type": "int"
-          },
-          { "name": "actions_json", "required": true, "type": "json" }
-        ],
-        "notes": [
-          "Triggers can be normalized into subtables later (TriggerConditions/TriggerActions) if JSON-in-cells becomes too heavy."
-        ]
-      },
-
-      {
-        "name": "RewardPools",
-        "required": true,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "rewardPoolId" },
-          { "name": "rewards_json", "required": true, "type": "json" }
-        ],
-        "notes": [
-          "A RewardPool is a weighted list of actions. The JSON shape is validated by GameDefinitionValidator."
-        ]
-      }
-    ],
-
-    "enums": {
-      "resourceKind": [
-        "softCurrency",
-        "hardCurrency",
-        "metaCurrency",
-        "inventory"
-      ],
-      "resourceFormatStyle": ["currency", "suffix", "plain"],
-      "nodeType": ["producer", "converter", "bottleneck", "sink"],
-      "automationPolicy": [
-        "alwaysOn",
-        "manualCollect",
-        "autoRepeat",
-        "manualStart"
-      ],
-      "priceCurveType": ["exponential", "linear", "piecewise", "table"],
-      "outputMode": ["rate", "cycle"],
-      "capacityMode": ["capacity", "throughputPerSecond"],
-      "scopeKind": ["global", "zone", "node", "nodeTag", "resource"],
-      "modifierOperation": ["add", "multiply", "set", "clampMin", "clampMax"],
-      "upgradeCategory": [
-        "node",
-        "global",
-        "automation",
-        "prestige",
-        "progression"
-      ],
-      "buffStacking": ["none", "refresh", "extend", "ignore", "stack"],
-      "buyModeKind": ["fixed", "nextMilestone", "maxAffordable"],
-      "triggerEvent": [
-        "node.cycleComplete",
-        "node.collect",
-        "node.start",
-        "node.levelPurchased",
-        "resource.gained",
-        "offline.claim",
-        "ad.rewarded",
-        "session.tick",
-        "prestige.reset",
-        "upgrade.purchased"
-      ]
+    "numberFormat": {
+      "type": "mantissaExponent|scientific|alphabetic|plain",
+      "precision": 16
     }
   },
 
-  "numberFormat": {
-    "type": "mantissaExponent|decimalString",
-    "precision": 16
+  "engineConfig": {
+    "simulation": {
+      "tickIntervalMs": 30,
+      "maxSimulationStepSeconds": 0.5
+    }
+  },
+
+  "gameConfig": {
+    "offline": {
+      "enabled": true,
+      "baseCapSeconds": 0,
+      "maxCyclesPerNodeInstance": 0
+    },
+    "prestige": {
+      "enabled": false,
+      "reset": {
+        "nodes": true,
+        "softCurrencies": true,
+        "hardCurrencies": false
+      }
+    }
+  },
+
+  "uiDefaults": {
+    "defaultBuyModeId": "buyModeId",
+    "buyModeIds": ["buyModeId"]
   },
 
   "resources": [
@@ -530,22 +147,22 @@
               }
             }
           ]
-        },
-
-        "outputScaling": [
-          {
-            "target": "outputs[resourceId].basePerSecond|outputs[resourceId].basePayout|outputs[resourceId].amountPerCycle",
-            "perLevel": { "type": "add|multiply", "value": "numberString" }
-          }
-        ],
-
-        "capacityScaling": [
-          {
-            "target": "capacities[resourceId].baseCapacity|capacities[resourceId].baseCapacityPerSecond",
-            "perLevel": { "type": "add|multiply", "value": "numberString" }
-          }
-        ]
+        }
       },
+
+      "outputScaling": [
+        {
+          "target": "outputs[resourceId].basePerSecond|outputs[resourceId].basePayout|outputs[resourceId].amountPerCycle",
+          "perLevel": { "type": "add|multiply|set", "value": "numberString" }
+        }
+      ],
+
+      "capacityScaling": [
+        {
+          "target": "capacities[resourceId].baseCapacity|capacities[resourceId].baseCapacityPerSecond",
+          "perLevel": { "type": "add|multiply", "value": "numberString" }
+        }
+      ],
 
       "automation": {
         "policy": "alwaysOn|manualCollect|autoRepeat|manualStart",
@@ -567,7 +184,7 @@
       "id": "instanceId",
       "nodeId": "nodeTypeId",
       "zoneId": "zone.main",
-      "displayNameOverride": "string?",
+      "displayName": "string?",
       "tags": ["string"],
       "initialState": { "level": 0, "enabled": true }
     }
@@ -783,7 +400,7 @@
     "resetScopes": {
       "resetNodes": true,
       "resetSoftCurrencies": true,
-      "keepHardCurrencies": true,
+      "resetHardCurrencies": false,
       "keepUnlocks": [],
       "keepUpgrades": [],
       "keepProjects": []

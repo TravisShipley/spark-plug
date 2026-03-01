@@ -30,26 +30,89 @@ using UnityEngine.Networking;
 public static class GoogleSheetImporter
 {
     private const string OutputPath = "Assets/Data/game_definition.json";
+    private const string DataTextPath = "Assets/Data/data.txt";
     private const string SchemaPath = "Assets/Data/spark_plug_definition_schema.json";
     private const string SheetSpecPath = "Assets/Data/spark_plug_sheet_spec.json";
+    private const string CsvExportDirectory = "Assets/Data/Csv";
+    private const string CsvAiBundlePath = "Assets/Data/Csv/_sheets_export_for_ai.json";
     private const string IndexSheetName = "__Index";
     private const int MaxSchemaValidationErrors = 25;
+
+    private sealed class SheetSpecColumn
+    {
+        public string Name;
+        public bool Required;
+        public string Type;
+    }
+
+    private sealed class SheetSpecRename
+    {
+        public string From;
+        public string To;
+    }
+
+    private sealed class SheetSpecEmbed
+    {
+        public string ParentTable;
+        public string ParentIdColumn;
+        public string ForeignKeyColumn;
+        public string As;
+    }
 
     private sealed class SheetSpecTable
     {
         public string Name;
+        public string PackKey;
+        public string Emit;
+        public string RowMode;
         public bool Required;
         public bool IsVirtual;
-        public string OutputKey;
+        public string PrimaryKey;
+        public readonly List<SheetSpecColumn> Columns = new();
+        public readonly List<SheetSpecRename> ColumnRenames = new();
+        public readonly Dictionary<string, SheetSpecColumn> ColumnsByName = new(
+            StringComparer.OrdinalIgnoreCase
+        );
+        public readonly Dictionary<string, string> RenamedColumnsByFrom = new(
+            StringComparer.OrdinalIgnoreCase
+        );
+        public SheetSpecEmbed Embed;
     }
 
     private sealed class SheetSpecDefinition
     {
+        private readonly List<SheetSpecTable> tablesInOrder = new();
         private readonly Dictionary<string, SheetSpecTable> byName = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly HashSet<string> reservedSheets = new(StringComparer.OrdinalIgnoreCase);
 
-        public IReadOnlyList<SheetSpecTable> Tables => byName.Values.ToList();
+        public bool AllowExtraColumns { get; set; } = true;
+        public IReadOnlyList<SheetSpecTable> TablesInOrder => tablesInOrder;
+
+        public void AddReservedSheet(string sheetName)
+        {
+            if (string.IsNullOrWhiteSpace(sheetName))
+                return;
+
+            reservedSheets.Add(sheetName.Trim());
+        }
+
+        public bool IsReservedSheet(string sheetName)
+        {
+            if (string.IsNullOrWhiteSpace(sheetName))
+                return false;
+
+            return reservedSheets.Contains(sheetName.Trim());
+        }
+
+        public bool ContainsTable(string tableName)
+        {
+            if (string.IsNullOrWhiteSpace(tableName))
+                return false;
+
+            return byName.ContainsKey(tableName.Trim());
+        }
 
         public void Add(SheetSpecTable table)
         {
@@ -63,6 +126,7 @@ public static class GoogleSheetImporter
                 );
             }
 
+            tablesInOrder.Add(table);
             byName[table.Name] = table;
         }
 
@@ -84,12 +148,30 @@ public static class GoogleSheetImporter
         }
 
         public IEnumerable<string> RequiredNonVirtualTableNames =>
-            byName.Values.Where(t => t.Required && !t.IsVirtual).Select(t => t.Name);
+            tablesInOrder.Where(t => t.Required && !t.IsVirtual).Select(t => t.Name);
+    }
+
+    private sealed class ParsedTable
+    {
+        public SheetSpecTable Definition;
+        public List<string> Header = new();
+        public List<Dictionary<string, object>> Rows = new();
+    }
+
+    private sealed class RawSheetSnapshot
+    {
+        public string Name;
+        public string Gid;
+        public int Order;
+        public bool IsIndex;
+        public string Csv;
     }
 
     [MenuItem("SparkPlug/Import From Google Sheet")]
     public static void Import()
     {
+        Debug.ClearDeveloperConsole();
+
         var config = FindConfig();
         if (config == null)
         {
@@ -126,7 +208,10 @@ public static class GoogleSheetImporter
         try
         {
             var sheetSpec = LoadSheetSpecDefinition();
-            var tables = FetchAllTables(spreadsheetId, config.apiKey, sheetSpec);
+            PrepareCsvExportDirectory();
+            var rawSheetSnapshots = new List<RawSheetSnapshot>();
+            var tables = FetchAllTables(spreadsheetId, config.apiKey, sheetSpec, rawSheetSnapshots);
+            PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
             if (tables.Count == 0)
             {
                 EditorUtility.DisplayDialog(
@@ -142,13 +227,13 @@ public static class GoogleSheetImporter
                 .Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var importedTableSummary = importedTableNames
-                .Select(name => $"{name}({tables[name].Count})")
+                .Select(name => $"{name}({tables[name].Rows.Count})")
                 .ToList();
             Debug.Log(
                 $"[GoogleSheetImporter] Imported {importedTableNames.Count} table(s): {string.Join(", ", importedTableSummary)}"
             );
 
-            var pack = BuildPack(tables, sheetSpec);
+            var pack = BuildPackFromSpec(tables, sheetSpec);
             ValidatePack(pack);
             WriteJson(pack);
 
@@ -243,14 +328,20 @@ public static class GoogleSheetImporter
         return $"https://sheets.googleapis.com/v4/spreadsheets/{Uri.EscapeDataString(spreadsheetId)}/values/{Uri.EscapeDataString(range)}?key={Uri.EscapeDataString(apiKey)}";
     }
 
+    private static string BuildCsvExportByGidUrl(string spreadsheetId, string gid)
+    {
+        return $"https://docs.google.com/spreadsheets/d/{Uri.EscapeDataString(spreadsheetId)}/export?format=csv&gid={Uri.EscapeDataString(gid ?? string.Empty)}";
+    }
+
     // ----------------------------
     // Index-driven import (Sheets API v4)
     // ----------------------------
 
-    private static Dictionary<string, List<Dictionary<string, object>>> FetchAllTables(
+    private static Dictionary<string, ParsedTable> FetchAllTables(
         string spreadsheetId,
         string apiKey,
-        SheetSpecDefinition sheetSpec
+        SheetSpecDefinition sheetSpec,
+        List<RawSheetSnapshot> rawSheetSnapshots
     )
     {
         // 1) Get spreadsheet metadata
@@ -273,13 +364,14 @@ public static class GoogleSheetImporter
         var indexRange = $"'{IndexSheetName}'!A:Z";
         var indexValues = GetSheetValues(spreadsheetId, indexRange, apiKey);
         var indexCsv = ValuesToCsv(indexValues);
+        ExportRawSheetCsv(IndexSheetName, indexCsv);
+        AddRawSheetSnapshot(rawSheetSnapshots, IndexSheetName, string.Empty, -1, true, indexCsv);
+        PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
         var index = ParseIndex(indexCsv);
         ValidateRequiredTablesInIndex(index, sheetSpec);
 
         // 5) Import tables in order
-        var tables = new Dictionary<string, List<Dictionary<string, object>>>(
-            StringComparer.OrdinalIgnoreCase
-        );
+        var tables = new Dictionary<string, ParsedTable>(StringComparer.OrdinalIgnoreCase);
 
         for (int i = 0; i < index.Count; i++)
         {
@@ -290,96 +382,107 @@ public static class GoogleSheetImporter
                 index.Count == 0 ? 1f : (i + 1f) / index.Count
             );
 
-            // Find the sheet by name
+            if (
+                entry.TableName.StartsWith("_", StringComparison.Ordinal)
+                || entry.TableName.StartsWith("//", StringComparison.Ordinal)
+            )
+                continue;
+
+            if (
+                sheetSpec.IsReservedSheet(entry.TableName)
+                && !string.Equals(entry.TableName, IndexSheetName, StringComparison.Ordinal)
+                && !sheetSpec.ContainsTable(entry.TableName)
+            )
+            {
+                Debug.Log(
+                    $"[GoogleSheetImporter] Reserved sheet '{entry.TableName}' is enabled in __Index. Ignoring."
+                );
+                continue;
+            }
+
+            if (!sheetSpec.TryGet(entry.TableName, out var tableDef))
+            {
+                Debug.LogWarning($"Unknown/unsupported sheet '{entry.TableName}'. Ignoring.");
+                continue;
+            }
+
             var sheet = FindSheetByName(metadata, entry.TableName);
-            if (sheet == null)
+            if (sheet == null && string.IsNullOrWhiteSpace(entry.Gid))
             {
                 throw new InvalidOperationException(
                     $"Sheet '{entry.TableName}' listed in __Index does not exist in the spreadsheet."
                 );
             }
 
-            if (!(sheet is Dictionary<string, object> sheetDict))
+            var csv = string.Empty;
+            if (!string.IsNullOrWhiteSpace(entry.Gid))
             {
-                Debug.LogWarning(
-                    $"[GoogleSheetImporter] Invalid sheet metadata for '{entry.TableName}'. Skipping."
-                );
-                continue;
+                var gidCsvUrl = BuildCsvExportByGidUrl(spreadsheetId, entry.Gid);
+                csv = DownloadText(gidCsvUrl) ?? string.Empty;
             }
 
-            if (
-                !sheetDict.TryGetValue("properties", out var propsObj)
-                || !(propsObj is Dictionary<string, object> props)
-                || !props.TryGetValue("title", out var titleObj)
-            )
+            if (string.IsNullOrWhiteSpace(csv))
             {
-                Debug.LogWarning(
-                    $"[GoogleSheetImporter] Could not get sheet name for '{entry.TableName}'. Skipping."
-                );
-                continue;
-            }
-
-            var sheetName = titleObj?.ToString();
-            if (string.IsNullOrEmpty(sheetName))
-            {
-                Debug.LogWarning(
-                    $"[GoogleSheetImporter] Empty sheet name for '{entry.TableName}'. Skipping."
-                );
-                continue;
-            }
-
-            var range = $"'{sheetName}'!A:Z";
-            var values = GetSheetValues(spreadsheetId, range, apiKey);
-
-            if (values == null || values.Count == 0)
-            {
-                if (sheetSpec != null && sheetSpec.IsRequired(entry.TableName))
+                if (!(sheet is Dictionary<string, object> sheetDict))
                 {
                     throw new InvalidOperationException(
-                        $"Required table '{entry.TableName}' has no readable rows. "
-                            + "Keep the tab enabled in __Index and include at least a header row. "
-                            + "Header-only tabs are valid and will import as empty arrays."
+                        $"Could not resolve sheet metadata for '{entry.TableName}'."
                     );
                 }
 
-                Debug.LogWarning(
-                    $"[GoogleSheetImporter] Could not download sheet '{entry.TableName}'. Skipping."
-                );
-                continue;
+                if (
+                    !sheetDict.TryGetValue("properties", out var propsObj)
+                    || propsObj is not Dictionary<string, object> props
+                    || !props.TryGetValue("title", out var titleObj)
+                )
+                {
+                    throw new InvalidOperationException(
+                        $"Could not read sheet properties for '{entry.TableName}'."
+                    );
+                }
+
+                var sheetName = titleObj?.ToString();
+                if (string.IsNullOrWhiteSpace(sheetName))
+                {
+                    throw new InvalidOperationException(
+                        $"Empty sheet name in metadata for '{entry.TableName}'."
+                    );
+                }
+
+                var range = $"'{sheetName}'!A:Z";
+                var values = GetSheetValues(spreadsheetId, range, apiKey);
+                csv = ValuesToCsv(values);
             }
 
-            var csv = ValuesToCsv(values);
-            var rows = ParseCsv(csv);
+            ExportRawSheetCsv(entry.TableName, csv);
+            AddRawSheetSnapshot(
+                rawSheetSnapshots,
+                entry.TableName,
+                entry.Gid,
+                entry.Order,
+                false,
+                csv
+            );
+            PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
+
+            var rows = ParseCsv(csv ?? string.Empty);
             if (rows.Count < 1)
             {
-                if (sheetSpec != null && sheetSpec.IsRequired(entry.TableName))
-                {
-                    throw new InvalidOperationException(
-                        $"Required table '{entry.TableName}' is missing a header row. "
-                            + "Header-only tabs are valid and will import as empty arrays."
-                    );
-                }
-
-                continue;
+                throw new InvalidOperationException(
+                    $"Sheet '{entry.TableName}' is missing a header row."
+                );
             }
 
             var headerRow = rows[0];
+            ValidateTableHeaders(entry.TableName, headerRow, tableDef, sheetSpec.AllowExtraColumns);
+            var parsedRows = ParseTableRows(rows, tableDef);
 
-            // If the table tab itself is "commented out" (starts with "__"), ignore.
-            if (entry.TableName.StartsWith("__", StringComparison.Ordinal))
-                continue;
-
-            var dataRows = rows.Skip(1)
-                .Where(r => !IsCommentRow(r))
-                .Select(r => RowToDict(r, headerRow))
-                .Where(d => d.Count > 0)
-                .ToList();
-
-            var isRequired = sheetSpec != null && sheetSpec.IsRequired(entry.TableName);
-
-            // Meta and required sheets may be header-only but still meaningful.
-            if (dataRows.Count > 0 || IsMetaSheet(entry.TableName) || isRequired)
-                tables[entry.TableName] = dataRows;
+            tables[entry.TableName] = new ParsedTable
+            {
+                Definition = tableDef,
+                Header = new List<string>(headerRow),
+                Rows = parsedRows,
+            };
         }
 
         return tables;
@@ -443,7 +546,7 @@ public static class GoogleSheetImporter
                 continue;
 
             var title = titleObj?.ToString();
-            if (string.Equals(title, sheetName, StringComparison.Ordinal))
+            if (string.Equals(title, sheetName, StringComparison.OrdinalIgnoreCase))
                 return sheetDict;
         }
 
@@ -751,6 +854,7 @@ public static class GoogleSheetImporter
     {
         public string TableName;
         public int Order;
+        public string Gid;
     }
 
     private static List<IndexEntry> ParseIndex(string indexCsv)
@@ -763,18 +867,24 @@ public static class GoogleSheetImporter
 
         var header = rows[0].Select(h => (h ?? "").Trim()).ToList();
 
-        var sheetCol = FindColumnIndex(header, "sheet");
+        var sheetCol = FindColumnIndex(header, "tableName");
+        if (sheetCol < 0)
+            sheetCol = FindColumnIndex(header, "sheet");
         var enabledCol = FindColumnIndex(header, "enabled");
         var orderCol = FindColumnIndex(header, "order");
+        var gidCol = FindColumnIndex(header, "gid");
 
         if (sheetCol < 0)
-            throw new InvalidOperationException("__Index must include a 'sheet' column.");
+            throw new InvalidOperationException(
+                "__Index must include a 'tableName' column (or legacy 'sheet')."
+            );
         if (enabledCol < 0)
             throw new InvalidOperationException("__Index must include an 'enabled' column.");
         if (orderCol < 0)
             throw new InvalidOperationException("__Index must include an 'order' column.");
 
         var entries = new List<IndexEntry>();
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (int r = 1; r < rows.Count; r++)
         {
@@ -790,13 +900,16 @@ public static class GoogleSheetImporter
             // - __Foo
             // - // Foo
             if (
-                rawName.StartsWith("__", StringComparison.Ordinal)
+                rawName.StartsWith("_", StringComparison.Ordinal)
+                || rawName.StartsWith("__", StringComparison.Ordinal)
                 || rawName.StartsWith("//", StringComparison.Ordinal)
             )
                 continue;
 
             if (!IsEnabled(GetCell(row, enabledCol)))
                 continue;
+
+            var gid = gidCol >= 0 ? GetCell(row, gidCol).Trim() : string.Empty;
 
             var ord = 0;
             int.TryParse(
@@ -806,7 +919,21 @@ public static class GoogleSheetImporter
                 out ord
             );
 
-            entries.Add(new IndexEntry { TableName = rawName, Order = ord });
+            if (!seenNames.Add(rawName))
+            {
+                throw new InvalidOperationException(
+                    $"__Index contains duplicate enabled table '{rawName}'."
+                );
+            }
+
+            entries.Add(
+                new IndexEntry
+                {
+                    TableName = rawName,
+                    Order = ord,
+                    Gid = gid,
+                }
+            );
         }
 
         // Stable ordering: order asc, then name asc.
@@ -847,7 +974,7 @@ public static class GoogleSheetImporter
             "Required sheet tab(s) are missing or disabled in __Index: "
                 + string.Join(", ", missingRequired)
                 + ". Add each required tab to __Index with enabled=true. "
-                + "Header-only tabs are valid and will import as empty arrays."
+                + "Header-only tabs are valid and will import as empty arrays/objects."
         );
     }
 
@@ -859,7 +986,6 @@ public static class GoogleSheetImporter
             "Assets/data/spark_plug_sheet_spec.json",
             "Assets/Data/sheetSpec.json",
             "Assets/data/sheetSpec.json",
-            SchemaPath,
         };
 
         string resolvedPath = null;
@@ -894,7 +1020,7 @@ public static class GoogleSheetImporter
             root.TryGetValue("sheetSpec", out var nested) && nested is Dictionary<string, object> ns
         )
             sheetSpecObject = ns;
-        else if (root.TryGetValue("tables", out var _))
+        else if (root.TryGetValue("tables", out _))
             sheetSpecObject = root;
 
         if (sheetSpecObject == null)
@@ -915,28 +1041,107 @@ public static class GoogleSheetImporter
         }
 
         var definition = new SheetSpecDefinition();
+        if (
+            sheetSpecObject.TryGetValue("settings", out var settingsObj)
+            && settingsObj is Dictionary<string, object> settings
+        )
+        {
+            var allowExtraColumns = ReadNullableBool(settings, "allowExtraColumns");
+            if (allowExtraColumns.HasValue)
+                definition.AllowExtraColumns = allowExtraColumns.Value;
+
+            if (
+                settings.TryGetValue("reservedSheets", out var reservedObj)
+                && reservedObj is List<object> reservedSheets
+            )
+            {
+                for (int i = 0; i < reservedSheets.Count; i++)
+                {
+                    var reservedName = reservedSheets[i]?.ToString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(reservedName))
+                        definition.AddReservedSheet(reservedName);
+                }
+            }
+        }
+
         for (int i = 0; i < tables.Count; i++)
         {
-            if (tables[i] is not Dictionary<string, object> table)
+            if (tables[i] is not Dictionary<string, object> tableObj)
                 continue;
 
-            var name = ReadString(table, "name");
+            var name = ReadString(tableObj, "name");
             if (string.IsNullOrEmpty(name))
                 continue;
 
-            var outputKey = ReadString(table, "outputKey");
-            if (string.IsNullOrEmpty(outputKey))
-                outputKey = ReadString(table, "packKey");
+            var table = new SheetSpecTable
+            {
+                Name = name,
+                PackKey = ReadString(tableObj, "packKey") ?? ReadString(tableObj, "outputKey"),
+                Emit = ReadString(tableObj, "emit"),
+                RowMode = ReadString(tableObj, "rowMode"),
+                Required = ReadBool(tableObj, "required"),
+                PrimaryKey = ReadString(tableObj, "primaryKey"),
+                IsVirtual = ReadBool(tableObj, "virtual") || ReadBool(tableObj, "isVirtual"),
+            };
 
-            definition.Add(
-                new SheetSpecTable
+            if (tableObj.TryGetValue("columns", out var colsObj) && colsObj is List<object> columns)
+            {
+                for (int c = 0; c < columns.Count; c++)
                 {
-                    Name = name,
-                    Required = ReadBool(table, "required"),
-                    IsVirtual = ReadBool(table, "virtual") || ReadBool(table, "isVirtual"),
-                    OutputKey = outputKey,
+                    if (columns[c] is not Dictionary<string, object> colObj)
+                        continue;
+
+                    var colName = ReadString(colObj, "name");
+                    if (string.IsNullOrWhiteSpace(colName))
+                        continue;
+
+                    var column = new SheetSpecColumn
+                    {
+                        Name = colName,
+                        Required = ReadBool(colObj, "required"),
+                        Type = ReadString(colObj, "type"),
+                    };
+
+                    table.Columns.Add(column);
+                    table.ColumnsByName[colName] = column;
                 }
-            );
+            }
+
+            if (
+                tableObj.TryGetValue("columnRenames", out var renamesObj)
+                && renamesObj is List<object> renames
+            )
+            {
+                for (int r = 0; r < renames.Count; r++)
+                {
+                    if (renames[r] is not Dictionary<string, object> renameObj)
+                        continue;
+
+                    var from = ReadString(renameObj, "from");
+                    var to = ReadString(renameObj, "to");
+                    if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
+                        continue;
+
+                    table.ColumnRenames.Add(new SheetSpecRename { From = from, To = to });
+                    table.RenamedColumnsByFrom[from] = to;
+                }
+            }
+
+            if (
+                tableObj.TryGetValue("embed", out var embedObj)
+                && embedObj is Dictionary<string, object> embedDict
+            )
+            {
+                table.Embed = new SheetSpecEmbed
+                {
+                    ParentTable = ReadString(embedDict, "parentTable"),
+                    ParentIdColumn = ReadString(embedDict, "parentIdColumn"),
+                    ForeignKeyColumn = ReadString(embedDict, "foreignKeyColumn"),
+                    As = ReadString(embedDict, "as"),
+                };
+            }
+
+            definition.Add(table);
         }
 
         return definition;
@@ -1003,11 +1208,315 @@ public static class GoogleSheetImporter
         return false;
     }
 
+    private static bool? ReadNullableBool(Dictionary<string, object> obj, string key)
+    {
+        if (obj == null || string.IsNullOrWhiteSpace(key))
+            return null;
+
+        if (!obj.TryGetValue(key, out var value) || value == null)
+            return null;
+
+        if (value is bool b)
+            return b;
+
+        var s = value.ToString().Trim();
+        if (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (string.Equals(s, "false", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return null;
+    }
+
+    private static void PrepareCsvExportDirectory()
+    {
+        if (!Directory.Exists(CsvExportDirectory))
+        {
+            Directory.CreateDirectory(CsvExportDirectory);
+            return;
+        }
+
+        var existingCsvFiles = Directory.GetFiles(CsvExportDirectory, "*.csv");
+        for (int i = 0; i < existingCsvFiles.Length; i++)
+            File.Delete(existingCsvFiles[i]);
+
+        if (File.Exists(CsvAiBundlePath))
+            File.Delete(CsvAiBundlePath);
+    }
+
+    private static void ExportRawSheetCsv(string sheetName, string csv)
+    {
+        var safeName = SanitizeFileName(sheetName);
+        if (string.IsNullOrWhiteSpace(safeName))
+            safeName = "sheet";
+
+        var path = Path.Combine(CsvExportDirectory, $"{safeName}.csv");
+        File.WriteAllText(path, csv ?? string.Empty, new UTF8Encoding(false));
+    }
+
+    private static string SanitizeFileName(string rawName)
+    {
+        if (string.IsNullOrWhiteSpace(rawName))
+            return string.Empty;
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var trimmed = rawName.Trim();
+        var sb = new StringBuilder(trimmed.Length);
+        for (int i = 0; i < trimmed.Length; i++)
+        {
+            var c = trimmed[i];
+            sb.Append(invalidChars.Contains(c) ? '_' : c);
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static void AddRawSheetSnapshot(
+        List<RawSheetSnapshot> snapshots,
+        string sheetName,
+        string gid,
+        int order,
+        bool isIndex,
+        string csv
+    )
+    {
+        if (snapshots == null || string.IsNullOrWhiteSpace(sheetName))
+            return;
+
+        snapshots.Add(
+            new RawSheetSnapshot
+            {
+                Name = sheetName.Trim(),
+                Gid = (gid ?? string.Empty).Trim(),
+                Order = order,
+                IsIndex = isIndex,
+                Csv = csv ?? string.Empty,
+            }
+        );
+    }
+
+    private static void WriteAiSheetBundle(string spreadsheetId, List<RawSheetSnapshot> snapshots)
+    {
+        var ordered = snapshots ?? new List<RawSheetSnapshot>();
+        var sheets = ordered
+            .OrderBy(s => s.IsIndex ? 0 : 1)
+            .ThenBy(s => s.Order)
+            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(s =>
+                (object)
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["name"] = s.Name,
+                        ["gid"] = string.IsNullOrWhiteSpace(s.Gid) ? null : s.Gid,
+                        ["order"] = s.Order,
+                        ["isIndex"] = s.IsIndex,
+                        ["csv"] = s.Csv ?? string.Empty,
+                    }
+            )
+            .ToList();
+
+        var bundle = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["format"] = "sparkplug-google-sheet-export-v1",
+            ["spreadsheetId"] = spreadsheetId ?? string.Empty,
+            ["exportedAtUtc"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+            ["sheets"] = sheets,
+        };
+
+        File.WriteAllText(CsvAiBundlePath, ToJson(bundle), new UTF8Encoding(false));
+    }
+
+    private static void PersistRawSheetExports(
+        string spreadsheetId,
+        List<RawSheetSnapshot> snapshots
+    )
+    {
+        WriteAiSheetBundle(spreadsheetId, snapshots);
+        WriteDataText(snapshots);
+    }
+
+    private static void WriteDataText(List<RawSheetSnapshot> snapshots)
+    {
+        var ordered = (snapshots ?? new List<RawSheetSnapshot>())
+            .OrderBy(s => s.IsIndex ? 0 : 1)
+            .ThenBy(s => s.Order)
+            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            var sheet = ordered[i];
+            sb.Append(sheet.Name ?? string.Empty).Append('\n').Append('\n');
+            sb.Append(sheet.Csv ?? string.Empty);
+            if (sb.Length > 0 && sb[sb.Length - 1] != '\n')
+                sb.Append('\n');
+
+            sb.Append('\n').Append("---").Append('\n').Append('\n');
+        }
+
+        File.WriteAllText(DataTextPath, sb.ToString(), new UTF8Encoding(false));
+    }
+
     private static string GetCell(List<string> row, int col)
     {
         if (col < 0 || col >= row.Count)
             return "";
         return row[col] ?? "";
+    }
+
+    private static void ValidateTableHeaders(
+        string tableName,
+        List<string> headerRow,
+        SheetSpecTable tableDef,
+        bool allowExtraColumns
+    )
+    {
+        var normalizedHeaders = new HashSet<string>(
+            headerRow
+                .Select(h => (h ?? string.Empty).Trim())
+                .Where(h => !string.IsNullOrWhiteSpace(h)),
+            StringComparer.OrdinalIgnoreCase
+        );
+
+        for (int i = 0; i < tableDef.Columns.Count; i++)
+        {
+            var col = tableDef.Columns[i];
+            if (!col.Required)
+                continue;
+
+            if (normalizedHeaders.Contains(col.Name))
+                continue;
+
+            var hasAliasHeader = tableDef.ColumnRenames.Any(rename =>
+                string.Equals(rename.From, col.Name, StringComparison.OrdinalIgnoreCase)
+                && normalizedHeaders.Contains(rename.To)
+            );
+
+            if (!hasAliasHeader)
+            {
+                throw new InvalidOperationException(
+                    $"Sheet '{tableName}' missing required column '{col.Name}'."
+                );
+            }
+        }
+
+        if (allowExtraColumns)
+            return;
+
+        for (int i = 0; i < headerRow.Count; i++)
+        {
+            var header = (headerRow[i] ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(header))
+                continue;
+
+            if (!tableDef.ColumnsByName.ContainsKey(header))
+            {
+                throw new InvalidOperationException(
+                    $"Sheet '{tableName}' contains unsupported column '{header}'."
+                );
+            }
+        }
+    }
+
+    private static List<Dictionary<string, object>> ParseTableRows(
+        List<List<string>> rows,
+        SheetSpecTable tableDef
+    )
+    {
+        var parsedRows = new List<Dictionary<string, object>>();
+        if (rows == null || rows.Count == 0)
+            return parsedRows;
+
+        var header = rows[0];
+        for (int rowIndex = 1; rowIndex < rows.Count; rowIndex++)
+        {
+            var row = rows[rowIndex];
+            if (IsCommentRow(row))
+                continue;
+
+            var parsedRow = ParseDataRow(row, header, tableDef);
+            if (parsedRow.Count > 0)
+                parsedRows.Add(parsedRow);
+        }
+
+        return parsedRows;
+    }
+
+    private static Dictionary<string, object> ParseDataRow(
+        List<string> row,
+        List<string> header,
+        SheetSpecTable tableDef
+    )
+    {
+        var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < header.Count; i++)
+        {
+            var sourceColumn = (header[i] ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(sourceColumn))
+                continue;
+
+            if (
+                !TryResolveColumnForSourceHeader(
+                    tableDef,
+                    sourceColumn,
+                    out var canonicalColumn,
+                    out var colDef
+                )
+            )
+            {
+                continue;
+            }
+
+            var rawValue = GetCell(row, i);
+            if (string.IsNullOrWhiteSpace(rawValue) && (colDef == null || !colDef.Required))
+                continue;
+
+            var parsedValue = ParseValue(rawValue, canonicalColumn, colDef?.Type);
+            SetByPathRaw(dict, canonicalColumn, parsedValue);
+        }
+
+        return dict;
+    }
+
+    private static bool TryResolveColumnForSourceHeader(
+        SheetSpecTable tableDef,
+        string sourceColumn,
+        out string canonicalColumn,
+        out SheetSpecColumn colDef
+    )
+    {
+        canonicalColumn = null;
+        colDef = null;
+        if (tableDef == null || string.IsNullOrWhiteSpace(sourceColumn))
+            return false;
+
+        if (tableDef.ColumnsByName.TryGetValue(sourceColumn, out colDef))
+        {
+            canonicalColumn = tableDef.RenamedColumnsByFrom.TryGetValue(
+                sourceColumn,
+                out var renamed
+            )
+                ? renamed
+                : sourceColumn;
+            return true;
+        }
+
+        for (int i = 0; i < tableDef.ColumnRenames.Count; i++)
+        {
+            var rename = tableDef.ColumnRenames[i];
+            if (!string.Equals(rename.To, sourceColumn, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!tableDef.ColumnsByName.TryGetValue(rename.From, out colDef))
+                return false;
+
+            canonicalColumn = rename.To;
+            return true;
+        }
+
+        return false;
     }
 
     // ----------------------------
@@ -1155,54 +1664,12 @@ public static class GoogleSheetImporter
         if (row == null || row.Count == 0)
             return true;
 
-        var firstNonEmpty = string.Empty;
-        for (int i = 0; i < row.Count; i++)
-        {
-            var cell = (row[i] ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(cell))
-                continue;
-
-            firstNonEmpty = cell;
-            break;
-        }
-
-        if (string.IsNullOrEmpty(firstNonEmpty))
+        var firstCell = (row[0] ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(firstCell))
             return true;
 
-        return firstNonEmpty.StartsWith("_", StringComparison.Ordinal)
-            || firstNonEmpty.StartsWith("//", StringComparison.Ordinal);
-    }
-
-    // ----------------------------
-    // Row -> Dict (path nesting)
-    // ----------------------------
-
-    private static Dictionary<string, object> RowToDict(List<string> row, List<string> header)
-    {
-        var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-
-        for (int i = 0; i < header.Count && i < row.Count; i++)
-        {
-            var key = (header[i] ?? "").Trim();
-            if (string.IsNullOrEmpty(key))
-                continue;
-
-            var val = (row[i] ?? "").Trim();
-            if (string.IsNullOrEmpty(val) && !IsRequiredKey(key))
-                continue;
-
-            SetByPath(dict, key, val);
-        }
-
-        return dict;
-    }
-
-    private static bool IsRequiredKey(string key)
-    {
-        // Keys that we keep even if empty (helps avoid accidental missing critical fields).
-        var required = new[] { "id", "gameId", "version", "enabled" };
-        var baseKey = key.Split('.')[0];
-        return required.Contains(baseKey, StringComparer.OrdinalIgnoreCase);
+        return firstCell.StartsWith("_", StringComparison.Ordinal)
+            || firstCell.StartsWith("//", StringComparison.Ordinal);
     }
 
     private static void SetByPath(Dictionary<string, object> dict, string path, object value)
@@ -1249,17 +1716,60 @@ public static class GoogleSheetImporter
         current[parts[^1]] = parsed;
     }
 
-    private static object ParseValue(string s, string path)
+    private static void SetByPathRaw(Dictionary<string, object> dict, string path, object value)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        var parts = path.Split('.');
+        if (parts.Length == 1)
+        {
+            dict[parts[0]] = value;
+            return;
+        }
+
+        var current = dict;
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            var part = parts[i];
+            if (!current.TryGetValue(part, out var next))
+            {
+                var nextDict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                current[part] = nextDict;
+                current = nextDict;
+                continue;
+            }
+
+            if (next is Dictionary<string, object> asDict)
+            {
+                current = asDict;
+                continue;
+            }
+
+            throw new InvalidOperationException(
+                $"Key-path conflict while setting '{path}'. '{part}' already exists but is not an object."
+            );
+        }
+
+        current[parts[^1]] = value;
+    }
+
+    private static object ParseValue(string s, string path, string typeHint = null)
     {
         if (s == null)
             return null;
 
         s = s.Trim();
-        if (string.IsNullOrEmpty(s))
-            return null;
+        var normalizedType = (typeHint ?? string.Empty).Trim();
+        var isJsonColumn =
+            path.EndsWith("_json", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedType, "json", StringComparison.OrdinalIgnoreCase);
 
-        if (path.EndsWith("_json", StringComparison.OrdinalIgnoreCase))
+        if (isJsonColumn)
         {
+            if (string.IsNullOrEmpty(s))
+                return null;
+
             // Strict mode: fail loud if JSON is invalid.
             // Accept either raw JSON (preferred) OR a quoted/escaped JSON string (common when copy/pasting).
             var raw = s;
@@ -1283,9 +1793,67 @@ public static class GoogleSheetImporter
             }
 
             raw = raw.Trim();
-            raw = RemoveWhitespaceOutsideJsonStrings(raw);
+            if (
+                raw.StartsWith("[", StringComparison.Ordinal)
+                || raw.StartsWith("{", StringComparison.Ordinal)
+            )
+            {
+                var parsedJson = ParseJsonLikeValue(raw);
+                if (parsedJson is Dictionary<string, object> || parsedJson is List<object>)
+                    return parsedJson;
 
-            return ParseJsonLikeValue(raw);
+                throw new InvalidOperationException(
+                    $"Column '{path}' expects a JSON object/array value. Got: {s}"
+                );
+            }
+
+            raw = RemoveWhitespaceOutsideJsonStrings(raw);
+            var parsedFallback = ParseJsonLikeValue(raw);
+            if (parsedFallback is Dictionary<string, object> || parsedFallback is List<object>)
+                return parsedFallback;
+
+            throw new InvalidOperationException(
+                $"Column '{path}' expects a JSON object/array value. Got: {s}"
+            );
+        }
+
+        if (string.IsNullOrEmpty(s))
+            return null;
+
+        if (string.Equals(normalizedType, "stringList", StringComparison.OrdinalIgnoreCase))
+            return ParseCommaList(s);
+
+        if (IsStringLikeTypeHint(normalizedType))
+            return s;
+
+        if (string.Equals(normalizedType, "bool", StringComparison.OrdinalIgnoreCase))
+            return bool.TryParse(s, out var boolValue) ? boolValue : s;
+
+        if (string.Equals(normalizedType, "int", StringComparison.OrdinalIgnoreCase))
+        {
+            return int.TryParse(
+                s,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var intValue
+            )
+                ? intValue
+                : s;
+        }
+
+        if (
+            string.Equals(normalizedType, "double", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedType, "number", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return double.TryParse(
+                s,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var dblValue
+            )
+                ? dblValue
+                : s;
         }
 
         if (bool.TryParse(s, out var b))
@@ -1298,6 +1866,26 @@ public static class GoogleSheetImporter
             return null;
 
         return s;
+    }
+
+    private static bool IsStringLikeTypeHint(string normalizedType)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedType))
+            return false;
+
+        if (string.Equals(normalizedType, "string", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (string.Equals(normalizedType, "enum", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (string.Equals(normalizedType, "path", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (normalizedType.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 
     private static string RemoveWhitespaceOutsideJsonStrings(string s)
@@ -1544,207 +2132,366 @@ public static class GoogleSheetImporter
         result.Add(new KeyValuePair<string, string>(k, v));
     }
 
-    private static bool IsMetaSheet(string name) =>
-        string.Equals(name, "PackMeta", StringComparison.OrdinalIgnoreCase);
-
     // ----------------------------
-    // Pack building (minimal - extend as needed)
+    // Pack building (spec-driven)
     // ----------------------------
 
-    private static Dictionary<string, object> BuildPack(
-        Dictionary<string, List<Dictionary<string, object>>> tables,
+    private static Dictionary<string, object> BuildPackFromSpec(
+        Dictionary<string, ParsedTable> tables,
         SheetSpecDefinition sheetSpec
     )
     {
-        var pack = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        var pack = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tableDef in sheetSpec.TablesInOrder)
         {
-            ["gameId"] = "content_pack",
-            ["version"] = 2,
-            ["numberFormat"] = new Dictionary<string, object>
+            if (tableDef == null || tableDef.IsVirtual || string.IsNullOrWhiteSpace(tableDef.Name))
+                continue;
+
+            if (!tables.TryGetValue(tableDef.Name, out var parsed))
             {
-                ["type"] = "mantissaExponent",
-                ["precision"] = 16,
-            },
-            ["resources"] = new List<object>(),
-            ["phases"] = new List<object>(),
-            ["zones"] = new List<object>(),
-            ["computedVars"] = new List<object>(),
-            ["nodes"] = new List<object>(),
-            ["nodeInstances"] = new List<object>(),
-            ["links"] = new List<object>(),
-            ["modifiers"] = new List<object>(),
-            ["upgrades"] = new List<object>(),
-            ["milestones"] = new List<object>(),
-            ["projects"] = new List<object>(),
-            ["unlockGraph"] = new List<object>(),
-            ["buffs"] = new List<object>(),
-            ["buyModes"] = new List<object>(),
-            ["triggers"] = new List<object>(),
-            ["rewardPools"] = new List<object>(),
-        };
+                if (tableDef.Required)
+                {
+                    throw new InvalidOperationException(
+                        $"Required table '{tableDef.Name}' was not imported. Ensure it exists and is enabled in __Index."
+                    );
+                }
 
-        if (tables.TryGetValue("PackMeta", out var metaRows) && metaRows.Count > 0)
-        {
-            var m = metaRows[0];
-            if (m.TryGetValue("gameId", out var gid) && gid != null)
-                pack["gameId"] = gid;
-            if (m.TryGetValue("version", out var ver) && ver != null)
-                pack["version"] = ver;
-            if (
-                m.TryGetValue("numberFormat", out var nf) && nf is Dictionary<string, object> nfDict
-            )
-                pack["numberFormat"] = nfDict;
-        }
-
-        if (tables.TryGetValue("Resources", out var resRows))
-            pack["resources"] = resRows.Select(FlattenNested).Cast<object>().ToList();
-        if (tables.TryGetValue("Phases", out var phaseRows))
-            pack["phases"] = phaseRows.Select(FlattenNested).Cast<object>().ToList();
-        if (tables.TryGetValue("Zones", out var zoneRows))
-            pack["zones"] = zoneRows
-                .Select(r => FlattenNestedWithArrays(r, "localResources", "tags"))
-                .Cast<object>()
-                .ToList();
-
-        if (tables.TryGetValue("Nodes", out var nodeRows))
-            pack["nodes"] = nodeRows
-                .Select(r => FlattenNestedWithArrays(r, "tags"))
-                .Cast<object>()
-                .ToList();
-
-        if (
-            tables.TryGetValue("NodeOutputs", out var outRows)
-            && outRows.Count > 0
-            && pack["nodes"] is List<object> nodesList
-        )
-        {
-            var outputsByNode = outRows.GroupBy(r =>
-                r.TryGetValue("nodeId", out var v) ? v?.ToString() : null
-            );
-
-            // Attach outputs to nodes by matching node id.
-            foreach (var nodeObj in nodesList)
-            {
-                if (nodeObj is not Dictionary<string, object> node)
-                    continue;
-
-                if (!node.TryGetValue("id", out var idObj))
-                    continue;
-
-                var nodeId = idObj?.ToString();
-                if (string.IsNullOrEmpty(nodeId))
-                    continue;
-
-                var outputs = outputsByNode
-                    .Where(g => string.Equals(g.Key, nodeId, StringComparison.OrdinalIgnoreCase))
-                    .SelectMany(g => g)
-                    .Select(r =>
-                    {
-                        var o = FlattenNested(r);
-
-                        // NodeOutputs is a join table; when embedding into a node, remove join-only columns.
-                        o.Remove("nodeId");
-
-                        return (object)o;
-                    })
-                    .ToList();
-
-                if (outputs.Count > 0)
-                    node["outputs"] = outputs;
+                continue;
             }
+
+            var emit = (tableDef.Emit ?? "list").Trim().ToLowerInvariant();
+            if (emit == "subtable")
+                continue;
+
+            var packKey = ResolvePackKey(tableDef);
+            if (string.IsNullOrWhiteSpace(packKey))
+                continue;
+
+            if (emit == "object")
+            {
+                pack[packKey] = EmitObjectRows(parsed.Rows, tableDef);
+                continue;
+            }
+
+            pack[packKey] = EmitListRows(parsed.Rows);
         }
 
-        if (
-            tables.TryGetValue("NodeInputs", out var inputRows)
-            && inputRows.Count > 0
-            && pack["nodes"] is List<object> inputNodesList
-        )
+        foreach (var tableDef in sheetSpec.TablesInOrder)
         {
-            AttachRowsToNodeCollection(inputNodesList, inputRows, "inputs");
+            if (tableDef == null || tableDef.IsVirtual || string.IsNullOrWhiteSpace(tableDef.Name))
+                continue;
+
+            var emit = (tableDef.Emit ?? "list").Trim().ToLowerInvariant();
+            if (emit != "subtable")
+                continue;
+
+            if (!tables.TryGetValue(tableDef.Name, out var parsed))
+            {
+                if (tableDef.Required)
+                {
+                    throw new InvalidOperationException(
+                        $"Required table '{tableDef.Name}' was not imported. Ensure it exists and is enabled in __Index."
+                    );
+                }
+
+                continue;
+            }
+
+            if (tableDef.Embed == null)
+            {
+                var packKey = ResolvePackKey(tableDef);
+                if (!string.IsNullOrWhiteSpace(packKey))
+                    pack[packKey] = EmitListRows(parsed.Rows);
+                continue;
+            }
+
+            EmbedSubtableRows(pack, tableDef, parsed.Rows, sheetSpec);
         }
 
-        if (
-            tables.TryGetValue("NodeCapacities", out var capacityRows)
-            && capacityRows.Count > 0
-            && pack["nodes"] is List<object> capacityNodesList
-        )
-        {
-            AttachRowsToNodeCollection(capacityNodesList, capacityRows, "capacities");
-        }
-
-        if (tables.TryGetValue("NodeInstances", out var instRows))
-            pack["nodeInstances"] = instRows
-                .Select(FlattenNestedWithInitialState)
-                .Cast<object>()
-                .ToList();
-
-        if (tables.TryGetValue("Modifiers", out var modRows))
-            pack["modifiers"] = modRows.Select(FlattenNestedWithScope).Cast<object>().ToList();
-
-        if (tables.TryGetValue("Upgrades", out var upgRows))
-            pack["upgrades"] = upgRows.Select(FlattenUpgrade).Cast<object>().ToList();
-
-        if (tables.TryGetValue("Milestones", out var msRows))
-            pack["milestones"] = msRows.Select(FlattenMilestone).Cast<object>().ToList();
-
-        if (tables.TryGetValue("Buffs", out var buffRows))
-            pack["buffs"] = buffRows.Select(FlattenBuff).Cast<object>().ToList();
-
-        if (tables.TryGetValue("BuyModes", out var buyModeRows))
-            pack["buyModes"] = buyModeRows.Select(FlattenBuyMode).Cast<object>().ToList();
-
-        if (tables.TryGetValue("UnlockGraph", out var ugRows))
-            pack["unlockGraph"] = ugRows
-                .Select(r =>
-                    FlattenWithJsonRename(
-                        r,
-                        "unlocks_json",
-                        "unlocks",
-                        "requirements_json",
-                        "requirements"
-                    )
-                )
-                .Cast<object>()
-                .ToList();
-
-        if (tables.TryGetValue("Triggers", out var triggerRows))
-            pack["triggers"] = triggerRows.Select(FlattenTrigger).Cast<object>().ToList();
-
-        if (tables.TryGetValue("RewardPools", out var rewardPoolRows))
-            pack["rewardPools"] = rewardPoolRows.Select(FlattenRewardPool).Cast<object>().ToList();
-
-        if (tables.TryGetValue("Prestige", out var pRows) && pRows.Count > 0)
-            pack["prestige"] = FlattenNestedWithPrestige(pRows[0]);
-
-        EmitSpecDrivenTables(pack, tables, sheetSpec);
+        NormalizeNodePriceCurveTaggedUnion(pack);
+        MirrorMetaIdentityValues(pack);
 
         return pack;
     }
 
-    private static Dictionary<string, object> FlattenNested(Dictionary<string, object> flat)
+    private static List<object> EmitListRows(List<Dictionary<string, object>> rows)
     {
-        var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in flat)
-        {
-            if (string.IsNullOrEmpty(kv.Key) || kv.Value == null)
-                continue;
-            SetByPath(result, kv.Key, kv.Value);
-        }
-        return result;
+        if (rows == null || rows.Count == 0)
+            return new List<object>();
+
+        return rows.Select(r => (object)CloneDictionary(r)).ToList();
     }
 
-    private static Dictionary<string, object> FlattenNestedWithArrays(
-        Dictionary<string, object> flat,
-        params string[] arrayKeys
+    private static Dictionary<string, object> EmitObjectRows(
+        List<Dictionary<string, object>> rows,
+        SheetSpecTable tableDef
     )
     {
-        var d = FlattenNested(flat);
-        foreach (var key in arrayKeys)
+        var rowMode = (tableDef.RowMode ?? string.Empty).Trim().ToLowerInvariant();
+        if (rowMode == "kv")
         {
-            if (d.TryGetValue(key, out var v) && v is string s && !string.IsNullOrEmpty(s))
-                d[key] = ParseCommaList(s);
+            var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (rows == null || rows.Count == 0)
+                return result;
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                var key = GetValueByPath(row, "key")?.ToString()?.Trim();
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
+
+                var value = CloneValue(GetValueByPath(row, "value"));
+                if (string.Equals(key, "schemaVersion", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (value != null && value is not string)
+                        value = Convert.ToString(value, CultureInfo.InvariantCulture);
+                }
+                else if (value is string stringValue)
+                {
+                    value = ParseValue(stringValue, key, null);
+                }
+
+                SetByPathRaw(result, key, value);
+            }
+
+            return result;
         }
-        return d;
+
+        if (rows == null || rows.Count == 0)
+            return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        return CloneDictionary(rows[0]);
+    }
+
+    private static void EmbedSubtableRows(
+        Dictionary<string, object> pack,
+        SheetSpecTable subtableDef,
+        List<Dictionary<string, object>> rows,
+        SheetSpecDefinition sheetSpec
+    )
+    {
+        var embed = subtableDef.Embed;
+        if (
+            embed == null
+            || string.IsNullOrWhiteSpace(embed.ParentTable)
+            || string.IsNullOrWhiteSpace(embed.ParentIdColumn)
+            || string.IsNullOrWhiteSpace(embed.ForeignKeyColumn)
+            || string.IsNullOrWhiteSpace(embed.As)
+        )
+        {
+            throw new InvalidOperationException(
+                $"Subtable '{subtableDef.Name}' has an invalid embed block."
+            );
+        }
+
+        var parentPackKey = embed.ParentTable;
+        if (sheetSpec.TryGet(embed.ParentTable, out var parentDef))
+            parentPackKey = ResolvePackKey(parentDef);
+
+        if (
+            !pack.TryGetValue(parentPackKey, out var parentObj)
+            || parentObj is not List<object> parentRows
+        )
+        {
+            if (rows == null || rows.Count == 0)
+                return;
+
+            throw new InvalidOperationException(
+                $"Subtable '{subtableDef.Name}' cannot embed into '{embed.ParentTable}' because pack key '{parentPackKey}' is missing or not a list."
+            );
+        }
+
+        var grouped = rows.GroupBy(
+                r => GetValueByPath(r, embed.ForeignKeyColumn)?.ToString(),
+                StringComparer.OrdinalIgnoreCase
+            )
+            .ToDictionary(
+                g => g.Key ?? string.Empty,
+                g => g.ToList(),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+        for (int i = 0; i < parentRows.Count; i++)
+        {
+            if (parentRows[i] is not Dictionary<string, object> parentRow)
+                continue;
+
+            var parentId = GetValueByPath(parentRow, embed.ParentIdColumn)?.ToString();
+            if (string.IsNullOrWhiteSpace(parentId))
+                continue;
+
+            if (!grouped.TryGetValue(parentId, out var matches) || matches.Count == 0)
+                continue;
+
+            var embeddedRows = new List<object>(matches.Count);
+            for (int j = 0; j < matches.Count; j++)
+            {
+                var embedded = CloneDictionary(matches[j]);
+                RemoveByPath(embedded, embed.ForeignKeyColumn);
+                embeddedRows.Add(embedded);
+            }
+
+            SetByPathRaw(parentRow, embed.As, embeddedRows);
+        }
+    }
+
+    private static void NormalizeNodePriceCurveTaggedUnion(Dictionary<string, object> pack)
+    {
+        if (
+            !pack.TryGetValue("nodes", out var nodesObj)
+            || nodesObj is not List<object> nodes
+            || nodes.Count == 0
+        )
+            return;
+
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (nodes[i] is not Dictionary<string, object> node)
+                continue;
+
+            var type = GetValueByPath(node, "leveling.priceCurve.type")
+                ?.ToString()
+                ?.Trim()
+                ?.ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(type))
+                continue;
+
+            var keepTable = string.Equals(type, "table", StringComparison.OrdinalIgnoreCase);
+            var keepSegments =
+                string.Equals(type, "segments", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(type, "piecewise", StringComparison.OrdinalIgnoreCase);
+
+            if (!keepTable)
+                RemoveByPath(node, "leveling.priceCurve.table");
+
+            if (!keepSegments)
+                RemoveByPath(node, "leveling.priceCurve.segments");
+
+            if (keepTable || keepSegments)
+            {
+                RemoveByPath(node, "leveling.priceCurve.basePrice");
+                RemoveByPath(node, "leveling.priceCurve.growth");
+                RemoveByPath(node, "leveling.priceCurve.increment");
+                continue;
+            }
+
+            var nodeId = GetValueByPath(node, "id")?.ToString() ?? $"index {i}";
+            var hasBasePrice = GetValueByPath(node, "leveling.priceCurve.basePrice") != null;
+            if (string.Equals(type, "exponential", StringComparison.OrdinalIgnoreCase))
+            {
+                var hasGrowth = GetValueByPath(node, "leveling.priceCurve.growth") != null;
+                if (!hasBasePrice || !hasGrowth)
+                {
+                    Debug.LogWarning(
+                        $"Node '{nodeId}' priceCurve.type='exponential' should define leveling.priceCurve.basePrice and leveling.priceCurve.growth."
+                    );
+                }
+            }
+            else if (string.Equals(type, "linear", StringComparison.OrdinalIgnoreCase))
+            {
+                var hasIncrement = GetValueByPath(node, "leveling.priceCurve.increment") != null;
+                if (!hasBasePrice || !hasIncrement)
+                {
+                    Debug.LogWarning(
+                        $"Node '{nodeId}' priceCurve.type='linear' should define leveling.priceCurve.basePrice and leveling.priceCurve.increment."
+                    );
+                }
+            }
+        }
+    }
+
+    private static void MirrorMetaIdentityValues(Dictionary<string, object> pack)
+    {
+        if (
+            !pack.TryGetValue("meta", out var metaObj)
+            || metaObj is not Dictionary<string, object> meta
+        )
+            return;
+
+        if (
+            !pack.ContainsKey("gameId")
+            && meta.TryGetValue("gameId", out var gameId)
+            && gameId != null
+        )
+            pack["gameId"] = gameId;
+
+        if (
+            !pack.ContainsKey("version")
+            && meta.TryGetValue("version", out var version)
+            && version != null
+        )
+            pack["version"] = version;
+    }
+
+    private static object GetValueByPath(Dictionary<string, object> dict, string path)
+    {
+        if (dict == null || string.IsNullOrWhiteSpace(path))
+            return null;
+
+        var parts = path.Split('.');
+        object current = dict;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (current is not Dictionary<string, object> curDict)
+                return null;
+
+            if (!curDict.TryGetValue(parts[i], out current))
+                return null;
+        }
+
+        return current;
+    }
+
+    private static void RemoveByPath(Dictionary<string, object> dict, string path)
+    {
+        if (dict == null || string.IsNullOrWhiteSpace(path))
+            return;
+
+        var parts = path.Split('.');
+        if (parts.Length == 1)
+        {
+            dict.Remove(parts[0]);
+            return;
+        }
+
+        var current = dict;
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            if (
+                !current.TryGetValue(parts[i], out var next)
+                || next is not Dictionary<string, object> nextDict
+            )
+                return;
+
+            current = nextDict;
+        }
+
+        current.Remove(parts[^1]);
+    }
+
+    private static Dictionary<string, object> CloneDictionary(Dictionary<string, object> source)
+    {
+        var clone = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        if (source == null)
+            return clone;
+
+        foreach (var kv in source)
+            clone[kv.Key] = CloneValue(kv.Value);
+
+        return clone;
+    }
+
+    private static object CloneValue(object value)
+    {
+        if (value is Dictionary<string, object> dict)
+            return CloneDictionary(dict);
+
+        if (value is List<object> list)
+            return list.Select(CloneValue).ToList();
+
+        return value;
     }
 
     private static object ParseCommaList(string s)
@@ -1756,381 +2503,13 @@ public static class GoogleSheetImporter
             .ToList();
     }
 
-    private static Dictionary<string, object> FlattenNestedWithInitialState(
-        Dictionary<string, object> flat
-    )
-    {
-        var d = FlattenNested(flat);
-
-        if (
-            flat.TryGetValue("initialState.level", out var _)
-            || flat.TryGetValue("initialState.enabled", out var _2)
-        )
-        {
-            var state = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-
-            if (flat.TryGetValue("initialState.level", out var lvl) && lvl != null)
-                state["level"] = lvl;
-            if (flat.TryGetValue("initialState.enabled", out var en) && en != null)
-                state["enabled"] = en;
-
-            d["initialState"] = state;
-        }
-
-        return d;
-    }
-
-    private static Dictionary<string, object> FlattenNestedWithScope(
-        Dictionary<string, object> flat
-    )
-    {
-        var d = FlattenNested(flat);
-
-        // If the sheet already provides a nested "scope", we keep it.
-        // If it uses scope.* columns, we pack them.
-        var hasScopeColumns = flat.Keys.Any(k =>
-            k.StartsWith("scope.", StringComparison.OrdinalIgnoreCase)
-        );
-        if (!hasScopeColumns)
-            return d;
-
-        var scope = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in flat)
-        {
-            if (!kv.Key.StartsWith("scope.", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var key = kv.Key.Substring("scope.".Length);
-            scope[key] = kv.Value;
-        }
-
-        d["scope"] = scope;
-        return d;
-    }
-
-    private static Dictionary<string, object> FlattenUpgrade(Dictionary<string, object> flat)
-    {
-        var d = FlattenNestedWithArrays(flat, "tags");
-        RenameKey(d, "cost_json", "cost");
-        RenameKey(d, "effects_json", "effects");
-        RenameKey(d, "requirements_json", "requirements");
-        return d;
-    }
-
-    private static Dictionary<string, object> FlattenBuff(Dictionary<string, object> flat)
-    {
-        var d = FlattenNestedWithArrays(flat, "tags");
-        RenameKey(d, "effects_json", "effects");
-        return d;
-    }
-
-    private static Dictionary<string, object> FlattenBuyMode(Dictionary<string, object> flat)
-    {
-        return FlattenNestedWithArrays(flat, "tags");
-    }
-
-    private static Dictionary<string, object> FlattenMilestone(Dictionary<string, object> flat)
-    {
-        var d = FlattenWithJsonRename(flat, "grantEffects_json", "grantEffects");
-
-        if (
-            !d.TryGetValue("grantEffects", out var effectsObj)
-            || effectsObj is not List<object> effects
-        )
-            return d;
-
-        var milestoneId = d.TryGetValue("id", out var idObj) ? idObj?.ToString() : "<unknown>";
-        for (int i = 0; i < effects.Count; i++)
-        {
-            if (effects[i] is Dictionary<string, object> effectDict)
-            {
-                if (effectDict.ContainsKey("modifierId"))
-                    continue;
-
-                throw new InvalidOperationException(
-                    $"Milestone '{milestoneId}' grantEffects[{i}] must define 'modifierId'. "
-                        + $"Found keys: {string.Join(", ", effectDict.Keys)}. "
-                        + "Milestone grantEffects currently supports modifier references only."
-                );
-            }
-
-            throw new InvalidOperationException(
-                $"Milestone '{milestoneId}' grantEffects[{i}] must be an object with 'modifierId'."
-            );
-        }
-
-        return d;
-    }
-
-    private static Dictionary<string, object> FlattenTrigger(Dictionary<string, object> flat)
-    {
-        var d = FlattenNested(flat);
-        RenameKey(d, "scope_json", "scope");
-        RenameKey(d, "conditions_json", "conditions");
-        RenameKey(d, "actions_json", "actions");
-        return d;
-    }
-
-    private static Dictionary<string, object> FlattenRewardPool(Dictionary<string, object> flat)
-    {
-        var d = FlattenNested(flat);
-        // Canonical sheet column is rewards_json -> rewardPools[].rewards.
-        RenameKey(d, "rewards_json", "rewards");
-
-        if (d.TryGetValue("rewards", out var rewardsObj))
-        {
-            var rewardPoolId = d.TryGetValue("id", out var idObj) ? idObj?.ToString() : "<unknown>";
-            d["rewards"] = NormalizeRewardPoolRewards(rewardsObj, rewardPoolId);
-        }
-
-        return d;
-    }
-
-    private static List<object> NormalizeRewardPoolRewards(object rewardsObj, string rewardPoolId)
-    {
-        var rawRewards = rewardsObj as List<object>;
-        if (rawRewards == null)
-        {
-            throw new InvalidOperationException(
-                $"RewardPool '{rewardPoolId}' rewards_json must parse to an array."
-            );
-        }
-
-        var normalized = new List<object>(rawRewards.Count);
-        for (int i = 0; i < rawRewards.Count; i++)
-        {
-            var reward = NormalizeRewardPoolReward(rawRewards[i], rewardPoolId, i);
-            normalized.Add(reward);
-        }
-
-        return normalized;
-    }
-
-    private static Dictionary<string, object> NormalizeRewardPoolReward(
-        object rawReward,
-        string rewardPoolId,
-        int index
-    )
-    {
-        if (rawReward is string s)
-        {
-            var trimmed = s.Trim();
-            if (
-                !(trimmed.StartsWith("{", StringComparison.Ordinal))
-                && !(trimmed.StartsWith("[", StringComparison.Ordinal))
-                && !(
-                    trimmed.StartsWith("\"{", StringComparison.Ordinal)
-                    && trimmed.EndsWith("}\"", StringComparison.Ordinal)
-                )
-            )
-            {
-                throw new InvalidOperationException(
-                    $"RewardPool '{rewardPoolId}' rewards[{index}] must be an object."
-                );
-            }
-
-            var parsed = ParseJsonLikeValue(trimmed);
-            if (parsed is string)
-            {
-                throw new InvalidOperationException(
-                    $"RewardPool '{rewardPoolId}' rewards[{index}] must be an object."
-                );
-            }
-
-            return NormalizeRewardPoolReward(parsed, rewardPoolId, index);
-        }
-
-        if (rawReward is List<object> list)
-        {
-            if (list.Count == 1)
-                return NormalizeRewardPoolReward(list[0], rewardPoolId, index);
-
-            throw new InvalidOperationException(
-                $"RewardPool '{rewardPoolId}' rewards[{index}] must be an object."
-            );
-        }
-
-        if (rawReward is not Dictionary<string, object> dict)
-        {
-            throw new InvalidOperationException(
-                $"RewardPool '{rewardPoolId}' rewards[{index}] must be an object."
-            );
-        }
-
-        if (dict.ContainsKey("action"))
-            return dict;
-
-        if (!dict.ContainsKey("type"))
-        {
-            throw new InvalidOperationException(
-                $"RewardPool '{rewardPoolId}' rewards[{index}] must contain either 'action' or action 'type'."
-            );
-        }
-
-        var action = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        object weight = 1;
-        foreach (var kv in dict)
-        {
-            if (string.Equals(kv.Key, "weight", StringComparison.OrdinalIgnoreCase))
-            {
-                weight = kv.Value;
-                continue;
-            }
-
-            action[kv.Key] = kv.Value;
-        }
-
-        return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["weight"] = weight,
-            ["action"] = action,
-        };
-    }
-
-    private static void AttachRowsToNodeCollection(
-        List<object> nodesList,
-        List<Dictionary<string, object>> sourceRows,
-        string propertyName
-    )
-    {
-        var rowsByNode = sourceRows.GroupBy(r =>
-            r.TryGetValue("nodeId", out var v) ? v?.ToString() : null
-        );
-
-        foreach (var nodeObj in nodesList)
-        {
-            if (nodeObj is not Dictionary<string, object> node)
-                continue;
-
-            if (!node.TryGetValue("id", out var idObj))
-                continue;
-
-            var nodeId = idObj?.ToString();
-            if (string.IsNullOrEmpty(nodeId))
-                continue;
-
-            var rows = rowsByNode
-                .Where(g => string.Equals(g.Key, nodeId, StringComparison.OrdinalIgnoreCase))
-                .SelectMany(g => g)
-                .Select(r =>
-                {
-                    var item = FlattenNested(r);
-                    item.Remove("nodeId");
-                    return (object)item;
-                })
-                .ToList();
-
-            if (rows.Count > 0)
-                node[propertyName] = rows;
-        }
-    }
-
-    private static Dictionary<string, object> FlattenWithJsonRename(
-        Dictionary<string, object> flat,
-        params string[] renames
-    )
-    {
-        var d = FlattenNested(flat);
-        for (int i = 0; i + 1 < renames.Length; i += 2)
-            RenameKey(d, renames[i], renames[i + 1]);
-        return d;
-    }
-
-    private static void RenameKey(Dictionary<string, object> d, string from, string to)
-    {
-        if (d.TryGetValue(from, out var v))
-        {
-            d.Remove(from);
-            d[to] = v;
-        }
-    }
-
-    private static Dictionary<string, object> FlattenNestedWithPrestige(
-        Dictionary<string, object> flat
-    )
-    {
-        var d = FlattenNested(flat);
-        RenameKey(d, "metaUpgrades_json", "metaUpgrades");
-
-        // resetScopes uses _json columns in Sheets, but the final JSON should not.
-        if (d.TryGetValue("resetScopes", out var rsObj) && rsObj is Dictionary<string, object> rs)
-        {
-            RenameKey(rs, "keepUnlocks_json", "keepUnlocks");
-            RenameKey(rs, "keepUpgrades_json", "keepUpgrades");
-            RenameKey(rs, "keepProjects_json", "keepProjects");
-        }
-
-        return d;
-    }
-
-    private static void EmitSpecDrivenTables(
-        Dictionary<string, object> pack,
-        Dictionary<string, List<Dictionary<string, object>>> tables,
-        SheetSpecDefinition sheetSpec
-    )
-    {
-        if (sheetSpec == null)
-            return;
-
-        var handledTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "PackMeta",
-            "Resources",
-            "Phases",
-            "Zones",
-            "Nodes",
-            "NodeOutputs",
-            "NodeInputs",
-            "NodeCapacities",
-            "NodeInstances",
-            "Modifiers",
-            "Upgrades",
-            "Milestones",
-            "UnlockGraph",
-            "Buffs",
-            "BuyModes",
-            "Prestige",
-            "Triggers",
-            "RewardPools",
-        };
-
-        foreach (var table in sheetSpec.Tables)
-        {
-            if (table == null || string.IsNullOrWhiteSpace(table.Name) || table.IsVirtual)
-                continue;
-
-            var name = table.Name.Trim();
-            if (!tables.TryGetValue(name, out var rows))
-            {
-                if (table.Required)
-                {
-                    throw new InvalidOperationException(
-                        $"Required table '{name}' was not imported. Ensure it exists and is enabled in __Index. "
-                            + "Header-only tabs are valid and will import as empty arrays."
-                    );
-                }
-
-                continue;
-            }
-
-            if (handledTables.Contains(name))
-                continue;
-
-            var packKey = ResolvePackKey(table);
-            if (string.IsNullOrWhiteSpace(packKey))
-                continue;
-
-            pack[packKey] = rows.Select(FlattenNested).Cast<object>().ToList();
-        }
-    }
-
     private static string ResolvePackKey(SheetSpecTable table)
     {
         if (table == null)
             return null;
 
-        if (!string.IsNullOrWhiteSpace(table.OutputKey))
-            return table.OutputKey.Trim();
+        if (!string.IsNullOrWhiteSpace(table.PackKey))
+            return table.PackKey.Trim();
 
         return ToLowerCamelCase(table.Name);
     }

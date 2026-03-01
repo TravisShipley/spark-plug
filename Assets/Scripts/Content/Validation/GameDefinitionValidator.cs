@@ -28,20 +28,24 @@ public static class GameDefinitionValidator
     };
     private static readonly string[] SupportedTriggerEvents =
     {
+        "node.cycleComplete",
+        "node.collect",
+        "node.start",
+        "node.levelPurchased",
+        "resource.gained",
+        "offline.claim",
+        "ad.rewarded",
+        "session.tick",
+        "prestige.reset",
+        "upgrade.purchased",
         "milestone.fired",
     };
-    private static readonly string[] SupportedTriggerConditionTypes =
-    {
-        "milestoneIdEquals",
-    };
-    private static readonly string[] SupportedTriggerActionTypes =
-    {
-        "rollRewardPool",
-    };
-    private static readonly string[] SupportedRewardActionTypes =
-    {
-        "grantResource",
-    };
+
+    private static readonly string[] SupportedTriggerConditionTypes = { "milestoneIdEquals" };
+
+    private static readonly string[] SupportedTriggerActionTypes = { "rollRewardPool" };
+
+    private static readonly string[] SupportedRewardActionTypes = { "grantResource" };
     private static readonly string[] SupportedBuyModeKinds =
     {
         "fixed",
@@ -85,9 +89,11 @@ public static class GameDefinitionValidator
         }
 
         // ---- Nodes
+        if (gd.nodes == null)
+            errors.Add("nodes is null. Use [] when no nodes are defined.");
         var nodeIds = new HashSet<string>(StringComparer.Ordinal);
         var nodeTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < gd.nodes.Count; i++)
+        for (int i = 0; gd.nodes != null && i < gd.nodes.Count; i++)
         {
             var n = gd.nodes[i];
             if (n == null)
@@ -122,8 +128,10 @@ public static class GameDefinitionValidator
         ValidateTopLevelNodeInputsReferences(gd.nodeInputs, nodeIds, resourceIds, errors);
 
         // ---- NodeInstances -> Nodes
+        if (gd.nodeInstances == null)
+            errors.Add("nodeInstances is null. Use [] when no nodeInstances are defined.");
         var instanceIds = new HashSet<string>(StringComparer.Ordinal);
-        for (int i = 0; i < gd.nodeInstances.Count; i++)
+        for (int i = 0; gd.nodeInstances != null && i < gd.nodeInstances.Count; i++)
         {
             var instance = gd.nodeInstances[i];
             if (instance == null)
@@ -170,7 +178,7 @@ public static class GameDefinitionValidator
                 else if (!modifierIds.Add(m.id))
                     errors.Add($"Duplicate modifier id '{m.id}'.");
 
-                ValidateModifierVerticalSlice(m, i, nodeIds, nodeTags, resourceIds, errors);
+                ValidateModifier(m, i, nodeIds, nodeTags, resourceIds, errors);
             }
         }
 
@@ -197,35 +205,34 @@ public static class GameDefinitionValidator
             }
         }
 
+        if (gd.milestones == null)
+            errors.Add("milestones is null. Use [] when no milestones are defined.");
         var milestoneIds = new HashSet<string>(StringComparer.Ordinal);
-        if (gd.milestones != null)
+        for (int i = 0; gd.milestones != null && i < gd.milestones.Count; i++)
         {
-            for (int i = 0; i < gd.milestones.Count; i++)
+            var milestone = gd.milestones[i];
+            if (milestone == null)
             {
-                var milestone = gd.milestones[i];
-                if (milestone == null)
-                {
-                    errors.Add($"milestones[{i}] is null.");
-                    continue;
-                }
-
-                var milestoneId = (milestone.id ?? string.Empty).Trim();
-                if (string.IsNullOrEmpty(milestoneId))
-                {
-                    errors.Add($"milestones[{i}].id is empty.");
-                    continue;
-                }
-
-                if (!milestoneIds.Add(milestoneId))
-                    errors.Add($"Duplicate milestone id '{milestoneId}'.");
+                errors.Add($"milestones[{i}] is null.");
+                continue;
             }
-        }
 
-        var rewardPoolIds = ValidateRewardPools(gd.rewardPools, resourceIds, errors);
-        ValidateTriggers(gd.triggers, nodeIds, milestoneIds, rewardPoolIds, errors);
+            var milestoneId = (milestone.id ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(milestoneId))
+            {
+                errors.Add($"milestones[{i}].id is empty.");
+                continue;
+            }
+
+            if (!milestoneIds.Add(milestoneId))
+                errors.Add($"Duplicate milestone id '{milestoneId}'.");
+        }
 
         var buffIds = new HashSet<string>(StringComparer.Ordinal);
         ValidateBuffEntries(gd.buffs, modifierIds, buffIds, errors);
+
+        var rewardPoolIds = ValidateRewardPools(gd.rewardPools, resourceIds, errors);
+        ValidateTriggers(gd.triggers, nodeIds, milestoneIds, rewardPoolIds, errors);
         ValidateBuyModes(gd.buyModes, errors);
         ValidateFormulaPaths(gd, resourceIds, errors);
         ValidatePrestigeConfiguration(gd, resourceIds, errors);
@@ -449,9 +456,7 @@ public static class GameDefinitionValidator
                 && !ContainsIgnoreCase(SupportedTriggerEvents, eventType)
             )
             {
-                errors.Add(
-                    $"triggers[{i}] ('{triggerId}') event '{eventType}' is unsupported."
-                );
+                errors.Add($"triggers[{i}] ('{triggerId}') event '{eventType}' is unsupported.");
             }
 
             var scopeNodeId = (trigger.scope?.nodeId ?? string.Empty).Trim();
@@ -482,9 +487,7 @@ public static class GameDefinitionValidator
                     var conditionType = (condition.type ?? string.Empty).Trim();
                     if (string.IsNullOrEmpty(conditionType))
                     {
-                        errors.Add(
-                            $"triggers[{i}] ('{triggerId}') conditions[{c}].type is empty."
-                        );
+                        errors.Add($"triggers[{i}] ('{triggerId}') conditions[{c}].type is empty.");
                         continue;
                     }
 
@@ -537,7 +540,9 @@ public static class GameDefinitionValidator
 
             if (trigger.actions.Length == 0)
             {
-                errors.Add($"triggers[{i}] ('{triggerId}') actions must contain at least one item.");
+                errors.Add(
+                    $"triggers[{i}] ('{triggerId}') actions must contain at least one item."
+                );
                 continue;
             }
 
@@ -553,9 +558,7 @@ public static class GameDefinitionValidator
                 var actionType = (action.type ?? string.Empty).Trim();
                 if (string.IsNullOrEmpty(actionType))
                 {
-                    errors.Add(
-                        $"triggers[{i}] ('{triggerId}') actions[{a}].type is empty."
-                    );
+                    errors.Add($"triggers[{i}] ('{triggerId}') actions[{a}].type is empty.");
                     continue;
                 }
 
@@ -663,7 +666,7 @@ public static class GameDefinitionValidator
             if (!ContainsIgnoreCase(SupportedBuffStackingValues, stacking))
             {
                 errors.Add(
-                    $"buffs[{i}] ('{buffId}') stacking '{buff.stacking}' is unsupported in this slice. Expected 'none|refresh|extend|stack'."
+                    $"buffs[{i}] ('{buffId}') stacking '{buff.stacking}' is unsupported. Expected 'none|refresh|extend|stack'."
                 );
             }
 
@@ -912,7 +915,7 @@ public static class GameDefinitionValidator
         }
     }
 
-    private static void ValidateModifierVerticalSlice(
+    private static void ValidateModifier(
         ModifierDefinition modifier,
         int modifierIndex,
         HashSet<string> nodeIds,
@@ -925,7 +928,6 @@ public static class GameDefinitionValidator
         var scopeNodeId = (modifier.scope?.nodeId ?? string.Empty).Trim();
         var scopeNodeTag = (modifier.scope?.nodeTag ?? string.Empty).Trim();
         var scopeResourceId = (modifier.scope?.resource ?? string.Empty).Trim();
-        var operation = (modifier.operation ?? string.Empty).Trim();
         var target = (modifier.target ?? string.Empty).Trim();
         ParameterizedPathParser.ParsedPath parsedTarget;
         var hasParameterizedTarget = ParameterizedPathParser.TryParseModifierParameterizedPath(
@@ -940,11 +942,10 @@ public static class GameDefinitionValidator
             {
 #if UNITY_EDITOR
                 Debug.LogWarning(
-                    $"GameDefinitionValidator: modifier '{modifier.id}' target '{target}' normalized to '{canonical}'. Prefer bracket form."
+                    $"GameDefinitionValidator: modifier '{modifier.id}' target '{target}' should be '{canonical}'. Prefer bracket form."
                 );
 #endif
                 target = canonical;
-                modifier.target = canonical;
             }
         }
 
@@ -955,7 +956,7 @@ public static class GameDefinitionValidator
         else if (!ContainsIgnoreCase(SupportedModifierScopeKinds, scopeKind))
         {
             errors.Add(
-                $"modifiers[{modifierIndex}] ('{modifier.id}') scope.kind '{scopeKind}' is unsupported for current vertical slice."
+                $"modifiers[{modifierIndex}] ('{modifier.id}') scope.kind '{scopeKind}' is unsupported."
             );
         }
 
@@ -1017,98 +1018,36 @@ public static class GameDefinitionValidator
             return;
         }
 
-        bool isNodeSpeed =
-            target.StartsWith("nodeSpeedMultiplier", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(target, "node.speedMultiplier", StringComparison.OrdinalIgnoreCase);
-        bool isNodeOutput = hasParameterizedTarget
-            ? (
-                string.IsNullOrEmpty(parsedTarget.Suffix)
-                && string.Equals(
-                    parsedTarget.CanonicalBaseName,
-                    "nodeOutput",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            : (
-                target.StartsWith("nodeOutput", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(target, "node.outputMultiplier", StringComparison.OrdinalIgnoreCase)
-            );
-        bool isAutomation =
-            string.Equals(target, "automation.policy", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(target, "automation.autoCollect", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(target, "automation.autoRestart", StringComparison.OrdinalIgnoreCase);
-        bool isResourceGain = hasParameterizedTarget
-            ? (
-                string.IsNullOrEmpty(parsedTarget.Suffix)
-                && string.Equals(
-                    parsedTarget.CanonicalBaseName,
-                    "resourceGain",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            : target.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase);
-
-        if (!isNodeSpeed && !isNodeOutput && !isAutomation && !isResourceGain)
-        {
-            errors.Add(
-                $"modifiers[{modifierIndex}] ('{modifier.id}') target '{target}' is unsupported for current vertical slice."
-            );
-            return;
-        }
-
-        if (
-            !string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(operation, "add", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(operation, "set", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            errors.Add(
-                $"modifiers[{modifierIndex}] ('{modifier.id}') operation '{operation}' is unsupported. Expected one of: multiply, add, set."
-            );
-        }
-
-        if (isResourceGain)
-        {
-            var resourceId = ExtractTargetResourceId(target);
-            if (string.IsNullOrEmpty(resourceId))
-                resourceId = scopeResourceId;
-
-            if (string.IsNullOrEmpty(resourceId))
-            {
-                errors.Add(
-                    $"modifiers[{modifierIndex}] ('{modifier.id}') resourceGain target requires resource id via target or scope.resource."
-                );
-            }
-            else if (!resourceIds.Contains(resourceId))
-            {
-                errors.Add(
-                    $"modifiers[{modifierIndex}] ('{modifier.id}') resource id '{resourceId}' references missing resources.id."
-                );
-            }
-        }
-
-        if (isNodeOutput)
-        {
-            var resourceId = ExtractTargetResourceId(target);
-            if (!string.IsNullOrEmpty(resourceId) && !resourceIds.Contains(resourceId))
-            {
-                errors.Add(
-                    $"modifiers[{modifierIndex}] ('{modifier.id}') node output resource '{resourceId}' references missing resources.id."
-                );
-            }
-        }
+        var reportedMissingResourceIds = new HashSet<string>(StringComparer.Ordinal);
 
         if (
             hasParameterizedTarget
-            && !isNodeOutput
-            && !isResourceGain
             && !string.IsNullOrEmpty(parsedTarget.ParameterId)
             && !resourceIds.Contains(parsedTarget.ParameterId)
+            && reportedMissingResourceIds.Add(parsedTarget.ParameterId)
         )
         {
             errors.Add(
                 $"modifiers[{modifierIndex}] ('{modifier.id}') target resource '{parsedTarget.ParameterId}' references missing resources.id."
             );
+        }
+
+        if (
+            target.StartsWith("resourceGain[", StringComparison.OrdinalIgnoreCase)
+            || target.StartsWith("nodeOutput[", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            var resourceId = ExtractTargetResourceId(target);
+            if (
+                !string.IsNullOrEmpty(resourceId)
+                && !resourceIds.Contains(resourceId)
+                && reportedMissingResourceIds.Add(resourceId)
+            )
+            {
+                errors.Add(
+                    $"modifiers[{modifierIndex}] ('{modifier.id}') target resource '{resourceId}' references missing resources.id."
+                );
+            }
         }
     }
 
@@ -1217,19 +1156,15 @@ public static class GameDefinitionValidator
         else
         {
             var formulaType = (formula.type ?? string.Empty).Trim();
-            if (!string.Equals(formulaType, "sqrt", StringComparison.Ordinal))
+            if (string.IsNullOrEmpty(formulaType))
             {
-                errors.Add(
-                    $"prestige.formula.type '{formulaType}' is unsupported. Only 'sqrt' is supported in this slice."
-                );
+                errors.Add("prestige.formula.type is empty.");
             }
 
             var formulaBasedOn = (formula.basedOn ?? string.Empty).Trim();
-            if (!string.Equals(formulaBasedOn, "lifetimeEarnings[currencySoft]", StringComparison.Ordinal))
+            if (string.IsNullOrEmpty(formulaBasedOn))
             {
-                errors.Add(
-                    $"prestige.formula.basedOn '{formulaBasedOn}' is unsupported. Expected 'lifetimeEarnings[currencySoft]' in this slice."
-                );
+                errors.Add("prestige.formula.basedOn is empty.");
             }
         }
 
@@ -1238,60 +1173,29 @@ public static class GameDefinitionValidator
         {
             errors.Add("prestige.enabled is true but prestige.resetScopes is missing.");
         }
-        else
-        {
-            if (resetScopes.keepUnlocks != null && resetScopes.keepUnlocks.Length > 0)
-            {
-                errors.Add(
-                    "prestige.resetScopes.keepUnlocks is not supported in this slice. Expected empty array."
-                );
-            }
-
-            if (resetScopes.keepUpgrades != null && resetScopes.keepUpgrades.Length > 0)
-            {
-                errors.Add(
-                    "prestige.resetScopes.keepUpgrades is not supported in this slice. Expected empty array."
-                );
-            }
-
-            if (resetScopes.keepProjects != null && resetScopes.keepProjects.Length > 0)
-            {
-                errors.Add(
-                    "prestige.resetScopes.keepProjects is not supported in this slice. Expected empty array."
-                );
-            }
-        }
 
         var metaUpgrades = prestige.metaUpgrades;
-        if (metaUpgrades == null || metaUpgrades.Length == 0 || metaUpgrades[0] == null)
-        {
-            errors.Add(
-                "prestige.enabled is true but prestige.metaUpgrades[0] is missing. One linear meta upgrade is required in this slice."
-            );
+        if (metaUpgrades == null)
             return;
-        }
 
-        var computed = metaUpgrades[0].computed;
-        if (computed == null)
+        for (int i = 0; i < metaUpgrades.Length; i++)
         {
-            errors.Add("prestige.metaUpgrades[0].computed is missing.");
-            return;
-        }
+            var metaUpgrade = metaUpgrades[i];
+            if (metaUpgrade?.computed == null)
+                continue;
 
-        var computedType = (computed.type ?? string.Empty).Trim();
-        if (!string.Equals(computedType, "linear", StringComparison.Ordinal))
-        {
-            errors.Add(
-                $"prestige.metaUpgrades[0].computed.type '{computedType}' is unsupported. Only 'linear' is supported in this slice."
-            );
-        }
+            var computed = metaUpgrade.computed;
+            var computedType = (computed.type ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(computedType))
+            {
+                errors.Add($"prestige.metaUpgrades[{i}].computed.type is empty.");
+            }
 
-        var computedBasedOn = (computed.basedOn ?? string.Empty).Trim();
-        if (!string.Equals(computedBasedOn, "resource[currencyMeta]", StringComparison.Ordinal))
-        {
-            errors.Add(
-                $"prestige.metaUpgrades[0].computed.basedOn '{computedBasedOn}' is unsupported. Expected 'resource[currencyMeta]' in this slice."
-            );
+            var computedBasedOn = (computed.basedOn ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(computedBasedOn))
+            {
+                errors.Add($"prestige.metaUpgrades[{i}].computed.basedOn is empty.");
+            }
         }
     }
 

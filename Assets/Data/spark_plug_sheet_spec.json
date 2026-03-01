@@ -7,27 +7,114 @@
       "freezeHeaderRow": true,
       "allowExtraColumns": true,
       "newColumnsPolicy": "append",
-      "reservedSheets": ["PackMeta", "Dropdowns", "__Index", "__Notes"]
+      "reservedSheets": ["__Index", "__Enums", "__EnumDropdowns", "Meta"]
     },
 
     "tables": [
       {
-        "name": "PackMeta",
+        "name": "Meta",
+        "packKey": "meta",
+        "emit": "object",
+        "rowMode": "kv",
         "required": true,
         "kind": "meta",
         "primaryKey": "key",
         "columns": [
           { "name": "key", "required": true, "type": "string" },
           { "name": "value", "required": true, "type": "string" }
-        ],
-        "recommendedRows": [
-          { "key": "schemaVersion", "value": "0.2" },
-          { "key": "schemaUrl", "value": "" }
+        ]
+      },
+
+      {
+        "name": "EngineConfig",
+        "packKey": "engineConfig",
+        "emit": "object",
+        "rowMode": "single",
+        "required": true,
+        "kind": "meta",
+        "columns": [
+          {
+            "name": "simulation.tickIntervalMs",
+            "required": true,
+            "type": "int"
+          },
+          {
+            "name": "simulation.maxSimulationStepSeconds",
+            "required": true,
+            "type": "numberString"
+          }
+        ]
+      },
+
+      {
+        "name": "GameConfig",
+        "packKey": "gameConfig",
+        "emit": "object",
+        "rowMode": "single",
+        "required": true,
+        "kind": "meta",
+        "columns": [
+          { "name": "offline.enabled", "required": true, "type": "bool" },
+          { "name": "offline.baseCapSeconds", "required": true, "type": "int" },
+          {
+            "name": "offline.maxCyclesPerNodeInstance",
+            "required": true,
+            "type": "int"
+          },
+          { "name": "prestige.enabled", "required": true, "type": "bool" },
+          { "name": "prestige.reset.nodes", "required": true, "type": "bool" },
+          {
+            "name": "prestige.reset.softCurrencies",
+            "required": true,
+            "type": "bool"
+          },
+          {
+            "name": "prestige.reset.hardCurrencies",
+            "required": true,
+            "type": "bool"
+          }
+        ]
+      },
+
+      {
+        "name": "UiDefaults",
+        "packKey": "uiDefaults",
+        "emit": "object",
+        "rowMode": "single",
+        "columnRenames": [{ "from": "buyModeIds_json", "to": "buyModeIds" }],
+        "required": true,
+        "kind": "meta",
+        "columns": [
+          { "name": "defaultBuyModeId", "required": true, "type": "buyModeId" },
+          { "name": "buyModeIds_json", "required": true, "type": "json" }
+        ]
+      },
+
+      {
+        "name": "BuyModes",
+        "packKey": "buyModes",
+        "emit": "list",
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "buyModeId" },
+          { "name": "displayName", "required": true, "type": "string" },
+          {
+            "name": "kind",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.buyModeKind"
+          },
+          { "name": "fixedCount", "required": false, "type": "int" },
+          { "name": "tags", "required": false, "type": "stringList" }
         ]
       },
 
       {
         "name": "Resources",
+        "packKey": "resources",
+        "emit": "list",
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -52,7 +139,50 @@
       },
 
       {
+        "name": "Phases",
+        "packKey": "phases",
+        "emit": "list",
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "phaseId" },
+          { "name": "displayName", "required": true, "type": "string" },
+          { "name": "description", "required": false, "type": "string" },
+          { "name": "tags", "required": false, "type": "stringList" }
+        ]
+      },
+
+      {
+        "name": "ComputedVars",
+        "packKey": "computedVars",
+        "emit": "list",
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "varId" },
+          { "name": "zoneId", "required": false, "type": "zoneId" },
+          { "name": "displayName", "required": false, "type": "string" },
+          {
+            "name": "valueType",
+            "required": false,
+            "type": "enum",
+            "enumRef": "enums.varValueType"
+          },
+          { "name": "expression.type", "required": true, "type": "enum" },
+          { "name": "expression.args", "required": true, "type": "json" },
+          { "name": "tags", "required": false, "type": "stringList" }
+        ]
+      },
+
+      {
         "name": "Zones",
+        "packKey": "zones",
+        "emit": "list",
+        "columnRenames": [
+          { "from": "localResources_json", "to": "localResources" }
+        ],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -66,7 +196,77 @@
       },
 
       {
+        "name": "NodeInstances",
+        "packKey": "nodeInstances",
+        "emit": "list",
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "instanceId" },
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "zoneId", "required": true, "type": "zoneId" },
+          {
+            "name": "displayName",
+            "required": false,
+            "type": "string"
+          },
+          { "name": "tags", "required": false, "type": "stringList" },
+          { "name": "initialState.level", "required": false, "type": "int" },
+          { "name": "initialState.enabled", "required": false, "type": "bool" }
+        ]
+      },
+
+      {
+        "name": "Links",
+        "packKey": "links",
+        "emit": "list",
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columnRenames": [
+          { "from": "enabledRequirements_json", "to": "enabledRequirements" }
+        ],
+        "columns": [
+          { "name": "id", "required": true, "type": "linkId" },
+          { "name": "zoneId", "required": true, "type": "zoneId" },
+          {
+            "name": "from",
+            "required": true,
+            "type": "instanceId|nodeInstance"
+          },
+          {
+            "name": "to",
+            "required": true,
+            "type": "instanceId|nodeInstance"
+          },
+          { "name": "resource", "required": true, "type": "resourceId" },
+          {
+            "name": "mode",
+            "required": false,
+            "type": "enum",
+            "enumRef": "enums.linkMode"
+          },
+          { "name": "priority", "required": false, "type": "int" },
+          { "name": "lossFactor", "required": false, "type": "numberString" },
+          {
+            "name": "capacityPerSecondFrom",
+            "required": false,
+            "type": "numberString"
+          },
+          {
+            "name": "enabledRequirements_json",
+            "required": false,
+            "type": "numberString"
+          },
+          { "name": "tags", "required": false, "type": "stringList" }
+        ]
+      },
+
+      {
         "name": "Nodes",
+        "packKey": "nodes",
+        "emit": "list",
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -121,6 +321,14 @@
 
       {
         "name": "NodeOutputs",
+        "packKey": "nodes.outputs",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "outputs"
+        },
         "required": false,
         "kind": "subtable",
         "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
@@ -153,6 +361,14 @@
 
       {
         "name": "NodeInputs",
+        "packKey": "nodes.inputs",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "inputs"
+        },
         "required": false,
         "kind": "subtable",
         "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
@@ -169,6 +385,14 @@
 
       {
         "name": "NodeCapacities",
+        "packKey": "nodes.capacities",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "capacities"
+        },
         "required": false,
         "kind": "subtable",
         "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
@@ -195,7 +419,147 @@
       },
 
       {
+        "name": "NodeOutputScaling",
+        "packKey": "nodes.outputScaling",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "outputScaling"
+        },
+        "required": false,
+        "kind": "subtable",
+        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
+        "columns": [
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "target", "required": true, "type": "string" },
+          {
+            "name": "perLevel.type",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.scalingOperation"
+          },
+          {
+            "name": "perLevel.value",
+            "required": true,
+            "type": "numberOrBigNumberString"
+          }
+        ]
+      },
+
+      {
+        "name": "NodeCapacityScaling",
+        "packKey": "nodes.capacityScaling",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "capacityScaling"
+        },
+        "required": false,
+        "kind": "subtable",
+        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
+        "columns": [
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "target", "required": true, "type": "string" },
+          {
+            "name": "perLevel.type",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.scalingOperation"
+          },
+          {
+            "name": "perLevel.value",
+            "required": true,
+            "type": "numberOrBigNumberString"
+          }
+        ]
+      },
+
+      {
+        "name": "NodePriceCurveTable",
+        "packKey": "nodes.leveling.priceCurve.table",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "leveling.priceCurve.table"
+        },
+        "required": false,
+        "kind": "subtable",
+        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
+        "columns": [
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "level", "required": true, "type": "int" },
+          { "name": "price", "required": true, "type": "bigNumberString" }
+        ]
+      },
+
+      {
+        "name": "NodePriceCurveSegments",
+        "packKey": "nodes.leveling.priceCurve.segments",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "leveling.priceCurve.segments"
+        },
+        "required": false,
+        "kind": "subtable",
+        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
+        "columns": [
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "fromLevel", "required": true, "type": "int" },
+          { "name": "toLevel", "required": true, "type": "int" },
+          {
+            "name": "curve.type",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.priceCurveType"
+          },
+          {
+            "name": "curve.basePrice",
+            "required": false,
+            "type": "bigNumberString"
+          },
+          { "name": "curve.growth", "required": false, "type": "numberString" },
+          {
+            "name": "curve.increment",
+            "required": false,
+            "type": "bigNumberString"
+          }
+        ]
+      },
+
+      {
+        "name": "NodeRequirements",
+        "packKey": "nodes.requirements",
+        "emit": "subtable",
+        "embed": {
+          "parentTable": "Nodes",
+          "parentIdColumn": "id",
+          "foreignKeyColumn": "nodeId",
+          "as": "requirements"
+        },
+        "required": false,
+        "kind": "subtable",
+        "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
+        "columnRenames": [{ "from": "args_json", "to": "args" }],
+        "columns": [
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "type", "required": true, "type": "string" },
+          { "name": "args_json", "required": false, "type": "json" }
+        ]
+      },
+
+      {
         "name": "Modifiers",
+        "packKey": "modifiers",
+        "emit": "list",
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -227,14 +591,18 @@
             "required": false,
             "type": "numberOrBigNumberString"
           }
-        ],
-        "notes": [
-          "target uses bracket syntax for resource-param targets: nodeOutput[currencySoft], resourceGain[currencySoft], etc."
         ]
       },
 
       {
         "name": "Upgrades",
+        "packKey": "upgrades",
+        "emit": "list",
+        "columnRenames": [
+          { "from": "cost_json", "to": "cost" },
+          { "from": "effects_json", "to": "effects" },
+          { "from": "requirements_json", "to": "requirements" }
+        ],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -256,7 +624,37 @@
       },
 
       {
+        "name": "Projects",
+        "packKey": "projects",
+        "emit": "list",
+        "columnRenames": [
+          { "from": "cost_json", "to": "cost" },
+          { "from": "effects_json", "to": "effects" },
+          { "from": "requirements_json", "to": "requirements" }
+        ],
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "projectId" },
+          { "name": "displayName", "required": true, "type": "string" },
+          { "name": "zoneId", "required": true, "type": "zoneId" },
+          { "name": "timeSeconds", "required": true, "type": "numberString" },
+          { "name": "cost_json", "required": true, "type": "json" },
+          { "name": "effects_json", "required": true, "type": "json" },
+          { "name": "requirements_json", "required": false, "type": "json" },
+          { "name": "exclusiveGroup", "required": false, "type": "string" },
+          { "name": "tags", "required": false, "type": "stringList" }
+        ]
+      },
+
+      {
         "name": "Milestones",
+        "packKey": "milestones",
+        "emit": "list",
+        "columnRenames": [
+          { "from": "grantEffects_json", "to": "grantEffects" }
+        ],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -271,6 +669,9 @@
 
       {
         "name": "Buffs",
+        "packKey": "buffs",
+        "emit": "list",
+        "columnRenames": [{ "from": "effects_json", "to": "effects" }],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -294,26 +695,13 @@
       },
 
       {
-        "name": "BuyModes",
-        "required": false,
-        "kind": "entity",
-        "primaryKey": "id",
-        "columns": [
-          { "name": "id", "required": true, "type": "buyModeId" },
-          { "name": "displayName", "required": true, "type": "string" },
-          {
-            "name": "kind",
-            "required": true,
-            "type": "enum",
-            "enumRef": "enums.buyModeKind"
-          },
-          { "name": "fixedCount", "required": false, "type": "int" },
-          { "name": "tags", "required": false, "type": "stringList" }
-        ]
-      },
-
-      {
         "name": "UnlockGraph",
+        "packKey": "unlockGraph",
+        "emit": "list",
+        "columnRenames": [
+          { "from": "unlocks_json", "to": "unlocks" },
+          { "from": "requirements_json", "to": "requirements" }
+        ],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -327,6 +715,13 @@
 
       {
         "name": "Triggers",
+        "packKey": "triggers",
+        "emit": "list",
+        "columnRenames": [
+          { "from": "scope_json", "to": "scope" },
+          { "from": "conditions_json", "to": "conditions" },
+          { "from": "actions_json", "to": "actions" }
+        ],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
@@ -353,23 +748,101 @@
             "type": "int"
           },
           { "name": "actions_json", "required": true, "type": "json" }
-        ],
-        "notes": [
-          "Triggers can be normalized into subtables later (TriggerConditions/TriggerActions) if JSON-in-cells becomes too heavy."
         ]
       },
 
       {
         "name": "RewardPools",
+        "packKey": "rewardPools",
+        "emit": "list",
+        "columnRenames": [{ "from": "rewards_json", "to": "rewards" }],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [
           { "name": "id", "required": true, "type": "rewardPoolId" },
           { "name": "rewards_json", "required": true, "type": "json" }
+        ]
+      },
+
+      {
+        "name": "Prestige",
+        "packKey": "prestige",
+        "emit": "object",
+        "rowMode": "single",
+        "columnRenames": [
+          {
+            "from": "resetScopes.keepUnlocks_json",
+            "to": "resetScopes.keepUnlocks"
+          },
+          {
+            "from": "resetScopes.keepUpgrades_json",
+            "to": "resetScopes.keepUpgrades"
+          },
+          {
+            "from": "resetScopes.keepProjects_json",
+            "to": "resetScopes.keepProjects"
+          },
+          { "from": "metaUpgrades_json", "to": "metaUpgrades" }
         ],
-        "notes": [
-          "A RewardPool is a weighted list of actions. The JSON shape is validated by GameDefinitionValidator."
+        "required": true,
+        "kind": "meta",
+        "columns": [
+          { "name": "enabled", "required": true, "type": "bool" },
+          { "name": "zoneId", "required": true, "type": "zoneId" },
+          {
+            "name": "prestigeResource",
+            "required": true,
+            "type": "resourceId"
+          },
+          { "name": "formula.type", "required": true, "type": "string" },
+          { "name": "formula.basedOn", "required": true, "type": "string" },
+          {
+            "name": "formula.multiplier",
+            "required": true,
+            "type": "numberString"
+          },
+          {
+            "name": "formula.offset",
+            "required": true,
+            "type": "bigNumberString"
+          },
+          {
+            "name": "formula.expressionVarId",
+            "required": false,
+            "type": "varId"
+          },
+          {
+            "name": "resetScopes.resetNodes",
+            "required": true,
+            "type": "bool"
+          },
+          {
+            "name": "resetScopes.resetSoftCurrencies",
+            "required": true,
+            "type": "bool"
+          },
+          {
+            "name": "resetScopes.resetHardCurrencies",
+            "required": true,
+            "type": "bool"
+          },
+          {
+            "name": "resetScopes.keepUnlocks_json",
+            "required": false,
+            "type": "json"
+          },
+          {
+            "name": "resetScopes.keepUpgrades_json",
+            "required": false,
+            "type": "json"
+          },
+          {
+            "name": "resetScopes.keepProjects_json",
+            "required": false,
+            "type": "json"
+          },
+          { "name": "metaUpgrades_json", "required": false, "type": "json" }
         ]
       }
     ],
@@ -414,7 +887,10 @@
         "session.tick",
         "prestige.reset",
         "upgrade.purchased"
-      ]
+      ],
+      "varValueType": ["numberString", "bigNumberString"],
+      "linkMode": ["push", "pull"],
+      "scalingOperation": ["add", "multiply", "set"]
     }
   }
 }
