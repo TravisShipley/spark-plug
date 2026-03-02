@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 public class GeneratorView : MonoBehaviour
 {
+    #region properties
     [Header("UI")]
     [SerializeField]
     private TextMeshProUGUI nameText;
@@ -20,6 +21,9 @@ public class GeneratorView : MonoBehaviour
 
     [SerializeField]
     private GameObject ownedContainer;
+
+    [SerializeField]
+    private GameObject unownedContainer;
 
     [SerializeField]
     private Color outputColor = Color.white;
@@ -50,6 +54,7 @@ public class GeneratorView : MonoBehaviour
     private CompositeDisposable disposables = new();
     private GeneratorViewModel viewModel;
     private bool canLevelUpCached;
+    #endregion
 
     public void Bind(GeneratorViewModel vm)
     {
@@ -100,6 +105,10 @@ public class GeneratorView : MonoBehaviour
             return Fail(nameof(levelUpButtonView));
         if (collectButtonView == null)
             return Fail(nameof(collectButtonView));
+        if (ownedContainer == null)
+            return Fail(nameof(ownedContainer));
+        if (unownedContainer == null)
+            return Fail(nameof(unownedContainer));
 
         return true;
     }
@@ -207,10 +216,9 @@ public class GeneratorView : MonoBehaviour
         vm.IsOwned.DistinctUntilChanged()
             .Subscribe(owned =>
             {
-                if (ownedContainer != null)
-                    ownedContainer.SetActive(owned);
-                if (progressBarView != null)
-                    progressBarView.SetVisible(owned);
+                ownedContainer.SetActive(owned);
+                unownedContainer.SetActive(!owned);
+                progressBarView.SetVisible(owned);
             })
             .AddTo(disposables);
     }
