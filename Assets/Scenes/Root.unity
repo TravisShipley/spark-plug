@@ -164,6 +164,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UiServiceRegistry
   dontDestroyOnLoad: 0
+--- !u!1 &9937541 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5825880401464931784, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &9937546
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9937541}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31a19414c41e5ae4aae2af33fee712f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Mask
+  m_ShowMaskGraphic: 0
 --- !u!1 &27763114
 GameObject:
   m_ObjectHideFlags: 0
@@ -1943,6 +1962,16 @@ PrefabInstance:
         type: 3}
     - target: {fileID: 4299117159431893523, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
+      propertyPath: m_Camera
+      value: 
+      objectReference: {fileID: 27763116}
+    - target: {fileID: 4299117159431893523, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_RenderMode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4299117159431893523, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
       propertyPath: m_VertexColorAlwaysGammaSpace
       value: 1
       objectReference: {fileID: 0}
@@ -1980,6 +2009,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4653334151199274128, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_ScreenMatchMode
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4653334151199274128, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
@@ -2369,6 +2403,26 @@ PrefabInstance:
     - target: {fileID: 6262601210155177192, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6443778345882593201, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6443778345882593201, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6443778345882593201, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6443778345882593201, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6489988867801398165, guid: 602b3793041444a11842ad222eb83510,
@@ -3045,7 +3099,11 @@ PrefabInstance:
     m_RemovedGameObjects:
     - {fileID: 8888359209536957445, guid: 602b3793041444a11842ad222eb83510, type: 3}
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5825880401464931784, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 9937546}
   m_SourcePrefab: {fileID: 100100000, guid: 602b3793041444a11842ad222eb83510, type: 3}
 --- !u!225 &6065628833239432591 stripped
 CanvasGroup:
