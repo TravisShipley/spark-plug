@@ -5,8 +5,7 @@ using UnityEngine;
 
 public sealed class GameDefinitionService
 {
-    public const string DefaultPath = "Assets/Data/game_definition.json";
-    private readonly string path;
+    public const string DefaultPath = GameDefinitionLoader.DefaultFilePath;
     private GameDefinition definition;
     private readonly HashSet<string> warnedNodeInputsByNodeId = new(StringComparer.Ordinal);
     private ResourceCatalog resourceCatalog;
@@ -17,47 +16,56 @@ public sealed class GameDefinitionService
     private BuffCatalog buffCatalog;
     private BuyModeCatalog buyModeCatalog;
 
-    public GameDefinitionService(string projectRelativePath = "Assets/Data/game_definition.json")
+    public GameDefinitionService(GameDefinition loadedDefinition)
     {
-        path = projectRelativePath;
-        Reload();
+        Reload(loadedDefinition);
     }
 
-    public void Reload()
+    public void Reload(GameDefinition loadedDefinition)
     {
-        definition = GameDefinitionLoader.LoadFromFile(path);
-        resourceCatalog = new ResourceCatalog(definition?.resources);
-        nodeCatalog = new NodeCatalog(definition?.nodes);
+        definition =
+            loadedDefinition
+            ?? throw new InvalidOperationException(
+                "GameDefinitionService: loadedDefinition is null."
+            );
+        resourceCatalog = new ResourceCatalog(definition.resources);
+        nodeCatalog = new NodeCatalog(definition.nodes);
         nodeInputCatalog = new NodeInputCatalog(definition);
-        nodeInstanceCatalog = new NodeInstanceCatalog(definition?.nodeInstances);
-        upgradeCatalog = new UpgradeCatalog(definition?.upgrades);
-        buffCatalog = new BuffCatalog(definition?.buffs);
-        buyModeCatalog = new BuyModeCatalog(definition?.buyModes);
+        nodeInstanceCatalog = new NodeInstanceCatalog(definition.nodeInstances);
+        upgradeCatalog = new UpgradeCatalog(definition.upgrades);
+        buffCatalog = new BuffCatalog(definition.buffs);
+        buyModeCatalog = new BuyModeCatalog(definition.buyModes);
         WarnForNodeInputsNotExecuted();
     }
 
     public IReadOnlyList<ResourceDefinition> Resources =>
-        resourceCatalog?.Resources ?? new List<ResourceDefinition>();
-    public IReadOnlyList<NodeDefinition> Nodes => nodeCatalog?.Nodes ?? new List<NodeDefinition>();
+        resourceCatalog?.Resources ?? Array.Empty<ResourceDefinition>();
+    public IReadOnlyList<NodeDefinition> Nodes =>
+        nodeCatalog?.Nodes ?? Array.Empty<NodeDefinition>();
     public IReadOnlyList<NodeInputDefinition> NodeInputs =>
-        nodeInputCatalog?.NodeInputs ?? new List<NodeInputDefinition>();
+        nodeInputCatalog?.NodeInputs ?? Array.Empty<NodeInputDefinition>();
     public IReadOnlyList<NodeInstanceDefinition> NodeInstances =>
-        nodeInstanceCatalog?.NodeInstances ?? new List<NodeInstanceDefinition>();
+        nodeInstanceCatalog?.NodeInstances ?? Array.Empty<NodeInstanceDefinition>();
     public IReadOnlyList<UnlockGraphDefinition> UnlockGraph =>
-        definition?.unlockGraph ?? new List<UnlockGraphDefinition>();
+        (IReadOnlyList<UnlockGraphDefinition>)definition.unlockGraph
+        ?? Array.Empty<UnlockGraphDefinition>();
     public IReadOnlyList<ModifierDefinition> Modifiers =>
-        definition?.modifiers ?? new List<ModifierDefinition>();
+        (IReadOnlyList<ModifierDefinition>)definition.modifiers
+        ?? Array.Empty<ModifierDefinition>();
     public IReadOnlyList<UpgradeDefinition> Upgrades =>
-        upgradeCatalog?.Upgrades ?? new List<UpgradeDefinition>();
-    public IReadOnlyList<BuffDefinition> Buffs => buffCatalog?.Buffs ?? new List<BuffDefinition>();
+        upgradeCatalog?.Upgrades ?? Array.Empty<UpgradeDefinition>();
+    public IReadOnlyList<BuffDefinition> Buffs =>
+        buffCatalog?.Buffs ?? Array.Empty<BuffDefinition>();
     public IReadOnlyList<BuyModeDefinition> BuyModes =>
-        buyModeCatalog?.All ?? new List<BuyModeDefinition>();
+        buyModeCatalog?.All ?? Array.Empty<BuyModeDefinition>();
     public IReadOnlyList<MilestoneDefinition> Milestones =>
-        definition?.milestones ?? new List<MilestoneDefinition>();
+        (IReadOnlyList<MilestoneDefinition>)definition.milestones
+        ?? Array.Empty<MilestoneDefinition>();
     public IReadOnlyList<TriggerDefinition> Triggers =>
-        definition?.triggers ?? new List<TriggerDefinition>();
+        (IReadOnlyList<TriggerDefinition>)definition.triggers ?? Array.Empty<TriggerDefinition>();
     public IReadOnlyList<RewardPoolDefinition> RewardPools =>
-        definition?.rewardPools ?? new List<RewardPoolDefinition>();
+        (IReadOnlyList<RewardPoolDefinition>)definition.rewardPools
+        ?? Array.Empty<RewardPoolDefinition>();
 
     public bool TryGetNode(string id, out NodeDefinition node)
     {
@@ -101,7 +109,9 @@ public sealed class GameDefinitionService
         if (!TryGetUpgrade(id, out var upgrade) || upgrade == null)
             return Array.Empty<ModifierDefinition>();
 
-        var modifiers = definition?.modifiers ?? new List<ModifierDefinition>();
+        var modifiers =
+            (IReadOnlyList<ModifierDefinition>)definition.modifiers
+            ?? Array.Empty<ModifierDefinition>();
         var modifiersById = modifiers
             .Where(m => m != null && !string.IsNullOrWhiteSpace(m.id))
             .GroupBy(m => m.id.Trim(), StringComparer.Ordinal)
@@ -115,7 +125,6 @@ public sealed class GameDefinitionService
     public NodeInstanceCatalog NodeInstanceCatalog => nodeInstanceCatalog;
     public ResourceCatalog ResourceCatalog => resourceCatalog;
     public UpgradeCatalog UpgradeCatalog => upgradeCatalog;
-    public UpgradeCatalog Catalog => upgradeCatalog;
     public BuffCatalog BuffCatalog => buffCatalog;
     public BuyModeCatalog BuyModeCatalog => buyModeCatalog;
     public GameDefinition Definition => definition;

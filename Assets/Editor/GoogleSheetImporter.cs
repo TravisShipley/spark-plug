@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using UnityEditor;
@@ -30,11 +31,14 @@ using UnityEngine.Networking;
 public static class GoogleSheetImporter
 {
     private const string OutputPath = "Assets/Data/game_definition.json";
+    private const string ResourcesFallbackOutputPath = "Assets/Resources/Data/game_definition.json";
     private const string DataTextPath = "Assets/Data/data.txt";
     private const string SchemaPath = "Assets/Data/spark_plug_definition_schema.json";
     private const string SheetSpecPath = "Assets/Data/spark_plug_sheet_spec.json";
     private const string CsvExportDirectory = "Assets/Data/Csv";
     private const string CsvAiBundlePath = "Assets/Data/Csv/_sheets_export_for_ai.json";
+    private const string GameDefinitionAddressableKey = "game_definition";
+    private const string DataAddressableGroupName = "Data";
     private const string IndexSheetName = "__Index";
     private const int MaxSchemaValidationErrors = 25;
 
@@ -236,8 +240,14 @@ public static class GoogleSheetImporter
             var pack = BuildPackFromSpec(tables, sheetSpec);
             ValidatePack(pack);
             WriteJson(pack);
-
             AssetDatabase.Refresh();
+            EnsureGameDefinitionAddressable(
+                OutputPath,
+                GameDefinitionAddressableKey,
+                DataAddressableGroupName
+            );
+            BuildAddressablesPlayerContent();
+
             Debug.Log($"<color=green>✔ Import Complete</color>\nWrote {OutputPath}");
         }
         catch (Exception ex)
@@ -2818,12 +2828,213 @@ public static class GoogleSheetImporter
 
     private static void WriteJson(Dictionary<string, object> pack)
     {
-        var dir = Path.GetDirectoryName(OutputPath);
+        var json = ToJson(pack);
+        WriteTextAsset(OutputPath, json);
+        WriteTextAsset(ResourcesFallbackOutputPath, json);
+    }
+
+    private static void WriteTextAsset(string assetPath, string content)
+    {
+        var dir = Path.GetDirectoryName(assetPath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        var json = ToJson(pack);
-        File.WriteAllText(OutputPath, json, Encoding.UTF8);
+        File.WriteAllText(assetPath, content ?? string.Empty, Encoding.UTF8);
+    }
+
+    private static void EnsureGameDefinitionAddressable(
+        string assetPath,
+        string address,
+        string preferredGroupName
+    )
+    {
+        if (string.IsNullOrWhiteSpace(assetPath) || string.IsNullOrWhiteSpace(address))
+            return;
+
+        try
+        {
+            var settingsDefaultType = Type.GetType(
+                "UnityEditor.AddressableAssets.Settings.AddressableAssetSettingsDefaultObject, Unity.Addressables.Editor"
+            );
+            if (settingsDefaultType == null)
+                return;
+
+            var settings = settingsDefaultType
+                .GetProperty("Settings", BindingFlags.Public | BindingFlags.Static)
+                ?.GetValue(null);
+            if (settings == null)
+            {
+                var getSettingsMethod = settingsDefaultType.GetMethod(
+                    "GetSettings",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { typeof(bool) },
+                    null
+                );
+                settings = getSettingsMethod?.Invoke(null, new object[] { true });
+            }
+
+            if (settings == null)
+            {
+                Debug.LogWarning(
+                    "[GoogleSheetImporter] Addressables settings are unavailable. game_definition.json was not assigned an address."
+                );
+                return;
+            }
+
+            var guid = AssetDatabase.AssetPathToGUID(assetPath);
+            if (string.IsNullOrWhiteSpace(guid))
+                return;
+
+            var settingsType = settings.GetType();
+            var defaultGroup = settingsType
+                .GetProperty("DefaultGroup", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(settings);
+            var targetGroup = ResolveTargetAddressableGroup(settings, preferredGroupName) ?? defaultGroup;
+            if (targetGroup == null)
+            {
+                Debug.LogWarning(
+                    "[GoogleSheetImporter] Addressables default group is missing. game_definition.json was not assigned an address."
+                );
+                return;
+            }
+
+            object entry = null;
+            var createOrMoveMethods = settingsType
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Where(m => string.Equals(m.Name, "CreateOrMoveEntry", StringComparison.Ordinal))
+                .ToArray();
+
+            for (int i = 0; i < createOrMoveMethods.Length && entry == null; i++)
+            {
+                var method = createOrMoveMethods[i];
+                var parameters = method.GetParameters();
+                if (parameters.Length < 2 || parameters[0].ParameterType != typeof(string))
+                    continue;
+                if (!parameters[1].ParameterType.IsAssignableFrom(targetGroup.GetType()))
+                    continue;
+
+                var args = new object[parameters.Length];
+                args[0] = guid;
+                args[1] = targetGroup;
+                for (int p = 2; p < parameters.Length; p++)
+                {
+                    args[p] = parameters[p].ParameterType == typeof(bool)
+                        ? false
+                        : parameters[p].HasDefaultValue
+                            ? parameters[p].DefaultValue
+                            : null;
+                }
+
+                entry = method.Invoke(settings, args);
+            }
+
+            if (entry == null)
+                return;
+
+            var entryType = entry.GetType();
+            var addressProperty = entryType.GetProperty(
+                "address",
+                BindingFlags.Public | BindingFlags.Instance
+            );
+            var currentAddress = addressProperty?.GetValue(entry)?.ToString();
+            if (!string.Equals(currentAddress, address, StringComparison.Ordinal))
+                addressProperty?.SetValue(entry, address);
+
+            AssetDatabase.SaveAssets();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning(
+                $"[GoogleSheetImporter] Failed to assign addressable '{address}' to '{assetPath}': {ex.Message}"
+            );
+        }
+    }
+
+    private static object ResolveTargetAddressableGroup(object settings, string preferredGroupName)
+    {
+        if (settings == null || string.IsNullOrWhiteSpace(preferredGroupName))
+            return null;
+
+        var settingsType = settings.GetType();
+        var groupsObj = settingsType
+            .GetProperty("groups", BindingFlags.Public | BindingFlags.Instance)
+            ?.GetValue(settings) as System.Collections.IEnumerable;
+        if (groupsObj == null)
+            return null;
+
+        foreach (var group in groupsObj)
+        {
+            if (group == null)
+                continue;
+
+            var groupName = group
+                .GetType()
+                .GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(group)
+                ?.ToString();
+            if (string.Equals(groupName, preferredGroupName, StringComparison.OrdinalIgnoreCase))
+                return group;
+        }
+
+        return null;
+    }
+
+    private static void BuildAddressablesPlayerContent()
+    {
+        try
+        {
+            var settingsType = Type.GetType(
+                "UnityEditor.AddressableAssets.Settings.AddressableAssetSettings, Unity.Addressables.Editor"
+            );
+            if (settingsType == null)
+                return;
+
+            var resultType = Type.GetType(
+                "UnityEditor.AddressableAssets.Build.AddressablesPlayerBuildResult, Unity.Addressables.Editor"
+            );
+            if (resultType == null)
+                return;
+
+            var buildMethod = settingsType.GetMethod(
+                "BuildPlayerContent",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { resultType.MakeByRefType() },
+                null
+            );
+            if (buildMethod == null)
+                return;
+
+            EditorUtility.DisplayProgressBar(
+                "Google Sheet Import",
+                "Rebuilding Addressables content...",
+                0.95f
+            );
+
+            var args = new object[] { null };
+            buildMethod.Invoke(null, args);
+            var result = args[0];
+            var error = resultType
+                .GetProperty("Error", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(result)
+                ?.ToString();
+            if (!string.IsNullOrWhiteSpace(error))
+                throw new InvalidOperationException(error);
+
+            Debug.Log("[GoogleSheetImporter] Addressables player content rebuilt.");
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Addressables rebuild failed after import: {ex.Message}",
+                ex
+            );
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
     }
 
     // ----------------------------

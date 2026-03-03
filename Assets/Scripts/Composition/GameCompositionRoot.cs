@@ -22,6 +22,7 @@
  */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
@@ -92,18 +93,55 @@ public class GameCompositionRoot : MonoBehaviour
         // SaveService owns an in-memory snapshot.
         saveService = new SaveService();
 
-        InitializeCoreServices(out var uiScreenService);
-        if (!enabled)
-            return;
+        StartCoroutine(BootstrapAsync());
+    }
 
-        if (
-            gameDefinitionService.NodeInstances == null
-            || gameDefinitionService.NodeInstances.Count == 0
-        )
+    private IEnumerator BootstrapAsync()
+    {
+        GameDefinition loadedDefinition = null;
+        Exception loadException = null;
+        UiScreenService uiScreenService = null;
+
+        yield return StartCoroutine(
+            GameDefinitionLoader.LoadFromAddressableAsync(
+                gd => loadedDefinition = gd,
+                ex => loadException = ex
+            )
+        );
+
+        if (loadException != null)
+        {
+            Debug.LogException(loadException, this);
+            enabled = false;
+            yield break;
+        }
+
+        if (loadedDefinition == null)
+        {
+            Debug.LogError(
+                "GameCompositionRoot: GameDefinitionLoader completed without data.",
+                this
+            );
+            enabled = false;
+            yield break;
+        }
+
+        try
+        {
+            InitializeCoreServices(loadedDefinition, out uiScreenService);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogException(ex, this);
+            enabled = false;
+            yield break;
+        }
+
+        if (gameDefinitionService.NodeInstances.Count == 0)
         {
             Debug.LogError("GameCompositionRoot: No node instances could be resolved.", this);
             enabled = false;
-            return;
+            yield break;
         }
 
         LoadSaveState();
@@ -155,10 +193,15 @@ public class GameCompositionRoot : MonoBehaviour
         );
         triggerService = new TriggerService(gameDefinitionService, walletService, gameEventStream);
 
-        gameEventStream.ResetSaveRequested.Subscribe(_ => HandleResetRequested()).AddTo(disposables);
+        gameEventStream
+            .ResetSaveRequested.Subscribe(_ => HandleResetRequested())
+            .AddTo(disposables);
     }
 
-    private void InitializeCoreServices(out UiScreenService uiScreenService)
+    private void InitializeCoreServices(
+        GameDefinition loadedDefinition,
+        out UiScreenService uiScreenService
+    )
     {
         if (saveService == null)
             throw new InvalidOperationException(
@@ -166,7 +209,7 @@ public class GameCompositionRoot : MonoBehaviour
             );
 
         // Load content-driven definitions and build catalogs first.
-        gameDefinitionService = new GameDefinitionService();
+        gameDefinitionService = new GameDefinitionService(loadedDefinition);
         saveService.Load(gameDefinitionService.Definition);
         gameEventStream = new GameEventStream();
 
@@ -185,7 +228,7 @@ public class GameCompositionRoot : MonoBehaviour
 
         // Construct UpgradeService with the authoritative UpgradeCatalog
         upgradeService = new UpgradeService(
-            gameDefinitionService.Catalog,
+            gameDefinitionService.UpgradeCatalog,
             walletService,
             saveService,
             gameDefinitionService.Modifiers
@@ -198,7 +241,7 @@ public class GameCompositionRoot : MonoBehaviour
         );
         modifierService = new ModifierService(
             gameDefinitionService.Modifiers,
-            gameDefinitionService.Catalog,
+            gameDefinitionService.UpgradeCatalog,
             gameDefinitionService.NodeCatalog,
             gameDefinitionService.NodeInstanceCatalog,
             upgradeService,
@@ -224,11 +267,11 @@ public class GameCompositionRoot : MonoBehaviour
         // UiScreenManager needs the UpgradeService for screens like Upgrades.
         uiScreenManager.Initialize(upgradeService);
         // Provide the content-driven catalog to screens so they can render upgrades.
-        uiScreenManager.UpgradeCatalog = gameDefinitionService.Catalog;
+        uiScreenManager.UpgradeCatalog = gameDefinitionService.UpgradeCatalog;
         // Also expose the full GameDefinitionService for screens that need richer access.
         uiScreenManager.GameDefinitionService = gameDefinitionService;
         upgradeListBuilder = new UpgradeListBuilder(
-            gameDefinitionService.Catalog,
+            gameDefinitionService.UpgradeCatalog,
             upgradeService,
             gameDefinitionService
         );
