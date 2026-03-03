@@ -35,7 +35,6 @@ public static class GoogleSheetImporter
     private const string DataTextPath = "Assets/Data/data.txt";
     private const string SchemaPath = "Assets/Data/spark_plug_definition_schema.json";
     private const string SheetSpecPath = "Assets/Data/spark_plug_sheet_spec.json";
-    private const string CsvExportDirectory = "Assets/Data/Csv";
     private const string CsvAiBundlePath = "Assets/Data/Csv/_sheets_export_for_ai.json";
     private const string GameDefinitionAddressableKey = "game_definition";
     private const string DataAddressableGroupName = "Data";
@@ -212,7 +211,6 @@ public static class GoogleSheetImporter
         try
         {
             var sheetSpec = LoadSheetSpecDefinition();
-            PrepareCsvExportDirectory();
             var rawSheetSnapshots = new List<RawSheetSnapshot>();
             var tables = FetchAllTables(spreadsheetId, config.apiKey, sheetSpec, rawSheetSnapshots);
             PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
@@ -374,7 +372,6 @@ public static class GoogleSheetImporter
         var indexRange = $"'{IndexSheetName}'!A:Z";
         var indexValues = GetSheetValues(spreadsheetId, indexRange, apiKey);
         var indexCsv = ValuesToCsv(indexValues);
-        ExportRawSheetCsv(IndexSheetName, indexCsv);
         AddRawSheetSnapshot(rawSheetSnapshots, IndexSheetName, string.Empty, -1, true, indexCsv);
         PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
         var index = ParseIndex(indexCsv);
@@ -464,7 +461,6 @@ public static class GoogleSheetImporter
                 csv = ValuesToCsv(values);
             }
 
-            ExportRawSheetCsv(entry.TableName, csv);
             AddRawSheetSnapshot(
                 rawSheetSnapshots,
                 entry.TableName,
@@ -1238,49 +1234,6 @@ public static class GoogleSheetImporter
         return null;
     }
 
-    private static void PrepareCsvExportDirectory()
-    {
-        if (!Directory.Exists(CsvExportDirectory))
-        {
-            Directory.CreateDirectory(CsvExportDirectory);
-            return;
-        }
-
-        var existingCsvFiles = Directory.GetFiles(CsvExportDirectory, "*.csv");
-        for (int i = 0; i < existingCsvFiles.Length; i++)
-            File.Delete(existingCsvFiles[i]);
-
-        if (File.Exists(CsvAiBundlePath))
-            File.Delete(CsvAiBundlePath);
-    }
-
-    private static void ExportRawSheetCsv(string sheetName, string csv)
-    {
-        var safeName = SanitizeFileName(sheetName);
-        if (string.IsNullOrWhiteSpace(safeName))
-            safeName = "sheet";
-
-        var path = Path.Combine(CsvExportDirectory, $"{safeName}.csv");
-        File.WriteAllText(path, csv ?? string.Empty, new UTF8Encoding(false));
-    }
-
-    private static string SanitizeFileName(string rawName)
-    {
-        if (string.IsNullOrWhiteSpace(rawName))
-            return string.Empty;
-
-        var invalidChars = Path.GetInvalidFileNameChars();
-        var trimmed = rawName.Trim();
-        var sb = new StringBuilder(trimmed.Length);
-        for (int i = 0; i < trimmed.Length; i++)
-        {
-            var c = trimmed[i];
-            sb.Append(invalidChars.Contains(c) ? '_' : c);
-        }
-
-        return sb.ToString().Trim();
-    }
-
     private static void AddRawSheetSnapshot(
         List<RawSheetSnapshot> snapshots,
         string sheetName,
@@ -1307,6 +1260,10 @@ public static class GoogleSheetImporter
 
     private static void WriteAiSheetBundle(string spreadsheetId, List<RawSheetSnapshot> snapshots)
     {
+        var dir = Path.GetDirectoryName(CsvAiBundlePath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
         var ordered = snapshots ?? new List<RawSheetSnapshot>();
         var sheets = ordered
             .OrderBy(s => s.IsIndex ? 0 : 1)
