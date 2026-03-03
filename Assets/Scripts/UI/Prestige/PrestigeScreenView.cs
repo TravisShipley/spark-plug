@@ -47,7 +47,9 @@ public sealed class PrestigeScreenView : UiScreenView
 
         titleText.text = viewModel.Title;
         viewModel.PreviewGain.Subscribe(value => previewGainText.text = value).AddTo(disposables);
-        viewModel.CurrentMeta.Subscribe(value => currentMetaText.text = value).AddTo(disposables);
+        viewModel
+            .CurrentMeta.Subscribe(value => currentMetaText.text = $"Tokens: {value}")
+            .AddTo(disposables);
 
         closeButton.Bind(
             interactable: viewModel.Close.CanExecute,

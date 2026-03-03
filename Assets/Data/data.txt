@@ -293,7 +293,7 @@ buff.adBoost.profit2x,2x Profit (Rewarded Ad),zone.main,30,refresh,"[{""modifier
 Prestige
 
 enabled,zoneId,prestigeResource,formula.type,formula.basedOn,formula.multiplier,formula.offset,formula.expressionVarId,resetScopes.resetNodes,resetScopes.resetSoftCurrencies,resetScopes.resetHardCurrencies,resetScopes.keepUnlocks_json,resetScopes.keepUpgrades_json,resetScopes.keepProjects_json,metaUpgrades_json
-TRUE,zone.main,currencyMeta,sqrt,lifetimeEarnings[currencySoft],0.001,0,,TRUE,TRUE,FALSE,[],[],[],"[{""id"": ""meta.prestige.multiplier"", ""displayName"": ""Dark Money (computed)"", ""computed"": {""type"": ""linear"", ""basedOn"": ""resource[currencyMeta]"", ""multiplier"": ""0.02"", ""offset"": ""1.0""}, ""writesToState"": ""meta.prestigeEarningsMultiplier""}]"
+TRUE,zone.main,currencyMeta,sqrt,lifetimeEarnings[currencySoft],0.001,0,,TRUE,TRUE,FALSE,[],[],[],"[{""id"": ""meta.prestige.multiplier"", ""displayName"": ""Tokens"", ""computed"": {""type"": ""linear"", ""basedOn"": ""resource[currencyMeta]"", ""multiplier"": ""0.05"", ""offset"": ""1.0""}, ""writesToState"": ""meta.prestigeEarningsMultiplier""}]"
 
 ---
 

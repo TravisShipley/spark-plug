@@ -76,10 +76,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
-  m_ScaleFactor: 1
+  m_ScaleFactor: 1.12
   m_ReferenceResolution: {x: 1080, y: 1920}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -137,8 +137,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -2}
-  m_SizeDelta: {x: 0, y: -4}
+  m_AnchoredPosition: {x: 0, y: -200}
+  m_SizeDelta: {x: 0, y: -400}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7576096415516875559
 CanvasRenderer:
@@ -252,8 +252,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278240544
-  m_fontColor: {r: 0.12437657, g: 0.7735849, b: 0, a: 1}
+    rgba: 4281453872
+  m_fontColor: {r: 0.1882353, g: 0.8039216, b: 0.19215687, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1666,7 +1666,7 @@ PrefabInstance:
     - target: {fileID: 2505672749294639810, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_text
-      value: x2
+      value: Boost x2
       objectReference: {fileID: 0}
     - target: {fileID: 2505672749294639810, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
@@ -1711,7 +1711,7 @@ PrefabInstance:
     - target: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
       propertyPath: m_SizeDelta.x
-      value: 160
+      value: 300
       objectReference: {fileID: 0}
     - target: {fileID: 4002616653163560721, guid: 8f956f11e8ebf49bb86224e5b93ba01f,
         type: 3}
@@ -2241,12 +2241,12 @@ PrefabInstance:
     - target: {fileID: 1052154272523757103, guid: 655adcaa619ff4638a4875039e2bd3d4,
         type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: -80
       objectReference: {fileID: 0}
     - target: {fileID: 1052154272523757103, guid: 655adcaa619ff4638a4875039e2bd3d4,
         type: 3}
       propertyPath: m_SizeDelta.y
-      value: 340
+      value: 256
       objectReference: {fileID: 0}
     - target: {fileID: 1052154272523757103, guid: 655adcaa619ff4638a4875039e2bd3d4,
         type: 3}
@@ -2291,7 +2291,7 @@ PrefabInstance:
     - target: {fileID: 1052154272523757103, guid: 655adcaa619ff4638a4875039e2bd3d4,
         type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: 24
       objectReference: {fileID: 0}
     - target: {fileID: 1052154272523757103, guid: 655adcaa619ff4638a4875039e2bd3d4,
         type: 3}

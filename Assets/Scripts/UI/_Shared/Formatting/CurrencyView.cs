@@ -35,8 +35,10 @@ public class CurrencyView : MonoBehaviour
         }
 
         var source = (IObservable<double>)walletViewModel.Balance(resourceId);
+        Func<double, string> formatter =
+            (resourceId == "currencySoft") ? Format.Currency : Format.Gold;
 
         // Subscribe and update label (ReactiveProperty emits current value on subscribe)
-        source.Subscribe(count => value.text = $"{Format.Currency(count)}").AddTo(this);
+        source.Subscribe(count => value.text = $"{formatter(count)}").AddTo(this);
     }
 }

@@ -5,7 +5,18 @@ public static class Format
 {
     private static readonly string[] Suffixes =
     {
-        "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"
+        "",
+        "K",
+        "M",
+        "B",
+        "T",
+        "Qa",
+        "Qi",
+        "Sx",
+        "Sp",
+        "Oc",
+        "No",
+        "Dc",
     };
 
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
@@ -27,6 +38,22 @@ public static class Format
         }
 
         return "$" + Abbreviated(value);
+    }
+
+    // TODO: replace with proper formatter that uses the data defined currency symbol
+    public static string Gold(double value)
+    {
+        if (value < 0)
+            return "-" + Currency(-value);
+
+        // Currency rule: below 1000, always show two decimals (truncated)
+        if (value < 1000)
+        {
+            double truncated = TruncateDecimals(value, 2);
+            return "¥" + truncated.ToString("0.00", Invariant);
+        }
+
+        return "¥" + Abbreviated(value);
     }
 
     public static string Abbreviated(double value, int decimals = 2)
@@ -53,11 +80,9 @@ public static class Format
         return scaled.ToString(x(scaled), Invariant) + Suffixes[magnitude];
     }
 
-    public static string Plain(double value)
-        => Math.Truncate(value).ToString("#,0", Invariant);
+    public static string Plain(double value) => Math.Truncate(value).ToString("#,0", Invariant);
 
-    public static string Rate(double valuePerSecond)
-        => Currency(valuePerSecond) + "/s";
+    public static string Rate(double valuePerSecond) => Currency(valuePerSecond) + "/s";
 
     // ----------------------------
     // Helpers
@@ -74,15 +99,19 @@ public static class Format
 
     private static int GetDecimalCount(double value, int maxDecimals)
     {
-        if (value >= 100) return 0;
-        if (value >= 10) return Math.Min(1, maxDecimals);
+        if (value >= 100)
+            return 0;
+        if (value >= 10)
+            return Math.Min(1, maxDecimals);
         return Math.Min(2, maxDecimals);
     }
 
     private static string x(double value)
     {
-        if (value >= 100) return "0";
-        if (value >= 10) return "0.0";
+        if (value >= 100)
+            return "0";
+        if (value >= 10)
+            return "0.0";
         return "0.00";
     }
 }
