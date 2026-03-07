@@ -9,6 +9,8 @@ public sealed class PrestigeScreenViewModel : IDisposable
     public string Title => "Prestige";
     public IReadOnlyReactiveProperty<string> PreviewGain { get; }
     public IReadOnlyReactiveProperty<string> CurrentMeta { get; }
+    public IReadOnlyReactiveProperty<float> PrestigeProgressRatio =>
+        prestigeService.PrestigeProgressRatio;
     public IReadOnlyReactiveProperty<bool> CanPrestige => prestigeService.CanPrestige;
     public UiCommand PerformPrestige { get; }
     public UiCommand Close { get; }
@@ -20,19 +22,22 @@ public sealed class PrestigeScreenViewModel : IDisposable
         if (close == null)
             throw new ArgumentNullException(nameof(close));
 
-        PreviewGain = this.prestigeService
-            .PreviewGain.Select(gain => Format.Abbreviated(gain))
+        PreviewGain = this
+            .prestigeService.PreviewGain.Select(gain => Format.Abbreviated(gain))
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        CurrentMeta = this.prestigeService
-            .CurrentMetaBalance.Select(balance => Format.Abbreviated(balance))
+        CurrentMeta = this
+            .prestigeService.CurrentMetaBalance.Select(balance => Format.Abbreviated(balance))
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        PerformPrestige = new UiCommand(this.prestigeService.PerformPrestige, this.prestigeService.CanPrestige);
+        PerformPrestige = new UiCommand(
+            this.prestigeService.PerformPrestige,
+            this.prestigeService.CanPrestige
+        );
         Close = new UiCommand(close);
     }
 

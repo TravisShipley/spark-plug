@@ -19,17 +19,21 @@ public sealed class PrestigeService : IDisposable
     private readonly double incomeMultiplierPerMeta;
     private readonly double incomeMultiplierBase;
 
+    private readonly int gainMinimum = 1;
+
     private readonly Subject<Unit> changed = new();
     private readonly CompositeDisposable disposables = new();
     private readonly ReactiveProperty<double> lifetimeSoftEarnings = new(0d);
     private readonly ReactiveProperty<long> previewGain = new(0);
     private readonly ReactiveProperty<bool> canPrestige = new(false);
+    private readonly ReactiveProperty<float> prestigeProgressRatio = new(0f);
 
     public bool IsEnabled { get; }
     public IReadOnlyReactiveProperty<double> CurrentMetaBalance { get; }
     public IReadOnlyReactiveProperty<double> LifetimeSoftEarnings => lifetimeSoftEarnings;
     public IReadOnlyReactiveProperty<long> PreviewGain => previewGain;
     public IReadOnlyReactiveProperty<bool> CanPrestige => canPrestige;
+    public IReadOnlyReactiveProperty<float> PrestigeProgressRatio => prestigeProgressRatio;
     public IObservable<Unit> Changed => changed;
 
     public PrestigeService(
@@ -42,7 +46,8 @@ public sealed class PrestigeService : IDisposable
         this.gameDefinitionService =
             gameDefinitionService ?? throw new ArgumentNullException(nameof(gameDefinitionService));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
-        this.walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
+        this.walletService =
+            walletService ?? throw new ArgumentNullException(nameof(walletService));
         this.gameEventStream =
             gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
@@ -105,8 +110,7 @@ public sealed class PrestigeService : IDisposable
 
         CurrentMetaBalance = this.walletService.GetBalanceProperty(metaResourceId);
 
-        this.walletService
-            .GetBalanceProperty(lifetimeResourceId)
+        this.walletService.GetBalanceProperty(lifetimeResourceId)
             .DistinctUntilChanged()
             .Subscribe(_ => RefreshPreview())
             .AddTo(disposables);
@@ -119,17 +123,25 @@ public sealed class PrestigeService : IDisposable
         RefreshPreview();
     }
 
-    public long CalculateGain()
+    private double CalculateGainRaw()
     {
         if (!IsEnabled)
-            return 0;
+            return 0d;
 
         var lifetime = Math.Max(0d, saveService.GetLifetimeEarnings(lifetimeResourceId));
         var raw = (Math.Sqrt(lifetime) * gainMultiplier) + gainOffset;
         if (double.IsNaN(raw) || double.IsInfinity(raw))
-            return 0;
+            return 0d;
 
-        return Math.Max(0L, (long)Math.Floor(raw));
+        return Math.Max(0d, raw);
+    }
+
+    public long CalculateGain()
+    {
+        {
+            var raw = CalculateGainRaw();
+            return Math.Max(0L, (long)Math.Floor(raw));
+        }
     }
 
     public double GetIncomeMultiplierForResource(string resourceId)
@@ -155,7 +167,7 @@ public sealed class PrestigeService : IDisposable
             return;
 
         var gain = CalculateGain();
-        if (gain <= 0)
+        if (gain < this.gainMinimum)
             return;
 
         walletService.AddRaw(prestigeResourceId, gain);
@@ -177,6 +189,7 @@ public sealed class PrestigeService : IDisposable
         lifetimeSoftEarnings.Dispose();
         previewGain.Dispose();
         canPrestige.Dispose();
+        prestigeProgressRatio.Dispose();
         disposables.Dispose();
     }
 
@@ -187,15 +200,40 @@ public sealed class PrestigeService : IDisposable
             lifetimeSoftEarnings.Value = 0d;
             previewGain.Value = 0;
             canPrestige.Value = false;
+            prestigeProgressRatio.Value = 0f;
             return;
         }
 
         var lifetime = Math.Max(0d, saveService.GetLifetimeEarnings(lifetimeResourceId));
         lifetimeSoftEarnings.Value = lifetime;
 
-        var gain = CalculateGain();
+        var rawGain = CalculateGainRaw();
+        var gain = Math.Max(0L, (long)Math.Floor(rawGain));
+
         previewGain.Value = gain;
-        canPrestige.Value = gain > 0;
+        canPrestige.Value = gain >= this.gainMinimum;
+
+        // Progress should always represent eligibility progress (canPrestige threshold).
+        // Once eligible, keep it pinned at 1.
+        prestigeProgressRatio.Value = CalculatePrestigeProgressRatio(rawGain);
+        changed.OnNext(Unit.Default);
+    }
+
+    private float CalculatePrestigeProgressRatio(double rawGain)
+    {
+        if (gainMinimum <= 0)
+            return 0f;
+
+        var clampedRaw = Math.Max(0d, rawGain);
+        var normalized = (float)(clampedRaw / gainMinimum);
+        if (float.IsNaN(normalized) || float.IsInfinity(normalized))
+            return 0f;
+
+        if (normalized <= 0f)
+            return 0f;
+        if (normalized >= 1f)
+            return 1f;
+        return normalized;
     }
 
     private MetaUpgradeDefinition ResolveMetaUpgrade()
@@ -224,8 +262,10 @@ public sealed class PrestigeService : IDisposable
     {
         var normalizedPath = (path ?? string.Empty).Trim();
         if (
-            !ParameterizedPathParser.TryParseFormulaParameterizedPath(normalizedPath, out var parsed)
-            || string.IsNullOrEmpty(parsed.ParameterId)
+            !ParameterizedPathParser.TryParseFormulaParameterizedPath(
+                normalizedPath,
+                out var parsed
+            ) || string.IsNullOrEmpty(parsed.ParameterId)
         )
         {
             throw new InvalidOperationException(

@@ -107,9 +107,9 @@ id,displayName,zoneId,base,min,max,rounding,expression.type,expression.args,depe
 Nodes
 
 id,type,displayName,zoneId,tags,cycle.baseDurationSeconds,leveling.levelResource,leveling.baseLevel,leveling.maxLevel,leveling.priceCurve.type,leveling.priceCurve.basePrice,leveling.priceCurve.growth,leveling.priceCurve.increment,automation.policy,automation.autoCollect,automation.autoRestart
-nodeType.producer.apple,producer,Apples,zone.main,business,1,currencySoft,0,,exponential,4,1.07,,manualCollect,FALSE,FALSE
-nodeType.producer.grape,producer,Grapes,zone.main,business,3,currencySoft,0,,exponential,60,1.08,,manualCollect,FALSE,FALSE
-nodeType.producer.banana,producer,Bananas,zone.main,business,6,currencySoft,0,,exponential,720,1.09,,manualCollect,FALSE,FALSE
+nodeType.producer.apple,producer,Apples,zone.main,business,1,currencySoft,0,,exponential,5,1.08,,manualCollect,FALSE,FALSE
+nodeType.producer.grape,producer,Grapes,zone.main,business,3,currencySoft,0,,exponential,66,1.12,,manualCollect,FALSE,FALSE
+nodeType.producer.banana,producer,Bananas,zone.main,business,6,currencySoft,0,,exponential,770,1.19,,manualCollect,FALSE,FALSE
 
 ---
 
@@ -122,9 +122,9 @@ nodeId,resource,amountPerCycle,amountPerCycleFromVar,amountPerCycleFromState
 NodeOutputs
 
 nodeId,resource,mode,basePerSecond,basePayout,amountPerCycle,amountPerCycleFromVar,amountPerCycleFromState
-nodeType.producer.apple,currencySoft,cycle,,4
-nodeType.producer.grape,currencySoft,cycle,,60
-nodeType.producer.banana,currencySoft,cycle,,720
+nodeType.producer.apple,currencySoft,cycle,,1
+nodeType.producer.grape,currencySoft,cycle,,44
+nodeType.producer.banana,currencySoft,cycle,,512
 
 ---
 

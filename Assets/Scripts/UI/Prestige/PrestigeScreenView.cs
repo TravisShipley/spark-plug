@@ -1,6 +1,7 @@
 using TMPro;
 using UniRx;
 using UnityEngine;
+using UnityEngine.UI;
 
 public sealed class PrestigeScreenView : UiScreenView
 {
@@ -19,6 +20,9 @@ public sealed class PrestigeScreenView : UiScreenView
 
     [SerializeField]
     private ReactiveButtonView prestigeButton;
+
+    [SerializeField]
+    private Image prestigeProgress;
 
     private readonly CompositeDisposable disposables = new();
 
@@ -49,6 +53,9 @@ public sealed class PrestigeScreenView : UiScreenView
         viewModel.PreviewGain.Subscribe(value => previewGainText.text = value).AddTo(disposables);
         viewModel
             .CurrentMeta.Subscribe(value => currentMetaText.text = $"Tokens: {value}")
+            .AddTo(disposables);
+        viewModel
+            .PrestigeProgressRatio.Subscribe(fill => prestigeProgress.fillAmount = fill)
             .AddTo(disposables);
 
         closeButton.Bind(
