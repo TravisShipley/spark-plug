@@ -466,6 +466,7 @@ MonoBehaviour:
   - {fileID: 190678306}
   - {fileID: 633729475}
   bottomBarView: {fileID: 939591483}
+  testPanel: {fileID: 6065628833239432594}
   adBoostButtons:
   - {fileID: 6065628833239432593}
   buyModeButtons:
@@ -2305,6 +2306,11 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.x
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5825543524845500646, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 24.99997
+      objectReference: {fileID: 0}
     - target: {fileID: 5855517798394101630, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchorMax.y
@@ -3165,6 +3171,11 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 9114692068556459823, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 24.99997
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 8888359209536957445, guid: 602b3793041444a11842ad222eb83510, type: 3}
@@ -3205,6 +3216,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0963807cc3b4f2f93b18e8f42e6f90c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AdBoostButtonView
+--- !u!114 &6065628833239432594 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6071936366895419528, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3b5cfa8a68654b4f997cb28c035bab0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TestPanelView
 --- !u!223 &6065628833239432595 stripped
 Canvas:
   m_CorrespondingSourceObject: {fileID: 7584166579324823389, guid: 602b3793041444a11842ad222eb83510,

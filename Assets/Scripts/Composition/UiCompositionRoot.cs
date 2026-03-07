@@ -18,6 +18,7 @@
  *   game composition and initialization order.
  */
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public sealed class UiCompositionRoot : MonoBehaviour
 {
@@ -28,6 +29,10 @@ public sealed class UiCompositionRoot : MonoBehaviour
     [SerializeField]
     private BottomBarView bottomBarView;
 
+    [FormerlySerializedAs("nodeView")]
+    [SerializeField]
+    private TestPanelView testPanel;
+
     [SerializeField]
     private AdBoostButtonView[] adBoostButtons;
 
@@ -36,6 +41,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private bool hasBound;
     private BuyModeViewModel buyModeViewModel;
+    private TestPanelViewModel testPanelViewModel;
 
     public void Bind(in UiBindingsContext context)
     {
@@ -47,6 +53,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
         BindWalletHud(context);
         BindBottomBar(context);
+        BindTestPanel();
         BindAdBoostButtons(context);
         BindBuyModeButtons(context);
     }
@@ -118,6 +125,21 @@ public sealed class UiCompositionRoot : MonoBehaviour
         bottomBarView.Bind(bottomBarVm);
     }
 
+    private void BindTestPanel()
+    {
+        if (testPanel == null)
+            return;
+
+        testPanelViewModel ??= new TestPanelViewModel(
+            "Chicken coop",
+            "$12.34M",
+            0.67f,
+            true,
+            false
+        );
+        testPanel.Bind(testPanelViewModel);
+    }
+
     private void BindAdBoostButtons(in UiBindingsContext context)
     {
         if (adBoostButtons == null || adBoostButtons.Length == 0)
@@ -140,10 +162,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
         if (context.BuyModeService == null)
         {
-            Debug.LogError(
-                "UiCompositionRoot: BuyModeService is null in UiBindingsContext.",
-                this
-            );
+            Debug.LogError("UiCompositionRoot: BuyModeService is null in UiBindingsContext.", this);
             return;
         }
 
@@ -160,6 +179,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private void OnDestroy()
     {
+        testPanelViewModel?.Dispose();
         buyModeViewModel?.Dispose();
     }
 }
