@@ -133,7 +133,7 @@ public class GeneratorView : MonoBehaviour
             labelText: Observable
                 .CombineLatest(
                     vm.BuyModeDisplayName.DistinctUntilChanged(),
-                    vm.LevelUpCost.DistinctUntilChanged(),
+                    vm.LevelUpDisplayCost.DistinctUntilChanged(),
                     (modeLabel, cost) => $"Level Up {modeLabel}\n{Format.Currency(cost)}"
                 )
                 .DistinctUntilChanged(),

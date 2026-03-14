@@ -388,7 +388,7 @@ public class GeneratorService : IDisposable
             return 0;
 
         var affordableCount = CalculateAffordableLevels(requestedCount);
-        if (IsFixedMode(mode))
+        if (IsAllOrNothingMode(mode))
             return affordableCount >= requestedCount ? requestedCount : 0;
 
         return affordableCount;
@@ -407,7 +407,7 @@ public class GeneratorService : IDisposable
         if (requestedCount <= 0)
             return 0d;
 
-        if (IsFixedMode(mode))
+        if (IsAllOrNothingMode(mode))
             return CalculateTotalCostForLevels(requestedCount);
 
         var plannedCount = CalculatePlannedPurchaseCount(mode, cappedMaxToBuy);
@@ -415,6 +415,30 @@ public class GeneratorService : IDisposable
             return 0d;
 
         return CalculateTotalCostForLevels(plannedCount);
+    }
+
+    public double CalculateDisplayPurchaseCost(BuyModeDefinition mode, int maxToBuy = int.MaxValue)
+    {
+        if (mode == null)
+            throw new InvalidOperationException("GeneratorService: BuyMode is null.");
+
+        var cappedMaxToBuy = Math.Max(0, maxToBuy);
+        if (cappedMaxToBuy <= 0)
+            return 0d;
+
+        var requestedCount = ResolveRequestedCountForMode(mode, cappedMaxToBuy);
+        if (requestedCount <= 0)
+            return 0d;
+
+        if (!IsMaxAffordableMode(mode))
+            return CalculateTotalCostForLevels(requestedCount);
+
+        var plannedCost = CalculatePlannedPurchaseCost(mode, cappedMaxToBuy);
+        if (plannedCost > 0d)
+            return plannedCost;
+
+        // MAX still shows the single-level entry price even when nothing is currently affordable.
+        return CalculateMinimumPurchaseCost();
     }
 
     private int ResolveRequestedCountForMode(BuyModeDefinition mode, int cappedMaxToBuy)
@@ -454,10 +478,22 @@ public class GeneratorService : IDisposable
         );
     }
 
-    private static bool IsFixedMode(BuyModeDefinition mode)
+    private static bool IsAllOrNothingMode(BuyModeDefinition mode)
     {
         var kind = (mode?.kind ?? string.Empty).Trim();
-        return string.Equals(kind, "fixed", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(kind, "fixed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(kind, "nextMilestone", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMaxAffordableMode(BuyModeDefinition mode)
+    {
+        var kind = (mode?.kind ?? string.Empty).Trim();
+        return string.Equals(kind, "maxAffordable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private double CalculateMinimumPurchaseCost()
+    {
+        return CalculateTotalCostForLevels(1);
     }
 
     private int CalculateAffordableLevels(int requestedCount)

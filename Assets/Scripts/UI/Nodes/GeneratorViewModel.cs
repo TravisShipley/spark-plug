@@ -33,6 +33,7 @@ public class GeneratorViewModel : IDisposable
     public IReadOnlyReactiveProperty<double> OutputPerCycle { get; }
     public IReadOnlyReactiveProperty<double> NextLevelCost { get; }
     public IReadOnlyReactiveProperty<double> LevelUpCost { get; }
+    public IReadOnlyReactiveProperty<double> LevelUpDisplayCost { get; }
     public IReadOnlyReactiveProperty<string> BuyModeDisplayName { get; }
     public IReadOnlyReactiveProperty<bool> CanBuild { get; }
     public IReadOnlyReactiveProperty<bool> CanLevelUp { get; }
@@ -99,6 +100,16 @@ public class GeneratorViewModel : IDisposable
                 buyModeService.SelectedBuyMode.DistinctUntilChanged(),
                 walletViewModel.Balance(definition.LevelCostResourceId).DistinctUntilChanged(),
                 (_, mode, __) => generatorService.CalculatePlannedPurchaseCost(mode)
+            )
+            .ToReadOnlyReactiveProperty()
+            .AddTo(disposables);
+
+        LevelUpDisplayCost = Observable
+            .CombineLatest(
+                generatorService.Level.DistinctUntilChanged(),
+                buyModeService.SelectedBuyMode.DistinctUntilChanged(),
+                walletViewModel.Balance(definition.LevelCostResourceId).DistinctUntilChanged(),
+                (_, mode, __) => generatorService.CalculateDisplayPurchaseCost(mode)
             )
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
