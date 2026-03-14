@@ -42,9 +42,14 @@ public class GeneratorViewModel : IDisposable
     public IReadOnlyReactiveProperty<bool> ShowLevelUp { get; }
     public IReadOnlyReactiveProperty<bool> ShowCollect { get; }
     public IReadOnlyReactiveProperty<bool> IsOutputBoosted { get; }
-    public UiCommand BuildCommand { get; }
-    public UiCommand LevelUpCommand { get; }
-    public UiCommand CollectCommand { get; }
+    [BindableCommand]
+    public ICommand BuildCommand { get; }
+
+    [BindableCommand]
+    public ICommand LevelUpCommand { get; }
+
+    [BindableCommand]
+    public ICommand CollectCommand { get; }
     public IObservable<Unit> CycleCompleted => generatorService.CycleCompleted;
 
     public GeneratorViewModel(
@@ -164,11 +169,10 @@ public class GeneratorViewModel : IDisposable
                 if (generatorService.TryBuyLevel())
                     generatorService.StartRun();
             },
-            CanBuild,
-            ShowBuild
+            CanBuild
         );
 
-        LevelUpCommand = new UiCommand(() => TryLevelUpByMode(), CanLevelUp, ShowLevelUp);
+        LevelUpCommand = new UiCommand(() => TryLevelUpByMode(), CanLevelUp);
 
         CollectCommand = new UiCommand(
             () =>
@@ -176,8 +180,7 @@ public class GeneratorViewModel : IDisposable
                 generatorService.Collect();
                 generatorService.StartRun();
             },
-            CanCollect,
-            ShowCollect
+            CanCollect
         );
     }
 

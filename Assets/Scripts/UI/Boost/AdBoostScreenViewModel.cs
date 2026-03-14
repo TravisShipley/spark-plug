@@ -13,8 +13,11 @@ public sealed class AdBoostScreenViewModel : IDisposable
     public IReadOnlyReactiveProperty<bool> IsActive { get; }
     public IReadOnlyReactiveProperty<bool> CanActivate { get; }
     public IReadOnlyReactiveProperty<string> CountdownText { get; }
-    public UiCommand ActivateBoost { get; }
-    public UiCommand Close { get; }
+    [BindableCommand]
+    public ICommand ActivateBoost { get; }
+
+    [BindableCommand]
+    public ICommand Close { get; }
 
     public AdBoostScreenViewModel(BuffService buffService, BuffCatalog buffCatalog, Action close)
     {

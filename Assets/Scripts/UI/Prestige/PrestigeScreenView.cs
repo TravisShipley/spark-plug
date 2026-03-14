@@ -60,13 +60,13 @@ public sealed class PrestigeScreenView : UiScreenView
 
         closeButton.Bind(
             interactable: viewModel.Close.CanExecute,
-            visible: viewModel.Close.IsVisible,
+            visible: Observable.Return(true),
             onClick: viewModel.Close.Execute
         );
 
         prestigeButton.Bind(
             interactable: viewModel.CanPrestige,
-            visible: viewModel.PerformPrestige.IsVisible,
+            visible: Observable.Return(true),
             onClick: viewModel.PerformPrestige.Execute
         );
     }

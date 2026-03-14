@@ -125,7 +125,7 @@ public class GeneratorView : MonoBehaviour
             labelText: vm.NextLevelCost.Select(cost => $"Build\n{Format.Currency(cost)}")
                 .DistinctUntilChanged(),
             interactable: vm.BuildCommand.CanExecute,
-            visible: vm.BuildCommand.IsVisible,
+            visible: vm.ShowBuild,
             onClick: vm.BuildCommand.Execute
         );
 
@@ -138,7 +138,7 @@ public class GeneratorView : MonoBehaviour
                 )
                 .DistinctUntilChanged(),
             interactable: vm.LevelUpCommand.CanExecute,
-            visible: vm.LevelUpCommand.IsVisible,
+            visible: vm.ShowLevelUp,
             onClick: () =>
             {
                 if (levelHoldBinder != null && levelHoldBinder.ConsumeSuppressNextClick())
@@ -166,7 +166,7 @@ public class GeneratorView : MonoBehaviour
         collectButtonView.Bind(
             labelText: Observable.Return("Collect"),
             interactable: vm.CollectCommand.CanExecute,
-            visible: vm.CollectCommand.IsVisible,
+            visible: vm.ShowCollect,
             onClick: vm.CollectCommand.Execute
         );
     }

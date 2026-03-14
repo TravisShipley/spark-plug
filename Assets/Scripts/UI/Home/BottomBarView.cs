@@ -45,21 +45,21 @@ public sealed class BottomBarView : MonoBehaviour
         upgradesButton.Bind(
             labelText: Observable.Return("Upgrades"),
             interactable: vm.ShowUpgrades.CanExecute,
-            visible: vm.ShowUpgrades.IsVisible,
+            visible: Observable.Return(true),
             onClick: vm.ShowUpgrades.Execute
         );
 
         managersButton.Bind(
             labelText: Observable.Return("Managers"),
             interactable: vm.ShowManagers.CanExecute,
-            visible: vm.ShowManagers.IsVisible,
+            visible: Observable.Return(true),
             onClick: vm.ShowManagers.Execute
         );
 
         prestigeButton.Bind(
             labelText: Observable.Return("Prestige"),
             interactable: vm.ShowPrestige.CanExecute,
-            visible: vm.ShowPrestige.IsVisible,
+            visible: Observable.Return(true),
             onClick: vm.ShowPrestige.Execute
         );
 

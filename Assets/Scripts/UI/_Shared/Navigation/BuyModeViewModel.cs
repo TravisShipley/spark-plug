@@ -6,7 +6,8 @@ public sealed class BuyModeViewModel : IDisposable
     private readonly CompositeDisposable disposables = new();
 
     public IReadOnlyReactiveProperty<string> Label { get; }
-    public UiCommand CycleBuyModeCommand { get; }
+    [BindableCommand]
+    public ICommand CycleBuyModeCommand { get; }
 
     public BuyModeViewModel(BuyModeService buyModeService)
     {

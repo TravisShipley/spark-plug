@@ -11,7 +11,7 @@ public abstract class BinderBase : MonoBehaviour, IBinder
     [SerializeField]
     private string selectedMemberName;
 
-    public IBindingDataProvider DataProvider => dataProvider;
+    public DataProvider DataProvider => dataProvider;
     public string SelectedMemberName => selectedMemberName;
     public abstract Type BindingValueType { get; }
 

@@ -3,10 +3,17 @@ using UniRx;
 
 public sealed class BottomBarViewModel
 {
-    public UiCommand ShowUpgrades { get; }
-    public UiCommand ShowManagers { get; }
-    public UiCommand ShowPrestige { get; }
-    public UiCommand ShowStore { get; }
+    [BindableCommand]
+    public ICommand ShowUpgrades { get; }
+
+    [BindableCommand]
+    public ICommand ShowManagers { get; }
+
+    [BindableCommand]
+    public ICommand ShowPrestige { get; }
+
+    [BindableCommand]
+    public ICommand ShowStore { get; }
     public IReadOnlyReactiveProperty<bool> ShowUpgradesBadge { get; }
     public IReadOnlyReactiveProperty<bool> ShowManagersBadge { get; }
 

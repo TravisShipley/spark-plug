@@ -12,7 +12,8 @@ public sealed class OfflineEarningsViewModel : IDisposable
     public IReadOnlyReactiveProperty<string> Title { get; }
     public IReadOnlyReactiveProperty<string> Summary { get; }
     public IReadOnlyReactiveProperty<string> EarningsLine { get; }
-    public UiCommand Collect { get; }
+    [BindableCommand]
+    public ICommand Collect { get; }
 
     public OfflineEarningsViewModel(
         OfflineSessionResult result,

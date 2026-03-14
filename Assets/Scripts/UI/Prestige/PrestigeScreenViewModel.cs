@@ -12,8 +12,11 @@ public sealed class PrestigeScreenViewModel : IDisposable
     public IReadOnlyReactiveProperty<float> PrestigeProgressRatio =>
         prestigeService.PrestigeProgressRatio;
     public IReadOnlyReactiveProperty<bool> CanPrestige => prestigeService.CanPrestige;
-    public UiCommand PerformPrestige { get; }
-    public UiCommand Close { get; }
+    [BindableCommand]
+    public ICommand PerformPrestige { get; }
+
+    [BindableCommand]
+    public ICommand Close { get; }
 
     public PrestigeScreenViewModel(PrestigeService prestigeService, Action close)
     {

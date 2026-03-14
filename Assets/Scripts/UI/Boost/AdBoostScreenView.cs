@@ -44,13 +44,13 @@ public sealed class AdBoostScreenView : UiScreenView
 
         closeButton.Bind(
             interactable: viewModel.Close.CanExecute,
-            visible: viewModel.Close.IsVisible,
+            visible: Observable.Return(true),
             onClick: viewModel.Close.Execute
         );
 
         boostButton.Bind(
             interactable: viewModel.CanActivate,
-            visible: viewModel.ActivateBoost.IsVisible,
+            visible: Observable.Return(true),
             onClick: viewModel.ActivateBoost.Execute
         );
     }

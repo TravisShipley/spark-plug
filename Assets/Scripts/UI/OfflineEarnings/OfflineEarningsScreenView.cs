@@ -56,7 +56,7 @@ public sealed class OfflineEarningsScreenView : UiScreenView
 
         collectButton.Bind(
             interactable: viewModel.Collect.CanExecute,
-            visible: viewModel.Collect.IsVisible,
+            visible: Observable.Return(true),
             onClick: viewModel.Collect.Execute
         );
 

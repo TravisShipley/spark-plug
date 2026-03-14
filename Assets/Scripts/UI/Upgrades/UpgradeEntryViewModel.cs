@@ -19,13 +19,14 @@ public sealed class UpgradeEntryViewModel : IDisposable
     public IReadOnlyReactiveProperty<bool> IsAffordable { get; }
     public IReadOnlyReactiveProperty<bool> CanPurchase { get; }
     public IReadOnlyReactiveProperty<bool> IsVisible { get; }
-    public UiCommand PurchaseCommand { get; }
+    [BindableCommand]
+    public ICommand PurchaseCommand { get; }
 
     // Backward-compatible aliases for existing bindings.
     public string Title => DisplayName;
     public string Summary => InfoText;
     public IReadOnlyReactiveProperty<bool> CanAfford => IsAffordable;
-    public UiCommand Purchase => PurchaseCommand;
+    public ICommand Purchase => PurchaseCommand;
 
     public UpgradeEntryViewModel(
         UpgradeDefinition upgrade,
@@ -95,11 +96,7 @@ public sealed class UpgradeEntryViewModel : IDisposable
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
 
-        PurchaseCommand = new UiCommand(
-            () => upgradeService.TryPurchase(UpgradeId),
-            CanPurchase,
-            IsVisible
-        );
+        PurchaseCommand = new UiCommand(() => upgradeService.TryPurchase(UpgradeId), CanPurchase);
     }
 
     public void Dispose()
