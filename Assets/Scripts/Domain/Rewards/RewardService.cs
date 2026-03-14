@@ -5,17 +5,23 @@ using UnityEngine;
 public sealed class RewardService
 {
     private readonly WalletService walletService;
+    private readonly TimeWarpService timeWarpService;
     private readonly ResourceCatalog resourceCatalog;
     private readonly Dictionary<string, RewardPoolDefinition> rewardPoolsById = new(
         StringComparer.Ordinal
     );
 
-    public RewardService(GameDefinitionService gameDefinitionService, WalletService walletService)
+    public RewardService(
+        GameDefinitionService gameDefinitionService,
+        WalletService walletService,
+        TimeWarpService timeWarpService
+    )
     {
         if (gameDefinitionService == null)
             throw new ArgumentNullException(nameof(gameDefinitionService));
 
         this.walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
+        this.timeWarpService = timeWarpService ?? throw new ArgumentNullException(nameof(timeWarpService));
         resourceCatalog = gameDefinitionService.ResourceCatalog;
 
         var rewardPools = gameDefinitionService.RewardPools;
@@ -74,14 +80,26 @@ public sealed class RewardService
             );
         }
 
-        if (!string.Equals(actionType, "grantResource", StringComparison.Ordinal))
+        if (string.Equals(actionType, "grantResource", StringComparison.Ordinal))
         {
-            throw new InvalidOperationException(
-                $"RewardPool '{rewardPoolId}' has unsupported reward action '{actionType}'. "
-                    + "Only 'grantResource' is supported in this slice."
-            );
+            ExecuteGrantResource(rewardPoolId, action);
+            return;
         }
 
+        if (string.Equals(actionType, "timeWarp", StringComparison.Ordinal))
+        {
+            ExecuteTimeWarp(rewardPoolId, action);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"RewardPool '{rewardPoolId}' has unsupported reward action '{actionType}'. "
+                + "Supported reward actions are 'grantResource' and 'timeWarp'."
+        );
+    }
+
+    private void ExecuteGrantResource(string rewardPoolId, RewardAction action)
+    {
         var resourceId = NormalizeId(action.resourceId);
         if (string.IsNullOrEmpty(resourceId))
         {
@@ -101,6 +119,25 @@ public sealed class RewardService
 
         Debug.Log(
             $"[RewardPool] Rolled '{rewardPoolId}' -> grantResource {resourceId} +{action.amount.ToString("0.###")}."
+        );
+    }
+
+    private void ExecuteTimeWarp(string rewardPoolId, RewardAction action)
+    {
+        if (
+            double.IsNaN(action.durationSeconds)
+            || double.IsInfinity(action.durationSeconds)
+            || action.durationSeconds <= 0d
+        )
+        {
+            throw new InvalidOperationException(
+                $"RewardPool '{rewardPoolId}' timeWarp action must define durationSeconds > 0. Found '{action.durationSeconds}'."
+            );
+        }
+
+        timeWarpService.ApplyWarp(action.durationSeconds);
+        Debug.Log(
+            $"[RewardPool] Rolled '{rewardPoolId}' -> timeWarp {action.durationSeconds.ToString("0.###")}s."
         );
     }
 

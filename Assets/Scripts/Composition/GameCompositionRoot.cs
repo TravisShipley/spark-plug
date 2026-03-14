@@ -67,6 +67,7 @@ public class GameCompositionRoot : MonoBehaviour
     private UnlockService unlockService;
     private PrestigeService prestigeService;
     private OfflineProgressCalculator offlineProgressCalculator;
+    private TimeWarpService timeWarpService;
     private GameDefinitionService gameDefinitionService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
@@ -75,8 +76,6 @@ public class GameCompositionRoot : MonoBehaviour
 
     // Timing
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
-    private const long MaxOfflineSeconds = 8 * 60 * 60;
-
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
     private readonly List<GeneratorViewModel> generatorViewModels = new();
@@ -191,7 +190,12 @@ public class GameCompositionRoot : MonoBehaviour
             modifierService,
             gameEventStream
         );
-        triggerService = new TriggerService(gameDefinitionService, walletService, gameEventStream);
+        triggerService = new TriggerService(
+            gameDefinitionService,
+            walletService,
+            timeWarpService,
+            gameEventStream
+        );
 
         gameEventStream
             .ResetSaveRequested.Subscribe(_ => HandleResetRequested())
@@ -262,6 +266,11 @@ public class GameCompositionRoot : MonoBehaviour
         offlineProgressCalculator = new OfflineProgressCalculator(
             gameDefinitionService,
             modifierService
+        );
+        timeWarpService = new TimeWarpService(
+            offlineProgressCalculator,
+            saveService,
+            walletService
         );
 
         // UiScreenManager needs the UpgradeService for screens like Upgrades.
@@ -463,8 +472,7 @@ public class GameCompositionRoot : MonoBehaviour
         }
 
         var secondsAway = Math.Max(0, now - lastSeen);
-        var clampedSecondsAway = Math.Min(secondsAway, MaxOfflineSeconds);
-        var result = offlineProgressCalculator.Calculate(clampedSecondsAway, saveService.Data);
+        var result = offlineProgressCalculator.Calculate(secondsAway, saveService.Data);
 
         // Stamp this session immediately so repeated launches do not double-pay.
         saveService.SetLastSeenUnixSeconds(now, requestSave: true);

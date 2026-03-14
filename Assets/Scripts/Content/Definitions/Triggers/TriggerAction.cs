@@ -5,4 +5,5 @@ public sealed class TriggerAction
 {
     public string type;
     public string rewardPoolId;
+    public double durationSeconds;
 }

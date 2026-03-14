@@ -43,9 +43,9 @@ public static class GameDefinitionValidator
 
     private static readonly string[] SupportedTriggerConditionTypes = { "milestoneIdEquals" };
 
-    private static readonly string[] SupportedTriggerActionTypes = { "rollRewardPool" };
+    private static readonly string[] SupportedTriggerActionTypes = { "rollRewardPool", "timeWarp" };
 
-    private static readonly string[] SupportedRewardActionTypes = { "grantResource" };
+    private static readonly string[] SupportedRewardActionTypes = { "grantResource", "timeWarp" };
     private static readonly string[] SupportedBuyModeKinds =
     {
         "fixed",
@@ -410,6 +410,19 @@ public static class GameDefinitionValidator
                         );
                     }
                 }
+                else if (string.Equals(actionType, "timeWarp", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (
+                        double.IsNaN(action.durationSeconds)
+                        || double.IsInfinity(action.durationSeconds)
+                        || action.durationSeconds <= 0d
+                    )
+                    {
+                        errors.Add(
+                            $"rewardPools[{i}] ('{rewardPoolId}') rewards[{r}].action.durationSeconds must be > 0."
+                        );
+                    }
+                }
             }
         }
 
@@ -585,6 +598,19 @@ public static class GameDefinitionValidator
                     {
                         errors.Add(
                             $"triggers[{i}] ('{triggerId}') actions[{a}].rewardPoolId '{rewardPoolId}' references missing rewardPools.id."
+                        );
+                    }
+                }
+                else if (string.Equals(actionType, "timeWarp", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (
+                        double.IsNaN(action.durationSeconds)
+                        || double.IsInfinity(action.durationSeconds)
+                        || action.durationSeconds <= 0d
+                    )
+                    {
+                        errors.Add(
+                            $"triggers[{i}] ('{triggerId}') actions[{a}].durationSeconds must be > 0."
                         );
                     }
                 }

@@ -5,6 +5,7 @@ public sealed class OfflineProgressCalculator
 {
     private const string CurrencySoftResourceId = "currencySoft";
     private const double MinCycleDurationSeconds = 0.0001d;
+    private const double MaxPassiveOfflineSeconds = 8d * 60d * 60d;
 
     private readonly GameDefinitionService gameDefinitionService;
     private readonly ModifierService modifierService;
@@ -21,9 +22,26 @@ public sealed class OfflineProgressCalculator
 
     public OfflineSessionResult Calculate(long secondsAway, GameData saveData)
     {
-        var clampedSecondsAway = Math.Max(0, secondsAway);
-        var result = new OfflineSessionResult { secondsAway = clampedSecondsAway };
-        if (clampedSecondsAway <= 0 || saveData == null)
+        return Calculate((double)secondsAway, saveData, respectOfflineCap: true);
+    }
+
+    public OfflineSessionResult Calculate(
+        double elapsedSeconds,
+        GameData saveData,
+        bool respectOfflineCap = true
+    )
+    {
+        var sanitizedElapsedSeconds = SanitizeElapsedSeconds(elapsedSeconds);
+        var appliedElapsedSeconds = respectOfflineCap
+            ? Math.Min(sanitizedElapsedSeconds, MaxPassiveOfflineSeconds)
+            : sanitizedElapsedSeconds;
+
+        var result = new OfflineSessionResult
+        {
+            secondsAway = (long)Math.Floor(appliedElapsedSeconds),
+        };
+
+        if (appliedElapsedSeconds < MinCycleDurationSeconds || saveData == null)
             return result;
 
         var generatorsById = BuildGeneratorStateLookup(saveData.Generators);
@@ -74,7 +92,7 @@ public sealed class OfflineProgressCalculator
                 MinCycleDurationSeconds,
                 baseCycleDuration / speedMultiplier
             );
-            var cycles = (long)Math.Floor(clampedSecondsAway / cycleDurationSeconds);
+            var cycles = (long)Math.Floor(appliedElapsedSeconds / cycleDurationSeconds);
             if (cycles <= 0)
                 continue;
 
@@ -90,6 +108,14 @@ public sealed class OfflineProgressCalculator
         }
 
         return result;
+    }
+
+    private static double SanitizeElapsedSeconds(double elapsedSeconds)
+    {
+        if (double.IsNaN(elapsedSeconds) || double.IsInfinity(elapsedSeconds))
+            return 0d;
+
+        return Math.Max(0d, elapsedSeconds);
     }
 
     private static Dictionary<string, GameData.GeneratorStateData> BuildGeneratorStateLookup(

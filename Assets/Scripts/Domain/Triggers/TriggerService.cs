@@ -21,11 +21,13 @@ public sealed class TriggerService : IDisposable
     );
     private readonly RewardService rewardService;
     private readonly GameEventStream gameEventStream;
+    private readonly TimeWarpService timeWarpService;
     private readonly CompositeDisposable disposables = new();
 
     public TriggerService(
         GameDefinitionService gameDefinitionService,
         WalletService walletService,
+        TimeWarpService timeWarpService,
         GameEventStream gameEventStream
     )
     {
@@ -33,10 +35,11 @@ public sealed class TriggerService : IDisposable
             throw new ArgumentNullException(nameof(gameDefinitionService));
         if (walletService == null)
             throw new ArgumentNullException(nameof(walletService));
+        this.timeWarpService = timeWarpService ?? throw new ArgumentNullException(nameof(timeWarpService));
         this.gameEventStream =
             gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
-        rewardService = new RewardService(gameDefinitionService, walletService);
+        rewardService = new RewardService(gameDefinitionService, walletService, timeWarpService);
         IndexTriggers(gameDefinitionService.Triggers);
 
         this.gameEventStream.MilestoneFired.Subscribe(OnMilestoneFired).AddTo(disposables);
@@ -173,9 +176,26 @@ public sealed class TriggerService : IDisposable
                 continue;
             }
 
+            if (string.Equals(actionType, "timeWarp", StringComparison.Ordinal))
+            {
+                if (
+                    double.IsNaN(action.durationSeconds)
+                    || double.IsInfinity(action.durationSeconds)
+                    || action.durationSeconds <= 0d
+                )
+                {
+                    throw new InvalidOperationException(
+                        $"Trigger '{trigger.id}' timeWarp action must define durationSeconds > 0. Found '{action.durationSeconds}'."
+                    );
+                }
+
+                timeWarpService.ApplyWarp(action.durationSeconds);
+                continue;
+            }
+
             throw new InvalidOperationException(
                 $"Trigger '{trigger.id}' has unsupported action '{actionType}'. "
-                    + "Only 'rollRewardPool' is supported in this slice."
+                    + "Supported trigger actions are 'rollRewardPool' and 'timeWarp'."
             );
         }
     }
