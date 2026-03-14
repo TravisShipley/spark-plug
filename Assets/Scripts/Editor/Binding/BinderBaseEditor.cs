@@ -13,12 +13,12 @@ public sealed class BinderBaseEditor : Editor
     {
         serializedObject.Update();
 
-        DrawScriptField();
+        // DrawScriptField();
 
         var dataProviderProperty = serializedObject.FindProperty(DataProviderFieldName);
         var selectedMemberNameProperty = serializedObject.FindProperty(SelectedMemberNameFieldName);
 
-        EditorGUILayout.PropertyField(dataProviderProperty, new GUIContent("Data Provider"));
+        EditorGUILayout.PropertyField(dataProviderProperty, new GUIContent("Data"));
         DrawBindingMemberField(
             (BinderBase)target,
             dataProviderProperty,
@@ -70,7 +70,8 @@ public sealed class BinderBaseEditor : Editor
             return;
         }
 
-        EditorGUILayout.LabelField("Binding Data Type", dataType.Name);
+        // Showing the class name that provides the data feel like extra noise at the moment
+        // EditorGUILayout.LabelField("Data Type", dataType.Name);
 
         var compatibleMembers = GetCompatibleMembers(dataType, binder.BindingValueType);
         if (compatibleMembers.Count == 0)
@@ -122,11 +123,7 @@ public sealed class BinderBaseEditor : Editor
         }
 
         var selectedIndex = Math.Max(0, optionValues.IndexOf(currentValue));
-        var nextIndex = EditorGUILayout.Popup(
-            "Bindable Member",
-            selectedIndex,
-            optionLabels.ToArray()
-        );
+        var nextIndex = EditorGUILayout.Popup("Value", selectedIndex, optionLabels.ToArray());
         selectedMemberNameProperty.stringValue = optionValues[nextIndex];
     }
 

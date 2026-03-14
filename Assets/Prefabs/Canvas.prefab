@@ -1419,7 +1419,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4347367590944067231
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1833,10 +1833,20 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 6443778345882593201}
     m_Modifications:
+    - target: {fileID: 7629294576492374480, guid: e172413eed55043e2bea37d5930db31e,
+        type: 3}
+      propertyPath: m_Interactable
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7698694639072013049, guid: e172413eed55043e2bea37d5930db31e,
         type: 3}
       propertyPath: m_Name
       value: TestPanelView
+      objectReference: {fileID: 0}
+    - target: {fileID: 8751232985050635593, guid: e172413eed55043e2bea37d5930db31e,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9060925205737525749, guid: e172413eed55043e2bea37d5930db31e,
         type: 3}
