@@ -243,7 +243,11 @@ public class GeneratorService : IDisposable
     {
         var payout = CalculateOutput();
         var gainMultiplier = resourceGainMultiplier.Value;
-        if (double.IsNaN(gainMultiplier) || double.IsInfinity(gainMultiplier) || gainMultiplier <= 0)
+        if (
+            double.IsNaN(gainMultiplier)
+            || double.IsInfinity(gainMultiplier)
+            || gainMultiplier <= 0
+        )
             gainMultiplier = 1.0;
 
         model.PendingPayout += payout * gainMultiplier;
@@ -438,7 +442,7 @@ public class GeneratorService : IDisposable
             return plannedCost;
 
         // MAX still shows the single-level entry price even when nothing is currently affordable.
-        return CalculateMinimumPurchaseCost();
+        return CalculateSingleLevelCost();
     }
 
     private int ResolveRequestedCountForMode(BuyModeDefinition mode, int cappedMaxToBuy)
@@ -491,7 +495,7 @@ public class GeneratorService : IDisposable
         return string.Equals(kind, "maxAffordable", StringComparison.OrdinalIgnoreCase);
     }
 
-    private double CalculateMinimumPurchaseCost()
+    private double CalculateSingleLevelCost()
     {
         return CalculateTotalCostForLevels(1);
     }
@@ -602,7 +606,9 @@ public class GeneratorService : IDisposable
             newOutputMult = 1.0;
         outputMultiplier.Value = newOutputMult;
 
-        var newResourceGainMult = modifierService.GetResourceGainMultiplier(definition.OutputResourceId);
+        var newResourceGainMult = modifierService.GetResourceGainMultiplier(
+            definition.OutputResourceId
+        );
         if (
             double.IsNaN(newResourceGainMult)
             || double.IsInfinity(newResourceGainMult)
