@@ -29,6 +29,9 @@ public sealed class UiCompositionRoot : MonoBehaviour
     [SerializeField]
     private BottomBarView bottomBarView;
 
+    [SerializeField]
+    private TopBarView topBarView;
+
     [FormerlySerializedAs("nodeView")]
     [SerializeField]
     private TestPanelView testPanel;
@@ -42,6 +45,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
     private bool hasBound;
     private BuyModeViewModel buyModeViewModel;
     private TestPanelViewModel testPanelViewModel;
+    private TopBarViewModel topBarViewModel;
 
     public void Bind(in UiBindingsContext context)
     {
@@ -52,6 +56,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return;
 
         BindWalletHud(context);
+        BindTopBar(context);
         BindBottomBar(context);
         BindTestPanel();
         BindAdBoostButtons(context);
@@ -72,9 +77,18 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private bool Validate(in UiBindingsContext context)
     {
+        if (topBarView == null)
+            topBarView = GetComponentInChildren<TopBarView>(true);
+
         if (bottomBarView == null)
         {
             Debug.LogError("UiCompositionRoot: BottomBarView is not assigned.", this);
+            return false;
+        }
+
+        if (topBarView == null)
+        {
+            Debug.LogError("UiCompositionRoot: TopBarView is not assigned.", this);
             return false;
         }
 
@@ -102,6 +116,12 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return false;
         }
 
+        if (context.TimeWarpService == null)
+        {
+            Debug.LogError("UiCompositionRoot: TimeWarpService is null in UiBindingsContext.", this);
+            return false;
+        }
+
         return true;
     }
 
@@ -117,6 +137,12 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
             v.Initialize(context.WalletViewModel);
         }
+    }
+
+    private void BindTopBar(in UiBindingsContext context)
+    {
+        topBarViewModel ??= new TopBarViewModel(context.TimeWarpService);
+        topBarView.Bind(topBarViewModel);
     }
 
     private void BindBottomBar(in UiBindingsContext context)
@@ -179,6 +205,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private void OnDestroy()
     {
+        topBarViewModel?.Dispose();
         testPanelViewModel?.Dispose();
         buyModeViewModel?.Dispose();
     }

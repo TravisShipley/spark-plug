@@ -1,5 +1,6 @@
 public readonly struct UiBindingsContext
 {
+    public readonly TimeWarpService TimeWarpService;
     public readonly WalletService WalletService;
     public readonly WalletViewModel WalletViewModel;
     public readonly UpgradeService UpgradeService;
@@ -12,6 +13,7 @@ public readonly struct UiBindingsContext
         UiServiceRegistry uiServices,
         UpgradeService upgradeService,
         BuyModeService buyModeService,
+        TimeWarpService timeWarpService,
         WalletService walletService,
         WalletViewModel walletViewModel
     )
@@ -20,6 +22,7 @@ public readonly struct UiBindingsContext
         UiServices = uiServices;
         UpgradeService = upgradeService;
         BuyModeService = buyModeService;
+        TimeWarpService = timeWarpService;
         WalletService = walletService;
         WalletViewModel = walletViewModel;
     }

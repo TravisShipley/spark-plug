@@ -325,6 +325,7 @@ public class GameCompositionRoot : MonoBehaviour
             uiService,
             upgradeService,
             buyModeService,
+            timeWarpService,
             walletService,
             walletViewModel
         );

@@ -27,12 +27,17 @@ public sealed class TimeWarpService
             offlineProgressCalculator
             ?? throw new ArgumentNullException(nameof(offlineProgressCalculator));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
-        this.walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
+        this.walletService =
+            walletService ?? throw new ArgumentNullException(nameof(walletService));
     }
 
     public OfflineSessionResult ApplyWarp(double durationSeconds)
     {
-        if (double.IsNaN(durationSeconds) || double.IsInfinity(durationSeconds) || durationSeconds <= 0d)
+        if (
+            double.IsNaN(durationSeconds)
+            || double.IsInfinity(durationSeconds)
+            || durationSeconds <= 0d
+        )
         {
             throw new InvalidOperationException(
                 $"TimeWarpService: durationSeconds must be > 0. Found '{durationSeconds}'."

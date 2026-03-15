@@ -32,6 +32,9 @@ namespace Ignition.Binders
         {
             DisposeBinding();
 
+            if (target == null)
+                target = GetComponent<Button>();
+
             var targetWarning = GetTargetWarning();
             if (!string.IsNullOrWhiteSpace(targetWarning))
             {
