@@ -727,6 +727,9 @@ MonoBehaviour:
   - Id: PRESTIGE
     Prefab: {fileID: 4134247766494976815, guid: 95c8a0fde236845d3858be03673ffa85,
       type: 3}
+  - Id: TIME_WARP_RESULTS
+    Prefab: {fileID: 7136281493802865698, guid: ce17ffaf2211d434c80cf00974a9cfee,
+      type: 3}
 --- !u!1 &1263566856
 GameObject:
   m_ObjectHideFlags: 0
@@ -2242,7 +2245,7 @@ PrefabInstance:
     - target: {fileID: 5028050464667739038, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5238576236589170092, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
