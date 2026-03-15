@@ -270,7 +270,8 @@ public class GameCompositionRoot : MonoBehaviour
         timeWarpService = new TimeWarpService(
             offlineProgressCalculator,
             saveService,
-            walletService
+            walletService,
+            gameEventStream
         );
 
         // UiScreenManager needs the UpgradeService for screens like Upgrades.

@@ -1,3 +1,4 @@
+using Ignition.Navigation;
 using TMPro;
 using UniRx;
 using UnityEngine;

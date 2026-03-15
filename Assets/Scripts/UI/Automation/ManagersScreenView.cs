@@ -1,3 +1,4 @@
+using Ignition.Navigation;
 using UnityEngine;
 
 public sealed class ManagersScreenView : UiScreenView

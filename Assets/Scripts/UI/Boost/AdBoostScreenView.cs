@@ -1,3 +1,4 @@
+using Ignition.Navigation;
 using TMPro;
 using UniRx;
 using UnityEngine;
@@ -31,7 +32,12 @@ public sealed class AdBoostScreenView : UiScreenView
             return;
         }
 
-        if (titleText == null || countdownText == null || boostButton == null || closeButton == null)
+        if (
+            titleText == null
+            || countdownText == null
+            || boostButton == null
+            || closeButton == null
+        )
         {
             Debug.LogError("AdBoostScreenView: Required UI references are missing.", this);
             return;
