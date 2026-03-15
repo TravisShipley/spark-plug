@@ -16,11 +16,13 @@ public sealed class TimeWarpService
     private readonly OfflineProgressCalculator offlineProgressCalculator;
     private readonly SaveService saveService;
     private readonly WalletService walletService;
+    private readonly GameEventStream gameEventStream;
 
     public TimeWarpService(
         OfflineProgressCalculator offlineProgressCalculator,
         SaveService saveService,
-        WalletService walletService
+        WalletService walletService,
+        GameEventStream gameEventStream
     )
     {
         this.offlineProgressCalculator =
@@ -29,6 +31,8 @@ public sealed class TimeWarpService
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
         this.walletService =
             walletService ?? throw new ArgumentNullException(nameof(walletService));
+        this.gameEventStream =
+            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
     }
 
     public OfflineSessionResult ApplyWarp(double durationSeconds)
@@ -64,6 +68,7 @@ public sealed class TimeWarpService
         if (result.HasMeaningfulGain())
             saveService.SaveNow();
 
+        gameEventStream.PublishTimeWarpCompleted(result);
         Debug.Log($"[TimeWarp] Complete {result.secondsAway}s {SummarizeGains(result)}");
         return result;
     }

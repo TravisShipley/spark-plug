@@ -19,12 +19,24 @@ public sealed class GameEventStream : IDisposable
         }
     }
 
+    public readonly struct TimeWarpCompletedEvent
+    {
+        public readonly OfflineSessionResult result;
+
+        public TimeWarpCompletedEvent(OfflineSessionResult result)
+        {
+            this.result = result;
+        }
+    }
+
     private readonly Subject<(string resourceId, double amount)> incrementBalance = new();
     private readonly Subject<MilestoneFiredEvent> milestoneFired = new();
+    private readonly Subject<TimeWarpCompletedEvent> timeWarpCompleted = new();
     private readonly Subject<Unit> resetSaveRequested = new();
 
     public IObservable<(string resourceId, double amount)> IncrementBalance => incrementBalance;
     public IObservable<MilestoneFiredEvent> MilestoneFired => milestoneFired;
+    public IObservable<TimeWarpCompletedEvent> TimeWarpCompleted => timeWarpCompleted;
     public IObservable<Unit> ResetSaveRequested => resetSaveRequested;
 
     public void PublishIncrementBalance(string resourceId, double amount)
@@ -41,6 +53,14 @@ public sealed class GameEventStream : IDisposable
         milestoneFired.OnNext(evt);
     }
 
+    public void PublishTimeWarpCompleted(OfflineSessionResult result)
+    {
+        if (result == null)
+            throw new InvalidOperationException("GameEventStream: time warp result cannot be null.");
+
+        timeWarpCompleted.OnNext(new TimeWarpCompletedEvent(result));
+    }
+
     public void RequestResetSave()
     {
         resetSaveRequested.OnNext(Unit.Default);
@@ -50,6 +70,7 @@ public sealed class GameEventStream : IDisposable
     {
         incrementBalance.Dispose();
         milestoneFired.Dispose();
+        timeWarpCompleted.Dispose();
         resetSaveRequested.Dispose();
     }
 }
