@@ -1,31 +1,35 @@
+using Ignition.Binding;
 using UnityEngine;
 using UnityEngine.UI;
 
-public sealed class InteractableBinder : TypedBinder<bool>
+namespace Ignition.Binders
 {
-    [SerializeField]
-    private Selectable target;
-
-    protected override void ApplyValue(bool value)
+    public sealed class InteractableBinder : TypedBinder<bool>
     {
-        if (target == null)
-            return;
+        [SerializeField]
+        private Selectable target;
 
-        target.interactable = value;
-    }
+        protected override void ApplyValue(bool value)
+        {
+            if (target == null)
+                return;
 
-    protected override string GetTargetWarning()
-    {
-        return target == null
-            ? $"{nameof(InteractableBinder)}: target Selectable is not assigned."
-            : null;
-    }
+            target.interactable = value;
+        }
+
+        protected override string GetTargetWarning()
+        {
+            return target == null
+                ? $"{nameof(InteractableBinder)}: target Selectable is not assigned."
+                : null;
+        }
 
 #if UNITY_EDITOR
-    private void OnValidate()
-    {
-        if (target == null)
-            target = GetComponent<Selectable>();
-    }
+        private void OnValidate()
+        {
+            if (target == null)
+                target = GetComponent<Selectable>();
+        }
 #endif
+    }
 }

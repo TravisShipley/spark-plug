@@ -1,28 +1,34 @@
+using Ignition.Binding;
 using UnityEngine;
 
-public sealed class ActiveBinder : TypedBinder<bool>
+namespace Ignition.Binders
 {
-    [SerializeField]
-    private GameObject target;
-
-    protected override void ApplyValue(bool value)
+    public sealed class ActiveBinder : TypedBinder<bool>
     {
-        if (target == null)
-            return;
+        [SerializeField]
+        private GameObject target;
 
-        target.SetActive(value);
-    }
+        protected override void ApplyValue(bool value)
+        {
+            if (target == null)
+                return;
 
-    protected override string GetTargetWarning()
-    {
-        return target == null ? $"{nameof(ActiveBinder)}: target GameObject is not assigned." : null;
-    }
+            target.SetActive(value);
+        }
+
+        protected override string GetTargetWarning()
+        {
+            return target == null
+                ? $"{nameof(ActiveBinder)}: target GameObject is not assigned."
+                : null;
+        }
 
 #if UNITY_EDITOR
-    private void OnValidate()
-    {
-        if (target == null)
-            target = gameObject;
-    }
+        private void OnValidate()
+        {
+            if (target == null)
+                target = gameObject;
+        }
 #endif
+    }
 }

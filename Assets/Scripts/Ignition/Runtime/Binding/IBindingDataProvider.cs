@@ -1,4 +1,7 @@
-public interface IBindingDataProvider
+namespace Ignition.Binding
 {
-    object GetBindingData();
+    public interface IBindingDataProvider
+    {
+        object GetBindingData();
+    }
 }

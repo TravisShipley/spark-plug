@@ -1,4 +1,5 @@
 using System;
+using Ignition.Binding;
 using UniRx;
 
 public sealed class TestPanelViewModel : IDisposable

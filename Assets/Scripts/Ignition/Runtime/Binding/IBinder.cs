@@ -1,4 +1,7 @@
-public interface IBinder
+namespace Ignition.Binding
 {
-    void Rebind();
+    public interface IBinder
+    {
+        void Rebind();
+    }
 }

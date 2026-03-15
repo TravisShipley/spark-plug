@@ -3,126 +3,149 @@ using System.Collections.Generic;
 using System.Reflection;
 using UniRx;
 
-public static class BindingMetadataUtility
+namespace Ignition.Binding
 {
-    private const BindingFlags BindablePropertyFlags = BindingFlags.Instance | BindingFlags.Public;
-
-    public static IReadOnlyList<BindingMemberMetadata> GetBindableMembers(Type sourceType)
+    public static class BindingMetadataUtility
     {
-        if (sourceType == null)
-            return Array.Empty<BindingMemberMetadata>();
+        private const BindingFlags BindablePropertyFlags =
+            BindingFlags.Instance | BindingFlags.Public;
 
-        var members = new List<BindingMemberMetadata>();
-        var properties = sourceType.GetProperties(BindablePropertyFlags);
-        for (var i = 0; i < properties.Length; i++)
+        public static IReadOnlyList<BindingMemberMetadata> GetBindableMembers(Type sourceType)
         {
-            if (TryCreateMetadata(properties[i], out var metadata))
-                members.Add(metadata);
+            if (sourceType == null)
+                return Array.Empty<BindingMemberMetadata>();
+
+            var members = new List<BindingMemberMetadata>();
+            var properties = sourceType.GetProperties(BindablePropertyFlags);
+            for (var i = 0; i < properties.Length; i++)
+            {
+                if (TryCreateMetadata(properties[i], out var metadata))
+                    members.Add(metadata);
+            }
+
+            return members;
         }
 
-        return members;
-    }
+        public static bool TryGetBindableMember(
+            Type sourceType,
+            string memberName,
+            out BindingMemberMetadata metadata
+        )
+        {
+            metadata = null;
+            if (sourceType == null || string.IsNullOrWhiteSpace(memberName))
+                return false;
 
-    public static bool TryGetBindableMember(Type sourceType, string memberName, out BindingMemberMetadata metadata)
-    {
-        metadata = null;
-        if (sourceType == null || string.IsNullOrWhiteSpace(memberName))
-            return false;
+            var property = sourceType.GetProperty(memberName, BindablePropertyFlags);
+            return TryCreateMetadata(property, out metadata);
+        }
 
-        var property = sourceType.GetProperty(memberName, BindablePropertyFlags);
-        return TryCreateMetadata(property, out metadata);
-    }
+        public static bool IsBindable(PropertyInfo property)
+        {
+            return property != null
+                && Attribute.IsDefined(property, typeof(BindableAttribute), true);
+        }
 
-    public static bool IsBindable(PropertyInfo property)
-    {
-        return property != null && Attribute.IsDefined(property, typeof(BindableAttribute), true);
-    }
+        public static bool TryCreateMetadata(
+            PropertyInfo property,
+            out BindingMemberMetadata metadata
+        )
+        {
+            metadata = null;
+            if (property == null || !property.CanRead || property.GetIndexParameters().Length > 0)
+                return false;
 
-    public static bool TryCreateMetadata(PropertyInfo property, out BindingMemberMetadata metadata)
-    {
-        metadata = null;
-        if (property == null || !property.CanRead || property.GetIndexParameters().Length > 0)
-            return false;
+            var bindableAttribute = property.GetCustomAttribute<BindableAttribute>(true);
+            if (bindableAttribute == null)
+                return false;
 
-        var bindableAttribute = property.GetCustomAttribute<BindableAttribute>(true);
-        if (bindableAttribute == null)
-            return false;
+            if (!TryGetEmittedValueType(property.PropertyType, out var valueType))
+                return false;
 
-        if (!TryGetEmittedValueType(property.PropertyType, out var valueType))
-            return false;
-
-        var displayName =
-            string.IsNullOrWhiteSpace(bindableAttribute.DisplayName)
+            var displayName = string.IsNullOrWhiteSpace(bindableAttribute.DisplayName)
                 ? property.Name
                 : bindableAttribute.DisplayName.Trim();
 
-        metadata = new BindingMemberMetadata(
-            property,
-            property.Name,
-            displayName,
-            valueType,
-            property.PropertyType
-        );
-        return true;
-    }
-
-    public static bool TryGetEmittedValueType(Type propertyType, out Type valueType)
-    {
-        if (TryGetGenericArgument(propertyType, typeof(IReadOnlyReactiveProperty<>), out valueType))
+            metadata = new BindingMemberMetadata(
+                property,
+                property.Name,
+                displayName,
+                valueType,
+                property.PropertyType
+            );
             return true;
+        }
 
-        if (TryGetGenericArgument(propertyType, typeof(ReactiveProperty<>), out valueType))
-            return true;
-
-        if (TryGetGenericArgument(propertyType, typeof(IObservable<>), out valueType))
-            return true;
-
-        valueType = null;
-        return false;
-    }
-
-    public static bool IsExactValueTypeMatch(BindingMemberMetadata metadata, Type expectedValueType)
-    {
-        return metadata != null && metadata.ValueType == expectedValueType;
-    }
-
-    private static bool TryGetGenericArgument(
-        Type candidateType,
-        Type genericTypeDefinition,
-        out Type valueType
-    )
-    {
-        if (candidateType == null)
+        public static bool TryGetEmittedValueType(Type propertyType, out Type valueType)
         {
+            if (
+                TryGetGenericArgument(
+                    propertyType,
+                    typeof(IReadOnlyReactiveProperty<>),
+                    out valueType
+                )
+            )
+                return true;
+
+            if (TryGetGenericArgument(propertyType, typeof(ReactiveProperty<>), out valueType))
+                return true;
+
+            if (TryGetGenericArgument(propertyType, typeof(IObservable<>), out valueType))
+                return true;
+
             valueType = null;
             return false;
         }
 
-        if (candidateType.IsGenericType && candidateType.GetGenericTypeDefinition() == genericTypeDefinition)
+        public static bool IsExactValueTypeMatch(
+            BindingMemberMetadata metadata,
+            Type expectedValueType
+        )
         {
-            valueType = candidateType.GetGenericArguments()[0];
-            return true;
+            return metadata != null && metadata.ValueType == expectedValueType;
         }
 
-        var interfaces = candidateType.GetInterfaces();
-        for (var i = 0; i < interfaces.Length; i++)
+        private static bool TryGetGenericArgument(
+            Type candidateType,
+            Type genericTypeDefinition,
+            out Type valueType
+        )
         {
-            var interfaceType = interfaces[i];
+            if (candidateType == null)
+            {
+                valueType = null;
+                return false;
+            }
+
             if (
-                interfaceType.IsGenericType
-                && interfaceType.GetGenericTypeDefinition() == genericTypeDefinition
+                candidateType.IsGenericType
+                && candidateType.GetGenericTypeDefinition() == genericTypeDefinition
             )
             {
-                valueType = interfaceType.GetGenericArguments()[0];
+                valueType = candidateType.GetGenericArguments()[0];
                 return true;
             }
+
+            var interfaces = candidateType.GetInterfaces();
+            for (var i = 0; i < interfaces.Length; i++)
+            {
+                var interfaceType = interfaces[i];
+                if (
+                    interfaceType.IsGenericType
+                    && interfaceType.GetGenericTypeDefinition() == genericTypeDefinition
+                )
+                {
+                    valueType = interfaceType.GetGenericArguments()[0];
+                    return true;
+                }
+            }
+
+            var baseType = candidateType.BaseType;
+            if (baseType != null)
+                return TryGetGenericArgument(baseType, genericTypeDefinition, out valueType);
+
+            valueType = null;
+            return false;
         }
-
-        var baseType = candidateType.BaseType;
-        if (baseType != null)
-            return TryGetGenericArgument(baseType, genericTypeDefinition, out valueType);
-
-        valueType = null;
-        return false;
     }
 }

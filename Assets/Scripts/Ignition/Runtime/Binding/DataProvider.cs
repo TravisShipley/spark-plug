@@ -1,17 +1,23 @@
 using System;
 using UnityEngine;
 
-public abstract class DataProvider : MonoBehaviour, IBindingDataProvider, IBindingDataTypeProvider
+namespace Ignition.Binding
 {
-    public abstract object GetBindingData();
-    public abstract Type GetBindingDataType();
-
-    protected void RebindChildren()
+    public abstract class DataProvider
+        : MonoBehaviour,
+            IBindingDataProvider,
+            IBindingDataTypeProvider
     {
-        foreach (var behaviour in GetComponentsInChildren<MonoBehaviour>(true))
+        public abstract object GetBindingData();
+        public abstract Type GetBindingDataType();
+
+        protected void RebindChildren()
         {
-            if (behaviour is IBinder binder)
-                binder.Rebind();
+            foreach (var behaviour in GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (behaviour is IBinder binder)
+                    binder.Rebind();
+            }
         }
     }
 }

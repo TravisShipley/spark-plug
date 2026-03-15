@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Ignition.Binding;
 using UnityEditor;
 using UnityEngine;
 

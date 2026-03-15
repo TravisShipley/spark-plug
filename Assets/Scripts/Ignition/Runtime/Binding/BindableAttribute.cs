@@ -1,16 +1,17 @@
 using System;
 
-[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-public sealed class BindableAttribute : Attribute
+namespace Ignition.Binding
 {
-    public BindableAttribute()
+    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+    public sealed class BindableAttribute : Attribute
     {
-    }
+        public BindableAttribute() { }
 
-    public BindableAttribute(string displayName)
-    {
-        DisplayName = displayName;
-    }
+        public BindableAttribute(string displayName)
+        {
+            DisplayName = displayName;
+        }
 
-    public string DisplayName { get; }
+        public string DisplayName { get; }
+    }
 }

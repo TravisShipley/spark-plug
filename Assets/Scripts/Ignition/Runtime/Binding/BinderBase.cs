@@ -2,23 +2,26 @@ using System;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-public abstract class BinderBase : MonoBehaviour, IBinder
+namespace Ignition.Binding
 {
-    [FormerlySerializedAs("sourceProvider")]
-    [SerializeField]
-    private DataProvider dataProvider;
-
-    [SerializeField]
-    private string selectedMemberName;
-
-    public DataProvider DataProvider => dataProvider;
-    public string SelectedMemberName => selectedMemberName;
-    public abstract Type BindingValueType { get; }
-
-    public abstract void Rebind();
-
-    public virtual string GetEditorWarning()
+    public abstract class BinderBase : MonoBehaviour, IBinder
     {
-        return null;
+        [FormerlySerializedAs("sourceProvider")]
+        [SerializeField]
+        private DataProvider dataProvider;
+
+        [SerializeField]
+        private string selectedMemberName;
+
+        public DataProvider DataProvider => dataProvider;
+        public string SelectedMemberName => selectedMemberName;
+        public abstract Type BindingValueType { get; }
+
+        public abstract void Rebind();
+
+        public virtual string GetEditorWarning()
+        {
+            return null;
+        }
     }
 }

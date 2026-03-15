@@ -1,29 +1,35 @@
+using Ignition.Binding;
 using TMPro;
 using UnityEngine;
 
-public sealed class TextBinder : TypedBinder<string>
+namespace Ignition.Binders
 {
-    [SerializeField]
-    private TMP_Text target;
-
-    protected override void ApplyValue(string value)
+    public sealed class TextBinder : TypedBinder<string>
     {
-        if (target == null)
-            return;
+        [SerializeField]
+        private TMP_Text target;
 
-        target.text = value ?? string.Empty;
-    }
+        protected override void ApplyValue(string value)
+        {
+            if (target == null)
+                return;
 
-    protected override string GetTargetWarning()
-    {
-        return target == null ? $"{nameof(TextBinder)}: target TMP_Text is not assigned." : null;
-    }
+            target.text = value ?? string.Empty;
+        }
+
+        protected override string GetTargetWarning()
+        {
+            return target == null
+                ? $"{nameof(TextBinder)}: target TMP_Text is not assigned."
+                : null;
+        }
 
 #if UNITY_EDITOR
-    private void OnValidate()
-    {
-        if (target == null)
-            target = GetComponent<TMP_Text>();
-    }
+        private void OnValidate()
+        {
+            if (target == null)
+                target = GetComponent<TMP_Text>();
+        }
 #endif
+    }
 }

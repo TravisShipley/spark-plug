@@ -1,4 +1,6 @@
 using System;
+using Ignition.Binding;
+using Ignition.Commands;
 using UniRx;
 
 public sealed class UpgradeEntryViewModel : IDisposable

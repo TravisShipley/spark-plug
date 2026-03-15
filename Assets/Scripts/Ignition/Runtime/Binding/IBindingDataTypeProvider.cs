@@ -1,6 +1,9 @@
 using System;
 
-public interface IBindingDataTypeProvider
+namespace Ignition.Binding
 {
-    Type GetBindingDataType();
+    public interface IBindingDataTypeProvider
+    {
+        Type GetBindingDataType();
+    }
 }

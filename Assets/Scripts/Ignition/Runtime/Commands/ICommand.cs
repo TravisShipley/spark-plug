@@ -1,7 +1,10 @@
 using UniRx;
 
-public interface ICommand
+namespace Ignition.Commands
 {
-    IReadOnlyReactiveProperty<bool> CanExecute { get; }
-    void Execute();
+    public interface ICommand
+    {
+        IReadOnlyReactiveProperty<bool> CanExecute { get; }
+        void Execute();
+    }
 }
