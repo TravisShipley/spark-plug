@@ -1,15 +1,13 @@
 using System;
 using Ignition.Binding;
+using Ignition.Commands;
 using UniRx;
+using UnityEngine;
 
 public sealed class TimeWarpResultsScreenViewModel
 {
-    private readonly ReactiveProperty<string> name = new(string.Empty);
     private readonly ReactiveProperty<string> title = new(string.Empty);
     private readonly ReactiveProperty<string> resultText = new(string.Empty);
-
-    [Bindable("Display Name")]
-    public IReadOnlyReactiveProperty<string> Name => name;
 
     [Bindable]
     public IReadOnlyReactiveProperty<string> Title => title;
@@ -22,14 +20,7 @@ public sealed class TimeWarpResultsScreenViewModel
         result ??= new OfflineSessionResult();
         var totalGain = result.TotalGain();
 
-        title.Value = BuildTitle(result);
+        title.Value = "4h Profit";
         resultText.Value = Format.Currency(totalGain);
-        name.Value = "TimeWarpResultsScreenViewModel";
-    }
-
-    private static string BuildTitle(OfflineSessionResult result)
-    {
-        var duration = TimeFormat.FormatDuration(Math.Max(0L, result.secondsAway));
-        return $"{duration} Profit.";
     }
 }

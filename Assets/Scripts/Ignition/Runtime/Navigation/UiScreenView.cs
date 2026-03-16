@@ -29,7 +29,7 @@ namespace Ignition.Navigation
         [SerializeField]
         private GraphicRaycaster graphicRaycaster;
 
-        private UiCommand requestCloseCommand;
+        private ICommand requestCloseCommand;
 
         public bool Dismissible => dismissible;
         public bool CloseOnBackdrop => closeOnBackdrop;
@@ -39,8 +39,8 @@ namespace Ignition.Navigation
         public CanvasGroup CanvasGroup => canvasGroup;
         public UiScreenManager Manager { get; internal set; }
 
-        [Bindable("RequestClose")]
-        public UiCommand RequestCloseCommand => requestCloseCommand ??= new UiCommand(RequestClose);
+        [BindableCommand("RequestClose")]
+        public ICommand RequestCloseCommand => requestCloseCommand ??= new UiCommand(RequestClose);
 
         public override object GetBindingData() => null;
 

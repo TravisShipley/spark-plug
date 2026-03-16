@@ -7,8 +7,6 @@ namespace Ignition.Binding
 {
     public abstract class TypedBinder<T> : BinderBase
     {
-        private const BindingFlags PropertyFlags = BindingFlags.Instance | BindingFlags.Public;
-
         private IDisposable subscription;
 
         public override Type BindingValueType => typeof(T);
@@ -24,46 +22,31 @@ namespace Ignition.Binding
                 return;
             }
 
-            if (DataProvider == null)
+            if (
+                !TryResolveBindingSource(
+                    out var metadata,
+                    out var bindingSource,
+                    out var logMessage,
+                    out var isWarning
+                )
+            )
             {
-                Debug.LogError($"{GetType().Name}: data provider is not assigned.", this);
+                if (isWarning)
+                    Debug.LogWarning(logMessage, this);
+                else
+                    Debug.LogError(logMessage, this);
                 return;
             }
-
-            if (string.IsNullOrWhiteSpace(SelectedMemberName))
-            {
-                Debug.LogWarning($"{GetType().Name}: no bindable member is selected.", this);
-                return;
-            }
-
-            if (DataProvider is not IBindingDataProvider provider)
-            {
-                Debug.LogError(
-                    $"{GetType().Name}: data provider must implement {nameof(IBindingDataProvider)}.",
-                    this
-                );
-                return;
-            }
-
-            var bindingData = provider.GetBindingData();
-            if (bindingData == null)
-            {
-                Debug.LogWarning($"{GetType().Name}: binding data is null during rebind.", this);
-                return;
-            }
-
-            if (!TryResolveMetadata(bindingData.GetType(), out var metadata))
-                return;
 
             object propertyValue;
             try
             {
-                propertyValue = metadata.Property.GetValue(bindingData);
+                propertyValue = metadata.Property.GetValue(bindingSource);
             }
             catch (TargetInvocationException exception)
             {
                 Debug.LogError(
-                    $"{GetType().Name}: failed to read '{metadata.MemberName}' from '{bindingData.GetType().Name}'. {exception.InnerException?.Message ?? exception.Message}",
+                    $"{GetType().Name}: failed to read '{metadata.SerializedKey}' from '{bindingSource.GetType().Name}'. {exception.InnerException?.Message ?? exception.Message}",
                     this
                 );
                 return;
@@ -71,7 +54,7 @@ namespace Ignition.Binding
             catch (Exception exception)
             {
                 Debug.LogError(
-                    $"{GetType().Name}: failed to read '{metadata.MemberName}' from '{bindingData.GetType().Name}'. {exception.Message}",
+                    $"{GetType().Name}: failed to read '{metadata.SerializedKey}' from '{bindingSource.GetType().Name}'. {exception.Message}",
                     this
                 );
                 return;
@@ -80,7 +63,16 @@ namespace Ignition.Binding
             if (propertyValue == null)
             {
                 Debug.LogWarning(
-                    $"{GetType().Name}: bindable member '{metadata.MemberName}' resolved to null.",
+                    $"{GetType().Name}: bindable member '{metadata.SerializedKey}' resolved to null.",
+                    this
+                );
+                return;
+            }
+
+            if (!BindingMetadataUtility.IsExactValueTypeMatch(metadata, typeof(T)))
+            {
+                Debug.LogError(
+                    $"{GetType().Name}: '{metadata.SerializedKey}' emits '{metadata.ValueType.Name}', but this binder requires '{typeof(T).Name}'.",
                     this
                 );
                 return;
@@ -99,7 +91,7 @@ namespace Ignition.Binding
             }
 
             Debug.LogError(
-                $"{GetType().Name}: '{metadata.MemberName}' must expose {typeof(T).Name} via IReadOnlyReactiveProperty<T> or IObservable<T>.",
+                $"{GetType().Name}: '{metadata.SerializedKey}' must expose {typeof(T).Name} via IReadOnlyReactiveProperty<T> or IObservable<T>.",
                 this
             );
         }
@@ -119,50 +111,6 @@ namespace Ignition.Binding
         protected virtual void OnDestroy()
         {
             DisposeSubscription();
-        }
-
-        private bool TryResolveMetadata(Type sourceType, out BindingMemberMetadata metadata)
-        {
-            metadata = null;
-
-            var property = sourceType.GetProperty(SelectedMemberName, PropertyFlags);
-            if (property == null)
-            {
-                Debug.LogError(
-                    $"{GetType().Name}: could not find public property '{SelectedMemberName}' on '{sourceType.Name}'.",
-                    this
-                );
-                return false;
-            }
-
-            if (!BindingMetadataUtility.IsBindable(property))
-            {
-                Debug.LogError(
-                    $"{GetType().Name}: '{sourceType.Name}.{SelectedMemberName}' is not marked with [Bindable].",
-                    this
-                );
-                return false;
-            }
-
-            if (!BindingMetadataUtility.TryCreateMetadata(property, out metadata))
-            {
-                Debug.LogError(
-                    $"{GetType().Name}: '{sourceType.Name}.{SelectedMemberName}' must return IReadOnlyReactiveProperty<T>, ReactiveProperty<T>, or IObservable<T>.",
-                    this
-                );
-                return false;
-            }
-
-            if (!BindingMetadataUtility.IsExactValueTypeMatch(metadata, typeof(T)))
-            {
-                Debug.LogError(
-                    $"{GetType().Name}: '{sourceType.Name}.{SelectedMemberName}' emits '{metadata.ValueType.Name}', but this binder requires '{typeof(T).Name}'.",
-                    this
-                );
-                return false;
-            }
-
-            return true;
         }
 
         private void HandleBindingError(Exception exception)

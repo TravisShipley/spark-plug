@@ -59,26 +59,19 @@ public sealed class BinderBaseEditor : Editor
             return;
         }
 
+        var providerType = dataProviderComponent.GetType();
         var dataType = ResolveDataType(dataProviderComponent);
-        if (dataType == null)
-        {
-            EditorGUILayout.HelpBox(
-                "The data provider could not declare a binding data type. Implement IBindingDataTypeProvider for prefab authoring.",
-                MessageType.Warning
-            );
-            DrawMemberPopup(selectedMemberNameProperty, new List<BindingMemberMetadata>(), null);
-            DrawEditorWarning(binder);
-            return;
-        }
-
-        // Showing the class name that provides the data feel like extra noise at the moment
-        // EditorGUILayout.LabelField("Data Type", dataType.Name);
-
-        var compatibleMembers = GetCompatibleMembers(dataType, binder.BindingValueType);
+        var compatibleMembers = GetCompatibleMembers(
+            providerType,
+            dataType,
+            binder.BindingValueType
+        );
         if (compatibleMembers.Count == 0)
         {
             EditorGUILayout.HelpBox(
-                $"No [Bindable] members on {dataType.Name} emit {binder.BindingValueType.Name}.",
+                dataType == null
+                    ? $"No compatible bindable members on {providerType.Name} emit {binder.BindingValueType.Name}."
+                    : $"No compatible bindable members on {providerType.Name} or Data emit {binder.BindingValueType.Name}.",
                 MessageType.Warning
             );
         }
@@ -106,7 +99,7 @@ public sealed class BinderBaseEditor : Editor
             if (bindingValueType != null)
             {
                 EditorGUILayout.HelpBox(
-                    $"'{currentValue}' is not a compatible {bindingValueType.Name} binding on the current data type.",
+                    $"'{currentValue}' is not a compatible {bindingValueType.Name} binding on the current provider surface.",
                     MessageType.Warning
                 );
             }
@@ -115,12 +108,14 @@ public sealed class BinderBaseEditor : Editor
         for (var i = 0; i < members.Count; i++)
         {
             var member = members[i];
-            optionLabels.Add(
-                member.DisplayName == member.MemberName
-                    ? member.DisplayName
-                    : $"{member.DisplayName} ({member.MemberName})"
-            );
-            optionValues.Add(member.MemberName);
+            var optionLabel =
+                string.IsNullOrWhiteSpace(member.DisplayName) ? member.SerializedKey
+                : member.SerializedKey.StartsWith("Data.", StringComparison.Ordinal)
+                    ? $"Data.{member.DisplayName}"
+                : member.DisplayName;
+
+            optionLabels.Add(optionLabel);
+            optionValues.Add(member.SerializedKey);
         }
 
         var selectedIndex = Math.Max(0, optionValues.IndexOf(currentValue));
@@ -158,7 +153,7 @@ public sealed class BinderBaseEditor : Editor
     {
         for (var i = 0; i < members.Count; i++)
         {
-            if (members[i].MemberName == memberName)
+            if (members[i].SerializedKey == memberName)
                 return true;
         }
 
@@ -166,12 +161,13 @@ public sealed class BinderBaseEditor : Editor
     }
 
     private static List<BindingMemberMetadata> GetCompatibleMembers(
+        Type providerType,
         Type dataType,
         Type bindingValueType
     )
     {
         var result = new List<BindingMemberMetadata>();
-        var members = BindingMetadataUtility.GetBindableMembers(dataType);
+        var members = BindingMetadataUtility.GetBindableMembers(providerType, dataType);
         for (var i = 0; i < members.Count; i++)
         {
             var member = members[i];
@@ -181,7 +177,7 @@ public sealed class BinderBaseEditor : Editor
 
         result.Sort(
             (left, right) =>
-                string.Compare(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
+                string.Compare(left.SerializedKey, right.SerializedKey, StringComparison.Ordinal)
         );
         return result;
     }
