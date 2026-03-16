@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Ignition.Commands;
 using UniRx;
 
 namespace Ignition.Binding
@@ -46,6 +47,12 @@ namespace Ignition.Binding
                 && Attribute.IsDefined(property, typeof(BindableAttribute), true);
         }
 
+        public static bool IsBindableCommand(PropertyInfo property)
+        {
+            return property != null
+                && Attribute.IsDefined(property, typeof(BindableCommandAttribute), true);
+        }
+
         public static bool TryCreateMetadata(
             PropertyInfo property,
             out BindingMemberMetadata metadata
@@ -56,15 +63,31 @@ namespace Ignition.Binding
                 return false;
 
             var bindableAttribute = property.GetCustomAttribute<BindableAttribute>(true);
-            if (bindableAttribute == null)
+            var bindableCommandAttribute = property.GetCustomAttribute<BindableCommandAttribute>(
+                true
+            );
+            if (bindableAttribute == null && bindableCommandAttribute == null)
                 return false;
 
-            if (!TryGetEmittedValueType(property.PropertyType, out var valueType))
-                return false;
+            Type valueType;
+            if (bindableAttribute != null)
+            {
+                if (!TryGetEmittedValueType(property.PropertyType, out valueType))
+                    return false;
+            }
+            else
+            {
+                if (property.PropertyType != typeof(ICommand))
+                    return false;
 
-            var displayName = string.IsNullOrWhiteSpace(bindableAttribute.DisplayName)
-                ? property.Name
-                : bindableAttribute.DisplayName.Trim();
+                valueType = typeof(ICommand);
+            }
+
+            var displayName =
+                bindableAttribute != null
+                && !string.IsNullOrWhiteSpace(bindableAttribute.DisplayName)
+                    ? bindableAttribute.DisplayName.Trim()
+                    : property.Name;
 
             metadata = new BindingMemberMetadata(
                 property,

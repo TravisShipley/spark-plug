@@ -1,4 +1,5 @@
 using Ignition.Binding;
+using Ignition.Commands;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -28,6 +29,8 @@ namespace Ignition.Navigation
         [SerializeField]
         private GraphicRaycaster graphicRaycaster;
 
+        private UiCommand requestCloseCommand;
+
         public bool Dismissible => dismissible;
         public bool CloseOnBackdrop => closeOnBackdrop;
         public bool CloseOnEscape => closeOnEscape;
@@ -35,6 +38,9 @@ namespace Ignition.Navigation
         public Canvas Canvas => canvas;
         public CanvasGroup CanvasGroup => canvasGroup;
         public UiScreenManager Manager { get; internal set; }
+
+        [Bindable("RequestClose")]
+        public UiCommand RequestCloseCommand => requestCloseCommand ??= new UiCommand(RequestClose);
 
         public override object GetBindingData() => null;
 

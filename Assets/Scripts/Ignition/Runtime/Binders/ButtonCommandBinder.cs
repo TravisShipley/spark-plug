@@ -2,38 +2,26 @@ using System;
 using System.Reflection;
 using Ignition.Binding;
 using Ignition.Commands;
-using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Ignition.Binders
 {
     [RequireComponent(typeof(Button))]
-    public sealed class ButtonCommandBinder : MonoBehaviour, IBinder
+    public sealed class ButtonCommandBinder : BinderBase
     {
         private const BindingFlags PropertyFlags = BindingFlags.Instance | BindingFlags.Public;
 
         [SerializeField]
-        private DataProvider dataProvider;
-
-        [SerializeField]
-        private string selectedMemberName;
-
-        [SerializeField]
         private Button target;
 
-        [SerializeField]
-        private bool bindCanExecuteToInteractable = true;
-
-        private IDisposable canExecuteSubscription;
         private ICommand command;
 
-        public void Rebind()
-        {
-            DisposeBinding();
+        public override Type BindingValueType => typeof(ICommand);
 
-            if (target == null)
-                target = GetComponent<Button>();
+        public override void Rebind()
+        {
+            command = null;
 
             var targetWarning = GetTargetWarning();
             if (!string.IsNullOrWhiteSpace(targetWarning))
@@ -42,59 +30,46 @@ namespace Ignition.Binders
                 return;
             }
 
-            if (dataProvider == null)
+            if (DataProvider == null)
+            {
+                Debug.LogError($"{GetType().Name}: data provider is not assigned.", this);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(SelectedMemberName))
+            {
+                Debug.LogWarning($"{GetType().Name}: no bindable member is selected.", this);
+                return;
+            }
+
+            if (DataProvider is not IBindingDataProvider provider)
             {
                 Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: data provider is not assigned.",
+                    $"{GetType().Name}: assigned data provider does not implement {nameof(IBindingDataProvider)}.",
                     this
                 );
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(selectedMemberName))
-            {
-                Debug.LogWarning(
-                    $"{nameof(ButtonCommandBinder)}: no bindable command member is selected.",
-                    this
-                );
-                return;
-            }
-
-            object bindingData;
-            try
-            {
-                bindingData = dataProvider.GetBindingData();
-            }
-            catch (Exception exception)
-            {
-                Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: failed to get binding data. {exception.Message}",
-                    this
-                );
-                return;
-            }
-
+            var bindingData = provider.GetBindingData();
             if (bindingData == null)
             {
-                Debug.LogWarning(
-                    $"{nameof(ButtonCommandBinder)}: binding data is null during rebind.",
-                    this
-                );
+                Debug.LogWarning($"{GetType().Name}: binding data is null during rebind.", this);
                 return;
             }
 
-            if (!TryResolveCommandProperty(bindingData.GetType(), out var property))
+            if (!TryResolveMetadata(bindingData.GetType(), out var metadata))
                 return;
 
             object propertyValue;
             try
             {
-                propertyValue = property.GetValue(bindingData);
+                propertyValue = metadata.Property.GetValue(bindingData);
             }
             catch (TargetInvocationException exception)
             {
                 Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: failed to read '{property.Name}' from '{bindingData.GetType().Name}'. {exception.InnerException?.Message ?? exception.Message}",
+                    $"{GetType().Name}: failed to read '{metadata.MemberName}' from '{bindingData.GetType().Name}'. {exception.InnerException?.Message ?? exception.Message}",
                     this
                 );
                 return;
@@ -102,92 +77,99 @@ namespace Ignition.Binders
             catch (Exception exception)
             {
                 Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: failed to read '{property.Name}' from '{bindingData.GetType().Name}'. {exception.Message}",
+                    $"{GetType().Name}: failed to read '{metadata.MemberName}' from '{bindingData.GetType().Name}'. {exception.Message}",
                     this
                 );
                 return;
             }
 
-            if (propertyValue is not ICommand resolvedCommand)
-            {
-                Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: '{bindingData.GetType().Name}.{property.Name}' must return {nameof(ICommand)}.",
-                    this
-                );
-                return;
-            }
-
-            command = resolvedCommand;
-            target.onClick.AddListener(ExecuteCommand);
-
-            if (!bindCanExecuteToInteractable)
-                return;
-
-            if (command.CanExecute == null)
+            if (propertyValue == null)
             {
                 Debug.LogWarning(
-                    $"{nameof(ButtonCommandBinder)}: '{bindingData.GetType().Name}.{property.Name}' returned a command with no CanExecute stream.",
+                    $"{GetType().Name}: '{bindingData.GetType().Name}.{metadata.MemberName}' returned null.",
                     this
                 );
                 return;
             }
 
-            canExecuteSubscription = command.CanExecute.Subscribe(
-                value => target.interactable = value,
-                exception =>
-                    Debug.LogError(
-                        $"{nameof(ButtonCommandBinder)}: CanExecute stream failed. {exception.Message}",
-                        this
-                    )
+            if (propertyValue is ICommand resolvedCommand)
+            {
+                command = resolvedCommand;
+                return;
+            }
+
+            Debug.LogError(
+                $"{GetType().Name}: '{metadata.MemberName}' must expose {nameof(ICommand)}.",
+                this
             );
+        }
+
+        public override string GetEditorWarning()
+        {
+            return GetTargetWarning();
+        }
+
+        private void Awake()
+        {
+            if (target == null)
+                target = GetComponent<Button>();
+
+            if (target != null)
+                target.onClick.AddListener(OnClick);
         }
 
         private void OnDestroy()
         {
-            DisposeBinding();
-        }
-
-        private void ExecuteCommand()
-        {
-            command?.Execute();
-        }
-
-        private void DisposeBinding()
-        {
-            canExecuteSubscription?.Dispose();
-            canExecuteSubscription = null;
-
             if (target != null)
-                target.onClick.RemoveListener(ExecuteCommand);
+                target.onClick.RemoveListener(OnClick);
 
             command = null;
         }
 
-        private bool TryResolveCommandProperty(Type sourceType, out PropertyInfo property)
+        private void OnClick()
         {
-            property = sourceType.GetProperty(selectedMemberName, PropertyFlags);
+            command?.Execute();
+        }
+
+        private bool TryResolveMetadata(Type sourceType, out BindingMemberMetadata metadata)
+        {
+            metadata = null;
+
+            var property = sourceType.GetProperty(SelectedMemberName, PropertyFlags);
             if (property == null)
             {
                 Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: could not find public property '{selectedMemberName}' on '{sourceType.Name}'.",
+                    $"{GetType().Name}: could not find public property '{SelectedMemberName}' on '{sourceType.Name}'.",
                     this
                 );
                 return false;
             }
 
-            if (!Attribute.IsDefined(property, typeof(BindableCommandAttribute), true))
+            if (
+                !BindingMetadataUtility.IsBindable(property)
+                && !BindingMetadataUtility.IsBindableCommand(property)
+            )
             {
                 Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: '{sourceType.Name}.{selectedMemberName}' is not marked with [{nameof(BindableCommandAttribute).Replace(nameof(Attribute), string.Empty)}].",
+                    $"{GetType().Name}: '{sourceType.Name}.{SelectedMemberName}' is not marked with [Bindable] or [BindableCommand].",
                     this
                 );
                 return false;
             }
 
-            if (!typeof(ICommand).IsAssignableFrom(property.PropertyType))
+            if (!BindingMetadataUtility.TryCreateMetadata(property, out metadata))
             {
                 Debug.LogError(
-                    $"{nameof(ButtonCommandBinder)}: '{sourceType.Name}.{selectedMemberName}' must return {nameof(ICommand)}.",
+                    $"{GetType().Name}: '{sourceType.Name}.{SelectedMemberName}' must return {nameof(ICommand)}.",
+                    this
+                );
+                return false;
+            }
+
+            if (!BindingMetadataUtility.IsExactValueTypeMatch(metadata, typeof(ICommand)))
+            {
+                Debug.LogError(
+                    $"{GetType().Name}: '{sourceType.Name}.{SelectedMemberName}' emits '{metadata.ValueType.Name}', but this binder requires '{nameof(ICommand)}'.",
                     this
                 );
                 return false;

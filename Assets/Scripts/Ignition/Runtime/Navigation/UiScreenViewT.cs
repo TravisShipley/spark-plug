@@ -9,11 +9,11 @@ namespace Ignition.Navigation
 
         public virtual void Bind(TData data)
         {
-            this.Data = data;
+            Data = data;
             RebindChildren();
         }
 
-        public override object GetBindingData() => this.Data;
+        public override object GetBindingData() => Data;
 
         public override Type GetBindingDataType() => typeof(TData);
 
@@ -26,6 +26,12 @@ namespace Ignition.Navigation
             }
 
             Bind(data);
+        }
+
+        public override void OnBeforeClose()
+        {
+            Data = default;
+            RebindChildren();
         }
     }
 }
