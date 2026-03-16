@@ -214,7 +214,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ignition.Binders.TextBinder
   dataProvider: {fileID: 7136281493802865698}
-  selectedMemberName: Title
+  selectedMemberName: Data.Title
   target: {fileID: 6893544787950186352}
 --- !u!1 &6091774632977921755
 GameObject:
@@ -555,7 +555,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ignition.Binders.TextBinder
   dataProvider: {fileID: 7136281493802865698}
-  selectedMemberName: ResultText
+  selectedMemberName: Data.ResultText
   target: {fileID: 5593463591877160364}
 --- !u!1 &7925247199866574964
 GameObject:
@@ -664,7 +664,7 @@ PrefabInstance:
     - target: {fileID: 6102753064142217781, guid: ac7610ec174e948259ed7c621fbbee4b,
         type: 3}
       propertyPath: selectedMemberName
-      value: 
+      value: RequestCloseCommand
       objectReference: {fileID: 0}
     - target: {fileID: 8057414510195469693, guid: ac7610ec174e948259ed7c621fbbee4b,
         type: 3}

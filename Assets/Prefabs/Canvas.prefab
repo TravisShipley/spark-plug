@@ -2450,7 +2450,7 @@ PrefabInstance:
     - target: {fileID: 5822580053536964937, guid: ac7610ec174e948259ed7c621fbbee4b,
         type: 3}
       propertyPath: m_Name
-      value: BaseButtonView
+      value: WarpButton
       objectReference: {fileID: 0}
     - target: {fileID: 6102753064142217781, guid: ac7610ec174e948259ed7c621fbbee4b,
         type: 3}
@@ -2460,6 +2460,11 @@ PrefabInstance:
     - target: {fileID: 6102753064142217781, guid: ac7610ec174e948259ed7c621fbbee4b,
         type: 3}
       propertyPath: selectedMemberName
+      value: Data.Warp
+      objectReference: {fileID: 0}
+    - target: {fileID: 8057414510195469693, guid: ac7610ec174e948259ed7c621fbbee4b,
+        type: 3}
+      propertyPath: m_text
       value: Warp
       objectReference: {fileID: 0}
     - target: {fileID: 8833944235032070318, guid: ac7610ec174e948259ed7c621fbbee4b,
@@ -2562,7 +2567,8 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 899514269254574518, guid: ac7610ec174e948259ed7c621fbbee4b, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
