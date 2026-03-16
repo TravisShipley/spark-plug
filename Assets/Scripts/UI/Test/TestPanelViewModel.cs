@@ -11,21 +11,6 @@ public sealed class TestPanelViewModel : IDisposable
     private readonly ReactiveProperty<bool> isVisible;
     private readonly ReactiveProperty<bool> isInteractable;
 
-    public TestPanelViewModel(
-        string name,
-        string incomeText,
-        float progress,
-        bool isVisible,
-        bool isInteractable
-    )
-    {
-        this.name = new ReactiveProperty<string>(name).AddTo(disposables);
-        this.incomeText = new ReactiveProperty<string>(incomeText).AddTo(disposables);
-        this.progress = new ReactiveProperty<float>(progress).AddTo(disposables);
-        this.isVisible = new ReactiveProperty<bool>(isVisible).AddTo(disposables);
-        this.isInteractable = new ReactiveProperty<bool>(isInteractable).AddTo(disposables);
-    }
-
     [Bindable("Display Name")]
     public IReadOnlyReactiveProperty<string> Name => name;
 
@@ -40,6 +25,21 @@ public sealed class TestPanelViewModel : IDisposable
 
     [Bindable]
     public IReadOnlyReactiveProperty<bool> IsInteractable => isInteractable;
+
+    public TestPanelViewModel(
+        string name,
+        string incomeText,
+        float progress,
+        bool isVisible,
+        bool isInteractable
+    )
+    {
+        this.name = new ReactiveProperty<string>(name).AddTo(disposables);
+        this.incomeText = new ReactiveProperty<string>(incomeText).AddTo(disposables);
+        this.progress = new ReactiveProperty<float>(progress).AddTo(disposables);
+        this.isVisible = new ReactiveProperty<bool>(isVisible).AddTo(disposables);
+        this.isInteractable = new ReactiveProperty<bool>(isInteractable).AddTo(disposables);
+    }
 
     public void SetName(string value)
     {

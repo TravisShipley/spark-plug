@@ -156,6 +156,9 @@ public class GameCompositionRoot : MonoBehaviour
         BindSceneUi(uiScreenService);
         BindDebugUi();
         TryShowOfflineEarnings(uiScreenService);
+        gameEventStream
+            .TimeWarpCompleted.Subscribe(evt => ShowTimeWarpResults(uiScreenService, evt.result))
+            .AddTo(disposables);
 
         var generatorComposer = new GeneratorListComposer(
             generatorUIRootPrefab,
@@ -481,6 +484,17 @@ public class GameCompositionRoot : MonoBehaviour
 
         if (result != null && result.HasMeaningfulGain())
             uiScreenService.ShowOfflineEarnings(result);
+    }
+
+    private static void ShowTimeWarpResults(
+        UiScreenService uiScreenService,
+        OfflineSessionResult result
+    )
+    {
+        if (uiScreenService == null)
+            return;
+
+        uiScreenService.Show("TIME_WARP_RESULTS", new TimeWarpResultsScreenViewModel(result));
     }
 
     private void UpdateLastSeenTimestamp(bool saveImmediately)
