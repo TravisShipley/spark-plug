@@ -61,6 +61,7 @@ Services:
 ViewModels:
 
 - Expose `IObservable` / `IReadOnlyReactiveProperty`
+- Expose `ICommand` intent surfaces when needed
 - Do not contain authoritative state
 - Do not compute domain logic
 - Forward values from Services
@@ -74,8 +75,10 @@ Views:
 - `MonoBehaviour` only
 - No gameplay logic
 - No state mutation
-- Bind once via `Bind(ViewModel)`
+- Bind once through an explicit setup path (`Bind(ViewModel)` or `DataProvider`/binder rebinding)
 - No scene searches
+
+Shared runtime UI infrastructure that is intended for eventual extraction should live under `Assets/Scripts/Ignition/Runtime/...`, not be mixed into feature-local UI folders.
 
 ---
 

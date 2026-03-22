@@ -65,34 +65,41 @@ This makes search and refactors trivial.
 
 ---
 
-### ✅ Put shared UI utilities in `UI/_Shared/`
+### ✅ Put shared UI utilities in the right shared layer
+
+Use `UI/_Shared/` for app-specific shared UI code, and `Ignition/Runtime/` for extractable runtime UI infrastructure.
 
 Only for items used by **2+** features:
 
 ```
-UI/_Shared/Binding/
 UI/_Shared/Formatting/
 UI/_Shared/Navigation/
 UI/_Shared/Components/
+Ignition/Runtime/Binding/
+Ignition/Runtime/Binders/
+Ignition/Runtime/Commands/
+Ignition/Runtime/Navigation/
 ```
 
 Examples:
 
-- binders (TextBinder, ActiveBinder)
+- app-specific formatting and navigation helpers
+- extractable binders and binding contracts (`TextBinder`, `ActiveBinder`, `ButtonCommandBinder`)
 - number formatting
 - screen navigation service
 - reusable components (progress bar)
 
 ---
 
-### ✅ Use verbs for commands, nouns for views
+### ✅ Use verbs for command members, nouns for views
 
-Commands:
+Command surfaces:
 
-- `OpenBoostCommand`
-- `BuyLevelCommand`
-- `CollectCommand`
-- `ActivateBoostCommand`
+- `OpenBoost`
+- `BuyLevel`
+- `Collect`
+- `ActivateBoost`
+- `RequestCloseCommand`
 
 Views/Components:
 
@@ -229,9 +236,9 @@ UI/Boost/
   BoostScreenViewModel.cs
   BoostButtonView.cs
   BoostButtonViewModel.cs
-  ActivateBoostCommand.cs
-  OpenBoostCommand.cs
 ```
+
+`ICommand`/`UiCommand` properties usually live on the ViewModel rather than in one-class-per-command files.
 
 ### Nodes feature
 

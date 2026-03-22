@@ -32,6 +32,12 @@ Key references:
 
 - `Docs/Architecture/MentalModel.md` core runtime/economy mental model
 - `Docs/Data/DatasheetGuide.md` Google Sheets authoring and table mapping guide
+- `Docs/Architecture/ArchitectureRules.md` current UI/domain ownership and command-binding rules
+
+Current UI direction:
+
+- Feature UI remains under `Assets/Scripts/UI/...`
+- Extractable binding/navigation runtime lives under `Assets/Scripts/Ignition/Runtime/...`
 
 ## Root Docs
 

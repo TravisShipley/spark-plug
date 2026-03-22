@@ -62,7 +62,7 @@ Examples:
 
 - Contain no Unity-specific code
 - Expose reactive properties (`IReadOnlyReactiveProperty<T>`)
-- Expose `UiCommand`s for user intent
+- Expose `ICommand` surfaces for user intent, usually backed by `UiCommand`
 - Do not mutate services except through explicit methods
 - Prefer delegating list/entry construction to a `Builder`/`Composer` rather than embedding complex lookup/parsing in the ViewModel.
 
@@ -83,7 +83,9 @@ Examples:
 - `MonoBehaviour` only
 - No gameplay logic
 - No state mutation
-- Bind once via a `Bind(ViewModel)` method
+- Bind once through an explicit setup path:
+  - a typed `Bind(ViewModel)` method when the view owns direct subscriptions, or
+  - a `DataProvider`/binder surface when the view exposes a composed binding surface
 - Never search the scene or access services directly
 
 ---
@@ -197,7 +199,7 @@ A `Registry` provides **lookup access to shared runtime services**.
 
 ### 2.6 Commands
 
-**Rule:** User intent is represented by `UiCommand`.
+**Rule:** User intent is exposed through `ICommand` surfaces, usually implemented by `UiCommand`.
 
 Examples:
 
@@ -208,11 +210,10 @@ Examples:
 
 **Guidelines:**
 
-- Owned by ViewModels
-- May expose:
-  - `CanExecute`
-  - `IsVisible`
-- Views bind directly to commands
+- Usually owned by ViewModels, but provider/root commands on views are also valid when they are UI-local intent (for example `RequestCloseCommand` on `UiScreenView`)
+- Expose `CanExecute`
+- Do not own visibility; visibility belongs on normal bindable UI data
+- Views and binders bind directly to commands
 - Commands never contain UI code
 
 ---
