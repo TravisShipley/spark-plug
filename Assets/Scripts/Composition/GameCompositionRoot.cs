@@ -28,6 +28,7 @@ using UniRx;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+[DefaultExecutionOrder(-1000)]
 public class GameCompositionRoot : MonoBehaviour
 {
     [Header("UI Composition")]
@@ -74,32 +75,91 @@ public class GameCompositionRoot : MonoBehaviour
     private SaveService saveService;
     private GameEventStream gameEventStream;
 
-    // Timing
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
     private readonly List<GeneratorViewModel> generatorViewModels = new();
     private readonly CompositeDisposable disposables = new CompositeDisposable();
+    private bool referencesValidated;
+    private bool bootStarted;
+    private GameSessionConfigAsset activeSessionConfigAsset;
+    private SparkPlugRuntimeConfig runtimeConfig;
 
     private void Awake()
     {
-        if (!ValidateReferences())
+        referencesValidated = ValidateReferences();
+        if (!referencesValidated)
         {
             enabled = false;
             return;
         }
-
-        // SaveService owns an in-memory snapshot.
-        saveService = new SaveService();
-
-        StartCoroutine(BootstrapAsync());
     }
 
-    private IEnumerator BootstrapAsync()
+    private void Start()
+    {
+        if (!enabled || bootStarted)
+            return;
+
+        if (FindAnyObjectByType<GameSessionBootstrapper>() != null)
+            return;
+
+        StartCoroutine(BootstrapLegacyAsync());
+    }
+
+    public void BeginBootstrap(
+        SparkPlugRuntimeConfig runtimeConfig,
+        GameSessionConfigAsset sessionConfigAsset = null
+    )
+    {
+        if (runtimeConfig == null)
+            throw new ArgumentNullException(nameof(runtimeConfig));
+
+        if (!referencesValidated)
+        {
+            referencesValidated = ValidateReferences();
+            if (!referencesValidated)
+            {
+                enabled = false;
+                return;
+            }
+        }
+
+        if (bootStarted)
+        {
+            Debug.LogWarning("GameCompositionRoot: BeginBootstrap called more than once.", this);
+            return;
+        }
+
+        bootStarted = true;
+        this.runtimeConfig = runtimeConfig;
+        activeSessionConfigAsset = sessionConfigAsset;
+        saveService = new SaveService(
+            SparkPlugSaveKey.Compose(runtimeConfig.SessionId, runtimeConfig.SaveSlotId)
+        );
+
+        if (runtimeConfig.VerboseLogging)
+        {
+            Debug.Log(
+                $"GameCompositionRoot: Starting session '{runtimeConfig.SessionId}' with save key '{saveService.SaveKey}'.",
+                this
+            );
+        }
+
+        try
+        {
+            BootstrapRuntime(runtimeConfig);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogException(ex, this);
+            enabled = false;
+        }
+    }
+
+    private IEnumerator BootstrapLegacyAsync()
     {
         GameDefinition loadedDefinition = null;
         Exception loadException = null;
-        UiScreenService uiScreenService = null;
 
         yield return StartCoroutine(
             GameDefinitionLoader.LoadFromAddressableAsync(
@@ -125,22 +185,27 @@ public class GameCompositionRoot : MonoBehaviour
             yield break;
         }
 
-        try
-        {
-            InitializeCoreServices(loadedDefinition, out uiScreenService);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogException(ex, this);
-            enabled = false;
-            yield break;
-        }
+        BeginBootstrap(
+            new SparkPlugRuntimeConfig(
+                SparkPlugSaveKey.DefaultSessionId,
+                "Spark Plug",
+                SparkPlugSaveKey.DefaultSaveSlotId,
+                resetSaveOnBoot: false,
+                verboseLogging: false,
+                loadedDefinition
+            )
+        );
+    }
+
+    private void BootstrapRuntime(SparkPlugRuntimeConfig runtimeConfig)
+    {
+        InitializeCoreServices(runtimeConfig, out var uiScreenService);
 
         if (gameDefinitionService.NodeInstances.Count == 0)
         {
             Debug.LogError("GameCompositionRoot: No node instances could be resolved.", this);
             enabled = false;
-            yield break;
+            return;
         }
 
         LoadSaveState();
@@ -181,11 +246,8 @@ public class GameCompositionRoot : MonoBehaviour
         );
 
         generatorComposer.Compose();
-
-        // Apply any saved upgrades (generators must be registered before this).
         upgradeService.ApplyAllPurchased();
 
-        // Subscribe milestone progression after generators are composed.
         milestoneService = new MilestoneService(
             gameDefinitionService,
             generatorServices,
@@ -206,18 +268,19 @@ public class GameCompositionRoot : MonoBehaviour
     }
 
     private void InitializeCoreServices(
-        GameDefinition loadedDefinition,
+        SparkPlugRuntimeConfig runtimeConfig,
         out UiScreenService uiScreenService
     )
     {
         if (saveService == null)
+        {
             throw new InvalidOperationException(
-                "GameCompositionRoot: SaveService must be created and loaded before InitializeCoreServices."
+                "GameCompositionRoot: SaveService must be created before InitializeCoreServices."
             );
+        }
 
-        // Load content-driven definitions and build catalogs first.
-        gameDefinitionService = new GameDefinitionService(loadedDefinition);
-        saveService.Load(gameDefinitionService.Definition);
+        gameDefinitionService = new GameDefinitionService(runtimeConfig.Definition);
+        saveService.Load(gameDefinitionService.Definition, runtimeConfig.ResetSaveOnBoot);
         gameEventStream = new GameEventStream();
 
         walletService = new WalletService(
@@ -227,13 +290,10 @@ public class GameCompositionRoot : MonoBehaviour
         );
         walletViewModel = new WalletViewModel(walletService);
 
-        // Time source for simulation
         tickService = new TickService(TickInterval);
 
-        // Scene-bound registry that exposes runtime services to UI.
         uiService.Initialize(walletService);
 
-        // Construct UpgradeService with the authoritative UpgradeCatalog
         upgradeService = new UpgradeService(
             gameDefinitionService.UpgradeCatalog,
             walletService,
@@ -277,11 +337,8 @@ public class GameCompositionRoot : MonoBehaviour
             gameEventStream
         );
 
-        // UiScreenManager needs the UpgradeService for screens like Upgrades.
         uiScreenManager.Initialize(upgradeService);
-        // Provide the content-driven catalog to screens so they can render upgrades.
         uiScreenManager.UpgradeCatalog = gameDefinitionService.UpgradeCatalog;
-        // Also expose the full GameDefinitionService for screens that need richer access.
         uiScreenManager.GameDefinitionService = gameDefinitionService;
         upgradeListBuilder = new UpgradeListBuilder(
             gameDefinitionService.UpgradeCatalog,
@@ -301,23 +358,25 @@ public class GameCompositionRoot : MonoBehaviour
         uiScreenManager.AdBoostScreenViewModel = adBoostScreenViewModel;
         uiScreenManager.PrestigeScreenViewModel = prestigeScreenViewModel;
 
-        // Domain-facing screen API (intent-based)
         uiScreenService = new UiScreenService(uiScreenManager, walletService);
     }
 
     private void LoadSaveState()
     {
         if (saveService == null)
+        {
             throw new InvalidOperationException(
                 "GameCompositionRoot: SaveService is null in LoadSaveState."
             );
+        }
 
         if (upgradeService == null)
+        {
             throw new InvalidOperationException(
                 "GameCompositionRoot: UpgradeService is null in LoadSaveState."
             );
+        }
 
-        // Load saved upgrade purchase facts. (WalletService loads currency from SaveService in its constructor.)
         upgradeService.LoadFrom(saveService.Data);
         modifierService.RebuildActiveModifiers();
     }
@@ -393,13 +452,9 @@ public class GameCompositionRoot : MonoBehaviour
     {
         UpdateLastSeenTimestamp(saveImmediately: false);
 
-        // Flush any pending save (best effort)
         saveService?.Dispose();
-
         disposables.Dispose();
 
-        // Dispose simulation/services first (they may publish into viewmodels/services)
-        // automationService?.Dispose();
         foreach (var s in generatorServices)
             s?.Dispose();
         milestoneService?.Dispose();
@@ -409,10 +464,8 @@ public class GameCompositionRoot : MonoBehaviour
         unlockService?.Dispose();
         modifierService?.Dispose();
 
-        // Dispose time source after consumers
         tickService?.Dispose();
 
-        // Dispose viewmodels after services (they may be subscribed to service state)
         foreach (var generatorViewModel in generatorViewModels)
             generatorViewModel?.Dispose();
         upgradesScreenViewModel?.Dispose();
@@ -421,7 +474,6 @@ public class GameCompositionRoot : MonoBehaviour
         prestigeScreenViewModel?.Dispose();
         walletViewModel?.Dispose();
 
-        // Dispose core state last
         upgradeService?.Dispose();
         prestigeService?.Dispose();
         walletService?.Dispose();
@@ -446,13 +498,22 @@ public class GameCompositionRoot : MonoBehaviour
         if (saveService == null || gameDefinitionService?.Definition == null)
             return;
 
+        if (runtimeConfig != null && runtimeConfig.VerboseLogging)
+        {
+            Debug.Log(
+                $"GameCompositionRoot: Reset requested for session '{runtimeConfig.SessionId}'.",
+                this
+            );
+        }
+
         if (!saveService.ConsumePendingScopedResetReload())
             saveService.Reset(gameDefinitionService.Definition);
         else
             saveService.SaveNow();
 
-        // For testing: a full scene reload guarantees all services, models, and views reset cleanly
-        // without needing every ViewModel/View to support re-initialization.
+        if (activeSessionConfigAsset != null)
+            SparkPlugBootContext.SetPendingSession(activeSessionConfigAsset);
+
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
@@ -479,7 +540,6 @@ public class GameCompositionRoot : MonoBehaviour
         var secondsAway = Math.Max(0, now - lastSeen);
         var result = offlineProgressCalculator.Calculate(secondsAway, saveService.Data);
 
-        // Stamp this session immediately so repeated launches do not double-pay.
         saveService.SetLastSeenUnixSeconds(now, requestSave: true);
 
         if (result != null && result.HasMeaningfulGain())

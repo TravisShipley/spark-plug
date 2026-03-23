@@ -10,7 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8243f4b40ee7e478abe27cc2e9b2466c, type: 3}
-  m_Name: GoogleSheetImportConfig
+  m_Name: GoogleSheetImportConfig_llama
   m_EditorClassIdentifier: Assembly-CSharp-Editor::GoogleSheetImportConfig
-  spreadsheetId: 1ILzPwrsXiR3u724Fs3OnUHCKHM-hJ8EY60Ukcs1hHZs
+  spreadsheetId: https://docs.google.com/spreadsheets/d/1NtCj2hX-cuQJTJn0rebwEffye6sxNc2jWkz99pOSF58/edit?gid=1855575755#gid=1855575755
   apiKey: AIzaSyCdCtu_TZrJ-1tm8PShf7Su08C10ctOc9c
+  outputJsonPath: Assets/Data/Definitions/game_definition_llama.json
+  resourcesFallbackOutputPath: 
+  addressableKey: game_def_llama
+  rebuildAddressables: 1

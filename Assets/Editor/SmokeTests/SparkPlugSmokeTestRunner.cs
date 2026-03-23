@@ -9,11 +9,15 @@ public static class SparkPlugSmokeTestRunner
 {
     private const string GameDefinitionPath = "Assets/Data/game_definition.json";
     private const int MaxUpgradeEntriesToPrint = 20;
+    private static readonly string DefaultSaveKey = SparkPlugSaveKey.Compose(
+        SparkPlugSaveKey.DefaultSessionId,
+        SparkPlugSaveKey.DefaultSaveSlotId
+    );
 
     [MenuItem("SparkPlug/Smoke Test/Reset Save")]
     public static void ResetSave()
     {
-        SaveSystem.DeleteSaveFile();
+        SaveSystem.DeleteSaveFile(DefaultSaveKey);
         Debug.Log(
             $"[SmokeTest] Save reset complete. persistentDataPath='{Application.persistentDataPath}'."
         );
@@ -33,7 +37,7 @@ public static class SparkPlugSmokeTestRunner
             return;
         }
 
-        var data = SaveSystem.LoadGame();
+        var data = SaveSystem.LoadGame(DefaultSaveKey);
         var usingDefaults = false;
         if (data == null)
         {
@@ -47,7 +51,7 @@ public static class SparkPlugSmokeTestRunner
 
     private static GameData CreateDefaultData(GameDefinition definition)
     {
-        var saveService = new SaveService();
+        var saveService = new SaveService(DefaultSaveKey);
         try
         {
             return saveService.CreateDefaultSaveData(definition);
@@ -66,9 +70,10 @@ public static class SparkPlugSmokeTestRunner
         var buffRemaining = string.IsNullOrEmpty(activeBuffId)
             ? 0
             : Math.Max(0, data.ActiveBuffExpiresAtUnixSeconds - now);
+        var sourceLabel = usingDefaults ? "content defaults (no save file)" : DefaultSaveKey;
 
         report.AppendLine("=== Spark Plug Smoke Test State ===");
-        report.AppendLine($"Source: {(usingDefaults ? "content defaults (no save file)" : "save.json")}");
+        report.AppendLine($"Source: {sourceLabel}");
         report.AppendLine($"persistentDataPath: {Application.persistentDataPath}");
         report.AppendLine($"CurrentZone: {ResolveCurrentZone(definition, data)}");
         report.AppendLine(

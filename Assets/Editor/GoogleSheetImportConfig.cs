@@ -11,4 +11,10 @@ public sealed class GoogleSheetImportConfig : ScriptableObject
 
     [Header("Sheets API v4")]
     public string apiKey;
+
+    [Header("Output")]
+    public string outputJsonPath = "Assets/Data/Definitions/game_definition.json";
+    public string resourcesFallbackOutputPath;
+    public string addressableKey;
+    public bool rebuildAddressables;
 }

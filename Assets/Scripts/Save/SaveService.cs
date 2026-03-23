@@ -12,32 +12,48 @@ public sealed class SaveService : IDisposable
     private readonly CompositeDisposable disposables = new();
     private readonly Subject<Unit> saveRequests = new();
     private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(250);
+    private readonly string saveKey;
     private bool hasPendingScopedResetReload;
 
     public GameData Data { get; private set; }
     public long LastSeenUnixSeconds => Data?.lastSeenUnixSeconds ?? 0;
     public string ActiveBuffId => NormalizeId(Data?.ActiveBuffId);
     public long ActiveBuffExpiresAtUnixSeconds => Data?.ActiveBuffExpiresAtUnixSeconds ?? 0;
+    public string SaveKey => saveKey;
 
-    public SaveService()
+    public SaveService(string saveKey)
     {
+        this.saveKey = string.IsNullOrWhiteSpace(saveKey)
+            ? SparkPlugSaveKey.Compose(
+                SparkPlugSaveKey.DefaultSessionId,
+                SparkPlugSaveKey.DefaultSaveSlotId
+            )
+            : saveKey.Trim();
         saveRequests
             .Throttle(Debounce)
             .Subscribe(_ =>
             {
                 if (Data != null)
-                    SaveSystem.SaveGame(Data);
+                    SaveSystem.SaveGame(Data, this.saveKey);
             })
             .AddTo(disposables);
     }
 
-    public void Load(GameDefinition definition)
+    public void Load(GameDefinition definition, bool resetSaveOnBoot = false)
     {
         if (definition == null)
             throw new ArgumentNullException(nameof(definition));
 
-        var hadSave = SaveSystem.HasSave();
-        var loaded = hadSave ? SaveSystem.LoadGame() : null;
+        if (resetSaveOnBoot)
+        {
+            Data = CreateDefaultSaveData(definition);
+            hasPendingScopedResetReload = false;
+            SaveNow();
+            return;
+        }
+
+        var hadSave = SaveSystem.HasSave(saveKey);
+        var loaded = hadSave ? SaveSystem.LoadGame(saveKey) : null;
 
         bool changed;
         Data = BuildFromDefaults(definition, loaded, out changed);
@@ -54,7 +70,7 @@ public sealed class SaveService : IDisposable
 
         Data = CreateDefaultSaveData(definition);
         hasPendingScopedResetReload = false;
-        SaveSystem.DeleteSaveFile();
+        SaveSystem.DeleteSaveFile(saveKey);
         SaveNow();
     }
 
@@ -72,7 +88,7 @@ public sealed class SaveService : IDisposable
             return;
 
         SortFactLists();
-        SaveSystem.SaveGame(Data);
+        SaveSystem.SaveGame(Data, saveKey);
     }
 
     public void SetLastSeenUnixSeconds(long unixSeconds, bool requestSave = true)

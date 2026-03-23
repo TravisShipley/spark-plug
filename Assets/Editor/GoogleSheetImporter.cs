@@ -30,14 +30,12 @@ using UnityEngine.Networking;
 
 public static class GoogleSheetImporter
 {
-    private const string OutputPath = "Assets/Data/game_definition.json";
-    private const string ResourcesFallbackOutputPath = "Assets/Resources/Data/game_definition.json";
     private const string DataTextPath = "Assets/Data/data.txt";
     private const string SchemaPath = "Assets/Data/spark_plug_definition_schema.json";
     private const string SheetSpecPath = "Assets/Data/spark_plug_sheet_spec.json";
     private const string CsvAiBundlePath = "Assets/Data/Csv/_sheets_export_for_ai.json";
-    private const string GameDefinitionAddressableKey = "game_definition";
     private const string DataAddressableGroupName = "Data";
+    private const string DefaultDefinitionsDirectory = "Assets/Data/Definitions";
     private const string IndexSheetName = "__Index";
     private const int MaxSchemaValidationErrors = 25;
 
@@ -173,15 +171,104 @@ public static class GoogleSheetImporter
     [MenuItem("SparkPlug/Import From Google Sheet")]
     public static void Import()
     {
-        Debug.ClearDeveloperConsole();
+        var config = ResolveSingleImportConfig();
+        if (config == null)
+            return;
 
-        var config = FindConfig();
+        Import(config);
+    }
+
+    [MenuItem("SparkPlug/Import Selected Definition")]
+    public static void ImportSelected()
+    {
+        var config = Selection.activeObject as GoogleSheetImportConfig;
         if (config == null)
         {
             EditorUtility.DisplayDialog(
                 "Import Failed",
-                "No GoogleSheetImportConfig found. Create one via Assets > Create > SparkPlug > Google Sheet Import Config, "
-                    + "assign the spreadsheet ID (or full URL) and API key, then run the import again.",
+                "Select a GoogleSheetImportConfig asset, then run Import Selected Definition.",
+                "OK"
+            );
+            return;
+        }
+
+        Import(config);
+    }
+
+    [MenuItem("SparkPlug/Import All Definitions")]
+    public static void ImportAll()
+    {
+        var configs = FindConfigs();
+        if (configs.Count == 0)
+        {
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                "No GoogleSheetImportConfig assets found. Create one via Assets > Create > SparkPlug > Google Sheet Import Config.",
+                "OK"
+            );
+            return;
+        }
+
+        Debug.ClearDeveloperConsole();
+
+        try
+        {
+            for (int i = 0; i < configs.Count; i++)
+            {
+                var config = configs[i];
+                EditorUtility.DisplayProgressBar(
+                    "SparkPlug Import",
+                    $"Importing definition {i + 1}/{configs.Count}: {config.name}",
+                    configs.Count <= 0 ? 0f : (float)i / configs.Count
+                );
+                ImportInternal(config);
+            }
+        }
+        catch (Exception ex)
+        {
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                ex.Message + "\n\nSee Console for details.",
+                "OK"
+            );
+            Debug.LogException(ex);
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+    }
+
+    private static void Import(GoogleSheetImportConfig config)
+    {
+        Debug.ClearDeveloperConsole();
+
+        try
+        {
+            ImportInternal(config);
+        }
+        catch (Exception ex)
+        {
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                ex.Message + "\n\nSee Console for details.",
+                "OK"
+            );
+            Debug.LogException(ex);
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+    }
+
+    private static void ImportInternal(GoogleSheetImportConfig config)
+    {
+        if (config == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                "No GoogleSheetImportConfig was provided.",
                 "OK"
             );
             return;
@@ -208,76 +295,104 @@ public static class GoogleSheetImporter
             return;
         }
 
-        try
-        {
-            var sheetSpec = LoadSheetSpecDefinition();
-            var rawSheetSnapshots = new List<RawSheetSnapshot>();
-            var tables = FetchAllTables(spreadsheetId, config.apiKey, sheetSpec, rawSheetSnapshots);
-            PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
-            if (tables.Count == 0)
-            {
-                EditorUtility.DisplayDialog(
-                    "Import Failed",
-                    "No tables were imported from __Index entries.\n\n"
-                        + "Ensure the __Index sheet exists and your API key is valid.",
-                    "OK"
-                );
-                return;
-            }
-
-            var importedTableNames = tables
-                .Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var importedTableSummary = importedTableNames
-                .Select(name => $"{name}({tables[name].Rows.Count})")
-                .ToList();
-            Debug.Log(
-                $"[GoogleSheetImporter] Imported {importedTableNames.Count} table(s): {string.Join(", ", importedTableSummary)}"
-            );
-
-            var pack = BuildPackFromSpec(tables, sheetSpec);
-            ValidatePack(pack);
-            WriteJson(pack);
-            AssetDatabase.Refresh();
-            EnsureGameDefinitionAddressable(
-                OutputPath,
-                GameDefinitionAddressableKey,
-                DataAddressableGroupName
-            );
-            BuildAddressablesPlayerContent();
-
-            Debug.Log($"<color=green>✔ Import Complete</color>\nWrote {OutputPath}");
-        }
-        catch (Exception ex)
+        var outputJsonPath = NormalizeOutputJsonPath(config.outputJsonPath);
+        if (string.IsNullOrWhiteSpace(outputJsonPath))
         {
             EditorUtility.DisplayDialog(
                 "Import Failed",
-                ex.Message + "\n\nSee Console for details.",
+                $"Config '{config.name}' has no valid outputJsonPath. Use a path under '{DefaultDefinitionsDirectory}/'.",
                 "OK"
             );
-            Debug.LogException(ex);
+            return;
         }
-        finally
+
+        var resourcesFallbackOutputPath = NormalizeOptionalAssetPath(config.resourcesFallbackOutputPath);
+        var addressableKey = NormalizeOptionalValue(config.addressableKey);
+
+        var sheetSpec = LoadSheetSpecDefinition();
+        var rawSheetSnapshots = new List<RawSheetSnapshot>();
+        var tables = FetchAllTables(spreadsheetId, config.apiKey, sheetSpec, rawSheetSnapshots);
+        PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
+        if (tables.Count == 0)
         {
-            EditorUtility.ClearProgressBar();
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                "No tables were imported from __Index entries.\n\n"
+                    + "Ensure the __Index sheet exists and your API key is valid.",
+                "OK"
+            );
+            return;
         }
+
+        var importedTableNames = tables
+            .Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var importedTableSummary = importedTableNames
+            .Select(name => $"{name}({tables[name].Rows.Count})")
+            .ToList();
+        Debug.Log(
+            $"[GoogleSheetImporter] Imported {importedTableNames.Count} table(s) for '{config.name}': {string.Join(", ", importedTableSummary)}"
+        );
+
+        var pack = BuildPackFromSpec(tables, sheetSpec);
+        ValidatePack(pack);
+        WriteJson(pack, outputJsonPath, resourcesFallbackOutputPath);
+        AssetDatabase.Refresh();
+
+        if (!string.IsNullOrWhiteSpace(addressableKey))
+        {
+            EnsureGameDefinitionAddressable(outputJsonPath, addressableKey, DataAddressableGroupName);
+            if (config.rebuildAddressables)
+                BuildAddressablesPlayerContent();
+        }
+
+        Debug.Log($"<color=green>✔ Import Complete</color>\nWrote {outputJsonPath}");
     }
 
     // ----------------------------
     // Config / ID helpers
     // ----------------------------
 
-    private static GoogleSheetImportConfig FindConfig()
+    private static List<GoogleSheetImportConfig> FindConfigs()
     {
         var guids = AssetDatabase.FindAssets("t:GoogleSheetImportConfig");
+        var configs = new List<GoogleSheetImportConfig>();
         foreach (var guid in guids)
         {
             var path = AssetDatabase.GUIDToAssetPath(guid);
             var config = AssetDatabase.LoadAssetAtPath<GoogleSheetImportConfig>(path);
             if (config != null)
-                return config;
+                configs.Add(config);
         }
 
+        configs.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.OrdinalIgnoreCase));
+        return configs;
+    }
+
+    private static GoogleSheetImportConfig ResolveSingleImportConfig()
+    {
+        if (Selection.activeObject is GoogleSheetImportConfig selectedConfig)
+            return selectedConfig;
+
+        var configs = FindConfigs();
+        if (configs.Count == 0)
+        {
+            EditorUtility.DisplayDialog(
+                "Import Failed",
+                "No GoogleSheetImportConfig assets found. Create one via Assets > Create > SparkPlug > Google Sheet Import Config.",
+                "OK"
+            );
+            return null;
+        }
+
+        if (configs.Count == 1)
+            return configs[0];
+
+        EditorUtility.DisplayDialog(
+            "Import Failed",
+            "Multiple GoogleSheetImportConfig assets were found. Select one and use Import Selected Definition, or use Import All Definitions.",
+            "OK"
+        );
         return null;
     }
 
@@ -2783,11 +2898,16 @@ public static class GoogleSheetImporter
             errors.Add(message);
     }
 
-    private static void WriteJson(Dictionary<string, object> pack)
+    private static void WriteJson(
+        Dictionary<string, object> pack,
+        string outputPath,
+        string resourcesFallbackOutputPath
+    )
     {
         var json = ToJson(pack);
-        WriteTextAsset(OutputPath, json);
-        WriteTextAsset(ResourcesFallbackOutputPath, json);
+        WriteTextAsset(outputPath, json);
+        if (!string.IsNullOrWhiteSpace(resourcesFallbackOutputPath))
+            WriteTextAsset(resourcesFallbackOutputPath, json);
     }
 
     private static void WriteTextAsset(string assetPath, string content)
@@ -2797,6 +2917,41 @@ public static class GoogleSheetImporter
             Directory.CreateDirectory(dir);
 
         File.WriteAllText(assetPath, content ?? string.Empty, Encoding.UTF8);
+    }
+
+    private static string NormalizeOutputJsonPath(string assetPath)
+    {
+        var normalized = NormalizeOptionalAssetPath(assetPath);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return null;
+
+        if (!normalized.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (
+            !normalized.StartsWith(
+                DefaultDefinitionsDirectory + "/",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return null;
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeOptionalAssetPath(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath))
+            return string.Empty;
+
+        return assetPath.Trim().Replace("\\", "/");
+    }
+
+    private static string NormalizeOptionalValue(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 
     private static void EnsureGameDefinitionAddressable(
@@ -2834,7 +2989,7 @@ public static class GoogleSheetImporter
             if (settings == null)
             {
                 Debug.LogWarning(
-                    "[GoogleSheetImporter] Addressables settings are unavailable. game_definition.json was not assigned an address."
+                    $"[GoogleSheetImporter] Addressables settings are unavailable. '{assetPath}' was not assigned an address."
                 );
                 return;
             }
@@ -2851,7 +3006,7 @@ public static class GoogleSheetImporter
             if (targetGroup == null)
             {
                 Debug.LogWarning(
-                    "[GoogleSheetImporter] Addressables default group is missing. game_definition.json was not assigned an address."
+                    $"[GoogleSheetImporter] Addressables default group is missing. '{assetPath}' was not assigned an address."
                 );
                 return;
             }

@@ -5,14 +5,12 @@ using System.Collections.Generic;
 
 public static class SaveSystem
 {
-    private static string SavePath => Path.Combine(Application.persistentDataPath, "save.json");
-
-    public static bool HasSave()
+    public static bool HasSave(string saveKey)
     {
-        return File.Exists(SavePath);
+        return File.Exists(GetSavePath(saveKey));
     }
 
-    public static void SaveGame(GameData data)
+    public static void SaveGame(GameData data, string saveKey)
     {
         try
         {
@@ -22,19 +20,20 @@ public static class SaveSystem
             data.EnsureInitialized();
 
             string json = JsonUtility.ToJson(data, true);
+            string savePath = GetSavePath(saveKey);
 
             // Atomic write: write to temp, then replace
-            string dir = Path.GetDirectoryName(SavePath);
+            string dir = Path.GetDirectoryName(savePath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            string tempPath = SavePath + ".tmp";
+            string tempPath = savePath + ".tmp";
             File.WriteAllText(tempPath, json);
 
-            if (File.Exists(SavePath))
-                File.Replace(tempPath, SavePath, null);
+            if (File.Exists(savePath))
+                File.Replace(tempPath, savePath, null);
             else
-                File.Move(tempPath, SavePath);
+                File.Move(tempPath, savePath);
         }
         catch (Exception e)
         {
@@ -42,14 +41,15 @@ public static class SaveSystem
         }
     }
 
-    public static GameData LoadGame()
+    public static GameData LoadGame(string saveKey)
     {
-        if (!File.Exists(SavePath))
+        string savePath = GetSavePath(saveKey);
+        if (!File.Exists(savePath))
             return null;
 
         try
         {
-            string json = File.ReadAllText(SavePath);
+            string json = File.ReadAllText(savePath);
             var data = JsonUtility.FromJson<GameData>(json);
             if (data == null)
             {
@@ -67,24 +67,52 @@ public static class SaveSystem
         }
     }
 
-    public static void DeleteSaveFile()
+    public static void DeleteSaveFile(string saveKey)
     {
+        string savePath = GetSavePath(saveKey);
         try
         {
-            if (File.Exists(SavePath))
+            if (File.Exists(savePath))
             {
-                File.Delete(SavePath);
-                Debug.Log($"SaveSystem: Save data cleared at '{SavePath}'.");
+                File.Delete(savePath);
+                Debug.Log($"SaveSystem: Save data cleared at '{savePath}'.");
             }
             else
             {
-                Debug.LogWarning($"SaveSystem: No save data to clear at '{SavePath}'.");
+                Debug.LogWarning($"SaveSystem: No save data to clear at '{savePath}'.");
             }
         }
         catch (Exception e)
         {
             Debug.LogError($"Failed to clear save data: {e.Message}");
         }
+    }
+
+    private static string GetSavePath(string saveKey)
+    {
+        var normalizedKey = string.IsNullOrWhiteSpace(saveKey)
+            ? SparkPlugSaveKey.Compose(
+                SparkPlugSaveKey.DefaultSessionId,
+                SparkPlugSaveKey.DefaultSaveSlotId
+            )
+            : saveKey.Trim();
+        return Path.Combine(
+            Application.persistentDataPath,
+            MakeSafeFileName(normalizedKey) + ".json"
+        );
+    }
+
+    private static string MakeSafeFileName(string value)
+    {
+        var chars = value.ToCharArray();
+        var invalidChars = Path.GetInvalidFileNameChars();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (Array.IndexOf(invalidChars, chars[i]) >= 0)
+                chars[i] = '_';
+        }
+
+        return new string(chars);
     }
 
     private static GameData CreateNewGameData()

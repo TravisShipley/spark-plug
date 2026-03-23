@@ -51,6 +51,7 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 
     private readonly Stack<UiScreenView> stack = new();
     private Dictionary<string, UiScreenView> screenById;
+    private int lastEscapeConsumedFrame = -1;
 
     public UpgradeService UpgradeService { get; private set; }
     public UpgradeCatalog UpgradeCatalog { get; set; }
@@ -59,6 +60,8 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
     public ManagersScreenViewModel ManagersScreenViewModel { get; set; }
     public AdBoostScreenViewModel AdBoostScreenViewModel { get; set; }
     public PrestigeScreenViewModel PrestigeScreenViewModel { get; set; }
+    public bool HasOpenScreens => stack.Count > 0;
+    public bool ConsumedEscapeThisFrame => lastEscapeConsumedFrame == Time.frameCount;
 
     public void Initialize(UpgradeService upgradeService)
     {
@@ -141,7 +144,10 @@ public sealed class UiScreenManager : MonoBehaviour, IGeneratorLookup
 
             var top = stack.Peek();
             if (top != null && top.Dismissible && top.CloseOnEscape)
+            {
+                lastEscapeConsumedFrame = Time.frameCount;
                 CloseTop();
+            }
         }
     }
 

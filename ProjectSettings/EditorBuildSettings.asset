@@ -9,8 +9,14 @@ EditorBuildSettings:
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
-    path: Assets/Scenes/Root.unity
+    path: Assets/Scenes/Bootstrap.unity
+    guid: 508df70a18c4546b78aa36912a01ae93
+  - enabled: 1
+    path: Assets/Scenes/Orange.unity
     guid: 0ba85037e34cc4f709fe439e719d667b
+  - enabled: 1
+    path: Assets/Scenes/Llama.unity
+    guid: 0fac72935687947c1b6881f279174add
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 5af3021abae9b40be8484120b2fec091,
       type: 2}

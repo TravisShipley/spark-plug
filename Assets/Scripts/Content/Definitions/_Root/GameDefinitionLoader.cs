@@ -11,6 +11,11 @@ public static class GameDefinitionLoader
     public const string DefaultAddressableKey = "game_definition";
     public const string DefaultResourcesFallbackKey = "Data/game_definition";
 
+    public static GameDefinition LoadFromJsonText(string json, string source = "runtime JSON")
+    {
+        return LoadFromJson(json, source);
+    }
+
     public static GameDefinition LoadFromFile(string projectRelativePath = DefaultFilePath)
     {
         var full = Path.GetFullPath(projectRelativePath);
