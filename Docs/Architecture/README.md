@@ -6,11 +6,12 @@ Use this folder to understand how the runtime is structured and where behavior s
 
 1. `MentalModel.md`
 2. `Overview.md`
-3. `SystemMap.md`
-4. `ArchitectureRules.md`
-5. `ServiceResponsibilities.md`
-6. `SimulationModel.md`
-7. `AntiPatterns.md`
+3. `BootAndSessions.md`
+4. `SystemMap.md`
+5. `ArchitectureRules.md`
+6. `ServiceResponsibilities.md`
+7. `SimulationModel.md`
+8. `AntiPatterns.md`
 
 ## Also Here
 

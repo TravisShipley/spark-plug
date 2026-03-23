@@ -17,6 +17,7 @@ Spark Plug is structured around **authoritative domain services**, **explicit co
 - **ViewModels** adapt domain state for UI consumption.
 - **Views** render and forward intent only.
 - **Composition roots** wire everything together once at startup.
+- **Bootstrappers** choose the session/definition before runtime composition starts.
 
 No scene searching. No hidden globals. No UI-owned game logic.
 
@@ -106,6 +107,21 @@ Examples:
 - The _only_ place where services and view models are instantiated
 - No gameplay logic
 - Construction and save-state loading are separate phases
+
+### 2.4.2 Bootstrappers
+
+**Rule:** Scene-level selection of which session to boot belongs in a `*Bootstrapper` `MonoBehaviour`, not in runtime services.
+
+Examples:
+
+- `GameSessionBootstrapper`
+
+**Guidelines:**
+
+- Resolve authoring assets and scene/menu overrides before runtime starts
+- Convert authoring data into plain runtime config objects
+- Hand runtime-only data into `GameCompositionRoot`
+- Do not let downstream services query scene names or `ScriptableObject` assets
 
 ### 2.4.1 Builders, Composers, and Factories
 
@@ -229,6 +245,7 @@ Examples:
 - Disk writes are debounced and scheduled internally
 - Other services never call `SaveSystem` directly
 - Scene reset is orchestrated by the composition root
+- Save keys must be namespaced by runtime session identity, not by scene name
 
 ---
 

@@ -31,6 +31,7 @@ Primary doc sections:
 Key references:
 
 - `Docs/Architecture/MentalModel.md` core runtime/economy mental model
+- `Docs/Architecture/BootAndSessions.md` boot flow, launcher/session wiring, and save namespacing
 - `Docs/Data/DatasheetGuide.md` Google Sheets authoring and table mapping guide
 - `Docs/Architecture/ArchitectureRules.md` current UI/domain ownership and command-binding rules
 

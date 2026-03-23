@@ -18,7 +18,7 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 | `WalletService` | Currency balances, spend/earn validation | `SaveService` |
 | `GeneratorService` | Generator state, cycle timing, output calculation | `SaveService` |
 | `UpgradeService` | Purchase state/rank and effect application | `SaveService` |
-| `SaveService` | In-memory `GameData`, disk persistence scheduling | Disk (`SaveSystem`) |
+| `SaveService` | In-memory `GameData`, session-scoped disk persistence scheduling | Disk (`SaveSystem`) |
 | `TickService` | Shared simulation time stream | n/a |
 | `UiScreenService` | Screen orchestration boundary for UI | n/a |
 | `GameDefinitionService` | Runtime game-definition loading, catalogs, and lookups | n/a |
@@ -46,6 +46,7 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 
 - Owns persistence boundary and disk write scheduling.
 - Only service allowed to touch `SaveSystem`.
+- Persists player facts into a session-scoped save namespace derived from `sessionId` and `saveSlotId`.
 
 ### TickService
 

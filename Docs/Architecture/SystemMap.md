@@ -15,9 +15,19 @@ This document provides a runtime mental model and ownership map.
 ```text
 Google Sheets
   -> Importer
-  -> game_definition.json
-  -> GameDefinitionService
+  -> Assets/Data/Definitions/*.json
+  -> GameSessionConfigAsset
+
+Bootstrap Scene / Menu
+  -> PrototypeLaunchService
+  -> SparkPlugBootContext
+
+Prototype Scene
+  -> GameSessionBootstrapper
+  -> SparkPlugRuntimeConfig
   -> GameCompositionRoot
+      -> GameDefinitionService
+      -> SaveService
       -> Services
       -> ViewModels
       -> Views
@@ -28,7 +38,7 @@ Google Sheets
 ### Content to Runtime
 
 ```text
-Sheets -> Importer -> Pack JSON -> Catalogs/Definitions -> Services
+Sheets -> Importer -> Definition JSON -> Session Config -> Runtime Config -> Catalogs/Definitions -> Services
 ```
 
 ### Player Action
@@ -43,6 +53,12 @@ View input -> ViewModel command -> Service mutation -> SaveService
 Service reactive state -> ViewModel projection -> View rendering
 ```
 
+### Session Launch
+
+```text
+Bootstrap UI -> PrototypeLaunchService -> SparkPlugBootContext -> Scene Load -> GameSessionBootstrapper -> GameCompositionRoot
+```
+
 ## 3. State Ownership
 
 | State Type               | Owner              | Persisted |
@@ -51,6 +67,7 @@ Service reactive state -> ViewModel projection -> View rendering
 | Player facts             | SaveService        | Yes       |
 | Simulation derived state | Domain services    | No        |
 | UI presentation state    | Views              | No        |
+| Pending selected session | SparkPlugBootContext | No      |
 
 ## 4. Where to Add New Work
 
@@ -58,5 +75,6 @@ Service reactive state -> ViewModel projection -> View rendering
 - New simulation mechanic: new/extended Service
 - New UI screen: ViewModel + View (+ screen wiring if needed)
 - New content feature: schema/import + service integration
+- New playable prototype: `GameSessionConfigAsset` + scene/build-settings wiring + optional launcher entry
 
 For constraints and forbidden patterns, see `ArchitectureRules.md`.

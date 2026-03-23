@@ -12,7 +12,30 @@ Quickly verify the core loop still works end-to-end after changes:
 - reload and verify persistence
 
 ## Content Pack Assumptions
-This checklist is written for `Assets/Data/game_definition.json`:
+This checklist is written for a selected prototype session and its assigned imported definition `TextAsset`.
+
+Typical current examples might look like:
+
+- `Assets/Data/Definitions/proto_llama.json`
+- `Assets/Data/Definitions/proto_orange.json`
+
+These filenames are examples only and are not considered stable.
+
+If you are testing a specific session:
+
+- note its `sessionId`
+- note its `saveSlotId` (usually `default`)
+- note the scene it boots
+
+The save namespace for the run will be:
+
+- `sparkplug.{sessionId}.{saveSlotId}`
+
+Example:
+
+- `sparkplug.proto_llama.default`
+
+The rest of this checklist still assumes a pack with:
 - zone: `zone.main`
 - node instances:
   - `nodeInstance.producer.apple`
@@ -28,7 +51,7 @@ This checklist is written for `Assets/Data/game_definition.json`:
 Use one of these existing reset paths before each smoke run:
 
 1. In play mode, press the in-game reset/clear-save flow (if present in your scene).
-2. In editor menu, use `SparkPlug/Smoke Test/Reset Save` (if `SparkPlugSmokeTestRunner` is present).
+2. In editor menu, use `SparkPlug/Smoke Test/Reset Save` for the default smoke-test save namespace (if `SparkPlugSmokeTestRunner` is present).
 
 Expected outcome:
 - next play start behaves like a brand-new run from content defaults
@@ -92,3 +115,8 @@ Use `SparkPlug/Smoke Test/Print Current State` to print one grouped snapshot:
 - fired milestones
 - milestone rank by node instance
 
+For session-based launches, also verify:
+
+- the intended prototype scene booted
+- the correct session config was used
+- save data does not leak across different `sessionId` values

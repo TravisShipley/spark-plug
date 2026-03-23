@@ -15,12 +15,14 @@ This document defines where each type of data lives and who can mutate it.
 | Data | Authority | Location | Mutated By |
 | --- | --- | --- | --- |
 | Game content (nodes, upgrades, etc.) | Google Sheets | External | Designers |
-| Imported pack | JSON (`game_definition.json`) | `Assets/Data` | Importer only |
+| Imported definition | JSON (`*.json`) | `Assets/Data/Definitions` | Importer only |
+| Session boot config | `GameSessionConfigAsset` | Unity assets | Developers/designers |
 
 Rules:
 
 - Treat imported content as read-only at runtime.
 - Change content through sheets + importer, never manual JSON edits.
+- Treat `GameSessionConfigAsset` as authoring input to boot only, not runtime authority.
 
 ## 2. Player Facts
 
@@ -29,11 +31,13 @@ Rules:
 | Wallet balances | `SaveService` | `GameData` | Domain services via `SaveService` |
 | Generator state | `SaveService` | `GameData` | Domain services via `SaveService` |
 | Purchased upgrades | `SaveService` | `GameData` | `UpgradeService` via `SaveService` |
+| Save namespace selection | runtime boot config | save key (`sparkplug.{sessionId}.{saveSlotId}`) | boot path only |
 
 Rules:
 
 - Only `SaveService` writes to disk.
 - Only facts are persisted.
+- Save isolation is determined before runtime boot and remains stable for the session lifetime.
 
 ## 3. Derived Runtime State
 
@@ -78,4 +82,5 @@ Related docs:
 
 - `../Architecture/ArchitectureRules.md` (constraints)
 - `../Architecture/SystemMap.md` (runtime flow)
+- `../Architecture/BootAndSessions.md` (boot/session flow)
 - `ContentImportWorkflow.md` (import process)
