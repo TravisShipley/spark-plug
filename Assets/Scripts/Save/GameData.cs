@@ -30,6 +30,13 @@ public class GameData : ISerializationCallbackReceiver
         public bool IsAutomated;
         public bool IsAutomationPurchased;
         public int Level;
+
+        // Explicit runtime snapshot used to restore manual/auto cycle state.
+        public bool HasRuntimeSnapshot;
+        public bool WasRunning;
+        public bool HasPendingPayout;
+        public double CycleElapsedSeconds;
+        public double PendingPayout;
     }
 
     [Serializable]
@@ -172,7 +179,6 @@ public class GameData : ISerializationCallbackReceiver
 
             state.Id = (state.Id ?? string.Empty).Trim();
             state.IsAutomationPurchased = state.IsAutomationPurchased || state.IsAutomated;
-
             if (state.IsOwned)
                 state.IsEnabled = true;
 
@@ -190,6 +196,22 @@ public class GameData : ISerializationCallbackReceiver
 
             if (!state.IsOwned)
                 state.Level = 0;
+
+            if (double.IsNaN(state.CycleElapsedSeconds) || double.IsInfinity(state.CycleElapsedSeconds))
+                state.CycleElapsedSeconds = 0d;
+            if (state.CycleElapsedSeconds < 0d)
+                state.CycleElapsedSeconds = 0d;
+
+            if (double.IsNaN(state.PendingPayout) || double.IsInfinity(state.PendingPayout))
+                state.PendingPayout = 0d;
+            if (state.PendingPayout < 0d)
+                state.PendingPayout = 0d;
+
+            if (!state.HasPendingPayout)
+                state.PendingPayout = 0d;
+
+            if (state.HasPendingPayout)
+                state.WasRunning = false;
 
             // Write legacy field for forward/backward compatibility.
             state.IsAutomated = state.IsAutomationPurchased;

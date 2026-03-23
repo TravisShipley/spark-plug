@@ -10,6 +10,7 @@ public class GeneratorModel
     public bool IsAutomated;
 
     // runtime-only (not serialized)
+    [NonSerialized] public bool WasRunning;
     [NonSerialized] public double CycleElapsedSeconds;
     [NonSerialized] public double PendingPayout;
     [NonSerialized] public bool HasPendingPayout;

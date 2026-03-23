@@ -11,6 +11,7 @@ public class GeneratorService : IDisposable
     private readonly WalletService wallet;
     private readonly TickService tickService;
     private readonly ModifierService modifierService;
+    private readonly SaveService saveService;
     private readonly GameEventStream gameEventStream;
 
     private double lastIntervalSeconds;
@@ -85,10 +86,19 @@ public class GeneratorService : IDisposable
         WalletService wallet,
         TickService tickService,
         ModifierService modifierService,
+        SaveService saveService,
         GameEventStream gameEventStream
     )
     {
         this.model = model;
+        this.definition = definition ?? throw new ArgumentNullException(nameof(definition));
+        this.wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
+        this.tickService = tickService ?? throw new ArgumentNullException(nameof(tickService));
+        this.modifierService =
+            modifierService ?? throw new ArgumentNullException(nameof(modifierService));
+        this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
+        this.gameEventStream =
+            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
 
         level = new ReactiveProperty<int>(model.Level);
         isOwned = new ReactiveProperty<bool>(model.IsOwned);
@@ -98,25 +108,17 @@ public class GeneratorService : IDisposable
         previousMilestoneAtLevel = new ReactiveProperty<int>(0);
         nextMilestoneAtLevel = new ReactiveProperty<int>(0);
         milestoneProgressRatio = new ReactiveProperty<float>(0f);
-
-        // Running rule: owned generators start running immediately; unowned do not run.
-        isRunning = new ReactiveProperty<bool>(model.IsOwned);
-
-        this.definition = definition;
-        this.wallet = wallet;
-        this.tickService = tickService;
-        this.modifierService =
-            modifierService ?? throw new ArgumentNullException(nameof(modifierService));
-        this.gameEventStream =
-            gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
+        isRunning = new ReactiveProperty<bool>(false);
 
         ValidateMilestoneLevels(definition.MilestoneLevels);
         RefreshFromModifiers();
-        RefreshEconomyState();
-        RefreshCanCollectState();
-
         cycleDurationSeconds.Value = ComputeCycleDurationSeconds(speedMultiplier.Value);
         lastIntervalSeconds = cycleDurationSeconds.Value;
+        NormalizeLoadedRuntimeState();
+        isRunning.Value = ResolveInitialRunningState();
+        RefreshEconomyState();
+        RefreshCanCollectState();
+        PersistRuntimeState(requestSave: false);
 
         tickService.OnTick.Subscribe(_ => OnTick()).AddTo(disposables);
         this.modifierService.Changed.Subscribe(_ => RefreshFromModifiers()).AddTo(disposables);
@@ -145,6 +147,7 @@ public class GeneratorService : IDisposable
                 lastIntervalSeconds = newInterval;
 
                 cycleProgress.Value = model.CycleElapsedSeconds / newInterval;
+                PersistRuntimeState(requestSave: false);
             })
             .AddTo(disposables);
 
@@ -174,8 +177,11 @@ public class GeneratorService : IDisposable
         if (!isOwned.Value)
         {
             model.CycleElapsedSeconds = 0;
+            model.PendingPayout = 0;
+            model.HasPendingPayout = false;
             cycleProgress.Value = 0;
             isRunning.Value = false;
+            PersistRuntimeState(requestSave: false);
             return;
         }
 
@@ -183,8 +189,13 @@ public class GeneratorService : IDisposable
         bool shouldRun = IsAutomationActive() || isRunning.Value;
         if (!shouldRun)
         {
-            model.CycleElapsedSeconds = 0;
-            cycleProgress.Value = 0;
+            if (!model.HasPendingPayout)
+            {
+                model.CycleElapsedSeconds = 0;
+                cycleProgress.Value = 0;
+            }
+
+            PersistRuntimeState(requestSave: false);
             return;
         }
 
@@ -202,7 +213,7 @@ public class GeneratorService : IDisposable
             {
                 model.CycleElapsedSeconds -= interval;
                 QueueCompletedCyclePayout();
-                Collect();
+                CollectInternal(requestSave: false, publishCycleCompleted: true);
             }
         }
         else
@@ -213,13 +224,21 @@ public class GeneratorService : IDisposable
                 model.CycleElapsedSeconds = 0;
                 QueueCompletedCyclePayout();
                 isRunning.Value = false;
+                PersistRuntimeState(requestSave: true);
             }
         }
 
         cycleProgress.Value = model.CycleElapsedSeconds / interval;
+        if (isAutomated.Value || model.WasRunning || model.CycleElapsedSeconds > 0d)
+            PersistRuntimeState(requestSave: false);
     }
 
     public void Collect()
+    {
+        CollectInternal(requestSave: true, publishCycleCompleted: true);
+    }
+
+    private void CollectInternal(bool requestSave, bool publishCycleCompleted)
     {
         if (!model.HasPendingPayout || model.PendingPayout <= 0)
             return;
@@ -230,7 +249,10 @@ public class GeneratorService : IDisposable
 
         wallet.AddRaw(definition.OutputResourceId, amount);
         RefreshCanCollectState();
-        cycleCompleted.OnNext(Unit.Default);
+        PersistRuntimeState(requestSave);
+
+        if (publishCycleCompleted)
+            cycleCompleted.OnNext(Unit.Default);
     }
 
     private double CalculateOutput()
@@ -241,16 +263,7 @@ public class GeneratorService : IDisposable
 
     private void QueueCompletedCyclePayout()
     {
-        var payout = CalculateOutput();
-        var gainMultiplier = resourceGainMultiplier.Value;
-        if (
-            double.IsNaN(gainMultiplier)
-            || double.IsInfinity(gainMultiplier)
-            || gainMultiplier <= 0
-        )
-            gainMultiplier = 1.0;
-
-        model.PendingPayout += payout * gainMultiplier;
+        model.PendingPayout += CalculateCompletedCyclePayoutAmount();
         model.HasPendingPayout = model.PendingPayout > 0;
         RefreshCanCollectState();
     }
@@ -291,6 +304,7 @@ public class GeneratorService : IDisposable
 
         // Automation implies continuous running from now on
         isRunning.Value = true;
+        PersistRuntimeState(requestSave: true);
 
         return true;
     }
@@ -310,6 +324,7 @@ public class GeneratorService : IDisposable
             isOwned.Value = true;
             // Newly owned generators begin running immediately
             isRunning.Value = true;
+            PersistRuntimeState(requestSave: true);
         }
 
         return true;
@@ -357,6 +372,8 @@ public class GeneratorService : IDisposable
 
         // Start a single cycle
         isRunning.Value = true;
+        model.CycleElapsedSeconds = Math.Max(0d, model.CycleElapsedSeconds);
+        PersistRuntimeState(requestSave: true);
     }
 
     private int ResolveLevelsToNextMilestone()
@@ -630,6 +647,7 @@ public class GeneratorService : IDisposable
 
         RefreshEconomyState();
         RefreshCanCollectState();
+        PersistRuntimeState(requestSave: false);
     }
 
     private void RefreshMilestoneProgress(int currentLevel)
@@ -718,5 +736,150 @@ public class GeneratorService : IDisposable
                 return;
             }
         }
+    }
+
+    private void NormalizeLoadedRuntimeState()
+    {
+        model.CycleElapsedSeconds = SanitizeNonNegative(model.CycleElapsedSeconds);
+        model.PendingPayout = SanitizeNonNegative(model.PendingPayout);
+
+        if (!isOwned.Value)
+        {
+            if (model.WasRunning || model.HasPendingPayout || model.CycleElapsedSeconds > 0d || model.PendingPayout > 0d)
+            {
+                Debug.LogError(
+                    $"GeneratorService[{definition.Id}]: Loaded runtime snapshot for an unowned generator. Clearing invalid runtime state."
+                );
+            }
+
+            model.WasRunning = false;
+            model.HasPendingPayout = false;
+            model.CycleElapsedSeconds = 0d;
+            model.PendingPayout = 0d;
+            cycleProgress.Value = 0d;
+            return;
+        }
+
+        if (model.HasPendingPayout && model.PendingPayout <= 0d)
+        {
+            Debug.LogError(
+                $"GeneratorService[{definition.Id}]: Loaded pending-payout state without a payout amount. Reconstructing one cycle of payout."
+            );
+            model.PendingPayout = CalculateCompletedCyclePayoutAmount();
+            model.HasPendingPayout = model.PendingPayout > 0d;
+        }
+
+        if (model.HasPendingPayout)
+        {
+            if (model.WasRunning || model.CycleElapsedSeconds > 0d)
+            {
+                Debug.LogError(
+                    $"GeneratorService[{definition.Id}]: Loaded both running progress and pending payout. Preserving pending payout and clearing progress."
+                );
+            }
+
+            model.WasRunning = false;
+            model.CycleElapsedSeconds = 0d;
+            cycleProgress.Value = 0d;
+            return;
+        }
+
+        var interval = Math.Max(0.0001d, cycleDurationSeconds.Value);
+
+        if (IsAutomationActive() && !model.WasRunning)
+        {
+            Debug.LogError(
+                $"GeneratorService[{definition.Id}]: Automated generator loaded idle without pending payout. Resuming continuous automation."
+            );
+            model.WasRunning = true;
+        }
+
+        if (!model.WasRunning && model.CycleElapsedSeconds > 0d)
+        {
+            Debug.LogError(
+                $"GeneratorService[{definition.Id}]: Loaded elapsed time for a non-running generator. Clearing elapsed time."
+            );
+            model.CycleElapsedSeconds = 0d;
+        }
+
+        if (model.CycleElapsedSeconds < interval)
+        {
+            cycleProgress.Value = interval > 0d ? model.CycleElapsedSeconds / interval : 0d;
+            return;
+        }
+
+        if (IsAutomationActive())
+        {
+            model.CycleElapsedSeconds %= interval;
+            model.WasRunning = true;
+            cycleProgress.Value = interval > 0d ? model.CycleElapsedSeconds / interval : 0d;
+            return;
+        }
+
+        Debug.LogError(
+            $"GeneratorService[{definition.Id}]: Loaded completed manual cycle without pending payout. Converting it to a waiting-to-collect state."
+        );
+        model.CycleElapsedSeconds = 0d;
+        model.PendingPayout = CalculateCompletedCyclePayoutAmount();
+        model.HasPendingPayout = model.PendingPayout > 0d;
+        model.WasRunning = false;
+        cycleProgress.Value = 0d;
+    }
+
+    private bool ResolveInitialRunningState()
+    {
+        if (!isOwned.Value)
+            return false;
+
+        if (model.HasPendingPayout)
+            return false;
+
+        if (IsAutomationActive())
+            return true;
+
+        return model.WasRunning;
+    }
+
+    private void PersistRuntimeState(bool requestSave)
+    {
+        var running =
+            isOwned.Value
+            && !model.HasPendingPayout
+            && (IsAutomationActive() || isRunning.Value);
+
+        model.WasRunning = running;
+
+        saveService.SetNodeInstanceRuntimeState(
+            definition.Id,
+            model.WasRunning,
+            model.HasPendingPayout,
+            model.CycleElapsedSeconds,
+            model.PendingPayout,
+            requestSave
+        );
+    }
+
+    private static double SanitizeNonNegative(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+            return 0d;
+
+        return Math.Max(0d, value);
+    }
+
+    private double CalculateCompletedCyclePayoutAmount()
+    {
+        var payout = CalculateOutput();
+        var gainMultiplier = resourceGainMultiplier.Value;
+        if (
+            double.IsNaN(gainMultiplier)
+            || double.IsInfinity(gainMultiplier)
+            || gainMultiplier <= 0
+        )
+        {
+            gainMultiplier = 1.0;
+        }
+
+        return payout * gainMultiplier;
     }
 }

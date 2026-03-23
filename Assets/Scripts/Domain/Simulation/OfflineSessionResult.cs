@@ -11,10 +11,22 @@ public sealed class OfflineSessionResult
         public double amount;
     }
 
+    [Serializable]
+    public sealed class GeneratorStateUpdate
+    {
+        public string nodeInstanceId;
+        public bool wasRunning;
+        public bool hasPendingPayout;
+        public double cycleElapsedSeconds;
+        public double pendingPayout;
+    }
+
     public long secondsAway;
     public List<ResourceGain> resourceGains = new();
+    public List<GeneratorStateUpdate> generatorStateUpdates = new();
 
     public IReadOnlyList<ResourceGain> ResourceGains => resourceGains;
+    public IReadOnlyList<GeneratorStateUpdate> GeneratorStateUpdates => generatorStateUpdates;
 
     public void AddGain(string resourceId, double amount)
     {
@@ -42,9 +54,55 @@ public sealed class OfflineSessionResult
         resourceGains.Add(new ResourceGain { resourceId = id, amount = amount });
     }
 
+    public void SetGeneratorState(
+        string nodeInstanceId,
+        bool wasRunning,
+        bool hasPendingPayout,
+        double cycleElapsedSeconds,
+        double pendingPayout
+    )
+    {
+        var id = NormalizeResourceId(nodeInstanceId);
+        if (string.IsNullOrEmpty(id))
+            return;
+
+        generatorStateUpdates ??= new List<GeneratorStateUpdate>();
+        for (int i = 0; i < generatorStateUpdates.Count; i++)
+        {
+            var entry = generatorStateUpdates[i];
+            if (entry == null)
+                continue;
+
+            if (!string.Equals(NormalizeResourceId(entry.nodeInstanceId), id, StringComparison.Ordinal))
+                continue;
+
+            entry.wasRunning = wasRunning;
+            entry.hasPendingPayout = hasPendingPayout;
+            entry.cycleElapsedSeconds = cycleElapsedSeconds;
+            entry.pendingPayout = pendingPayout;
+            return;
+        }
+
+        generatorStateUpdates.Add(
+            new GeneratorStateUpdate
+            {
+                nodeInstanceId = id,
+                wasRunning = wasRunning,
+                hasPendingPayout = hasPendingPayout,
+                cycleElapsedSeconds = cycleElapsedSeconds,
+                pendingPayout = pendingPayout,
+            }
+        );
+    }
+
     public bool HasMeaningfulGain(double epsilon = 0.0000001d)
     {
         return TotalGain() > epsilon;
+    }
+
+    public bool HasGeneratorStateChanges()
+    {
+        return generatorStateUpdates != null && generatorStateUpdates.Count > 0;
     }
 
     public double TotalGain()

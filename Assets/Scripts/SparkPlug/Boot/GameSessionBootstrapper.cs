@@ -12,8 +12,23 @@ public sealed class GameSessionBootstrapper : MonoBehaviour
     [SerializeField]
     private GameCompositionRoot compositionRoot;
 
+    private bool bootAttempted;
+
     private void Awake()
     {
+        if (!TryResolveCompositionRoot(out _))
+        {
+            enabled = false;
+        }
+    }
+
+    private void Start()
+    {
+        if (!enabled || bootAttempted)
+            return;
+
+        bootAttempted = true;
+
         if (!TryResolveCompositionRoot(out var root))
         {
             enabled = false;

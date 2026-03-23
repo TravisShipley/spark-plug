@@ -540,6 +540,9 @@ public class GameCompositionRoot : MonoBehaviour
         var secondsAway = Math.Max(0, now - lastSeen);
         var result = offlineProgressCalculator.Calculate(secondsAway, saveService.Data);
 
+        if (result != null && result.HasGeneratorStateChanges())
+            saveService.ApplyOfflineSessionResult(result, requestSave: false);
+
         saveService.SetLastSeenUnixSeconds(now, requestSave: true);
 
         if (result != null && result.HasMeaningfulGain())

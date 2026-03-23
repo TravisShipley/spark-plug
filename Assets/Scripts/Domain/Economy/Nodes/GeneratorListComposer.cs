@@ -168,12 +168,16 @@ public class GeneratorListComposer
         string id = generatorDefinition.Id;
 
         LoadGeneratorState(
-            saveService.Data,
+            saveService,
             id,
             nodeInstance,
             out bool isOwned,
             out bool isAutomated,
-            out int level
+            out int level,
+            out bool wasRunning,
+            out bool hasPendingPayout,
+            out double cycleElapsedSeconds,
+            out double pendingPayout
         );
 
         var model = new GeneratorModel
@@ -182,7 +186,10 @@ public class GeneratorListComposer
             Level = level,
             IsOwned = isOwned,
             IsAutomated = isAutomated,
-            CycleElapsedSeconds = 0,
+            WasRunning = wasRunning,
+            CycleElapsedSeconds = cycleElapsedSeconds,
+            HasPendingPayout = hasPendingPayout,
+            PendingPayout = pendingPayout,
         };
 
         generatorModels.Add(model);
@@ -193,6 +200,7 @@ public class GeneratorListComposer
             walletService,
             tickService,
             modifierService,
+            saveService,
             gameEventStream
         );
 
@@ -540,27 +548,35 @@ public class GeneratorListComposer
     }
 
     private static void LoadGeneratorState(
-        GameData data,
+        SaveService saveService,
         string id,
         NodeInstanceDefinition nodeInstance,
         out bool isOwned,
         out bool isAutomated,
-        out int level
+        out int level,
+        out bool wasRunning,
+        out bool hasPendingPayout,
+        out double cycleElapsedSeconds,
+        out double pendingPayout
     )
     {
         isOwned = nodeInstance?.initialState?.enabled ?? false;
         isAutomated = false;
         level = Math.Max(0, nodeInstance?.initialState?.level ?? 0);
+        wasRunning = isOwned;
+        hasPendingPayout = false;
+        cycleElapsedSeconds = 0d;
+        pendingPayout = 0d;
 
-        if (data != null && data.Generators != null)
+        if (saveService != null && saveService.TryGetGeneratorState(id, out var savedGen))
         {
-            var savedGen = data.Generators.Find(g => g != null && g.Id == id);
-            if (savedGen != null)
-            {
-                isOwned = savedGen.IsOwned;
-                isAutomated = savedGen.IsAutomationPurchased || savedGen.IsAutomated;
-                level = savedGen.Level;
-            }
+            isOwned = savedGen.IsOwned;
+            isAutomated = savedGen.IsAutomationPurchased || savedGen.IsAutomated;
+            level = savedGen.Level;
+            wasRunning = savedGen.WasRunning;
+            hasPendingPayout = savedGen.HasPendingPayout;
+            cycleElapsedSeconds = savedGen.CycleElapsedSeconds;
+            pendingPayout = savedGen.PendingPayout;
         }
 
         // Normalize: automation implies ownership; ownership implies at least level 1
@@ -570,6 +586,20 @@ public class GeneratorListComposer
             level = 1;
         if (!isOwned)
             level = 0;
+
+        if (!isOwned)
+        {
+            wasRunning = false;
+            hasPendingPayout = false;
+            cycleElapsedSeconds = 0d;
+            pendingPayout = 0d;
+            return;
+        }
+
+        if (hasPendingPayout)
+            wasRunning = false;
+        else if (!wasRunning)
+            cycleElapsedSeconds = 0d;
     }
 
     private void WireGeneratorPersistence(string id, GeneratorService service)

@@ -8,8 +8,10 @@ Manual test checklist:
 1) Start with active automated generators and note current balances.
 2) Apply a 60 second warp and verify balances increase consistently with live/offline math.
 3) Apply a warp longer than the passive offline cap and verify the full requested duration is used.
-4) Execute a timeWarp trigger/reward action and verify it completes successfully.
-5) Confirm no per-cycle trigger spam or replay occurs during the warp.
+4) Start a manual generator mid-cycle, warp short of completion, and verify the remaining time decreases correctly.
+5) Start a manual generator near completion, warp past the finish, and verify it waits for collect instead of auto-restarting.
+6) Execute a timeWarp trigger/reward action and verify it completes successfully.
+7) Confirm no per-cycle trigger spam or replay occurs during the warp.
 */
 public sealed class TimeWarpService
 {
@@ -61,11 +63,14 @@ public sealed class TimeWarpService
             respectOfflineCap: false
         );
 
+        if (result.HasGeneratorStateChanges())
+            saveService.ApplyOfflineSessionResult(result, requestSave: false);
+
         // v1 policy: apply only the net authoritative result. Do not replay per-cycle
         // events or trigger history for each simulated step.
         walletService.ApplyOfflineEarnings(result);
 
-        if (result.HasMeaningfulGain())
+        if (result.HasMeaningfulGain() || result.HasGeneratorStateChanges())
             saveService.SaveNow();
 
         gameEventStream.PublishTimeWarpCompleted(result);

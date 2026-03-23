@@ -264,17 +264,8 @@ public sealed class SaveService : IDisposable
         if (!owned)
             level = 0;
 
-        var entry = Data.Generators.Find(
-            g => g != null && string.Equals(NormalizeId(g.Id), id, StringComparison.Ordinal)
-        );
-
+        var entry = EnsureGeneratorStateEntry(id);
         bool changed = false;
-        if (entry == null)
-        {
-            entry = new GameData.GeneratorStateData { Id = id };
-            Data.Generators.Add(entry);
-            changed = true;
-        }
 
         if (entry.IsOwned != owned)
         {
@@ -306,6 +297,8 @@ public sealed class SaveService : IDisposable
             changed = true;
         }
 
+        NormalizeGeneratorRuntimeSnapshot(entry, useLegacyDefaultWhenMissing: !entry.HasRuntimeSnapshot);
+
         if (enabled)
         {
             if (Data.UnlockedNodeInstanceIds.Add(id))
@@ -319,6 +312,109 @@ public sealed class SaveService : IDisposable
 
         if (changed && requestSave)
             RequestSave();
+    }
+
+    public void SetNodeInstanceRuntimeState(
+        string nodeInstanceId,
+        bool wasRunning,
+        bool hasPendingPayout,
+        double cycleElapsedSeconds,
+        double pendingPayout,
+        bool requestSave = true
+    )
+    {
+        var id = NormalizeId(nodeInstanceId);
+        if (string.IsNullOrEmpty(id))
+            return;
+
+        EnsureDataInitialized();
+        var entry = EnsureGeneratorStateEntry(id);
+        bool changed = false;
+
+        wasRunning = wasRunning && entry.IsOwned;
+        hasPendingPayout = hasPendingPayout && entry.IsOwned;
+        cycleElapsedSeconds = SanitizeNonNegative(cycleElapsedSeconds);
+        pendingPayout = SanitizeNonNegative(pendingPayout);
+
+        if (!hasPendingPayout)
+            pendingPayout = 0d;
+
+        if (hasPendingPayout)
+            wasRunning = false;
+
+        if (!wasRunning && !hasPendingPayout)
+            cycleElapsedSeconds = 0d;
+
+        if (!entry.IsOwned)
+        {
+            wasRunning = false;
+            hasPendingPayout = false;
+            cycleElapsedSeconds = 0d;
+            pendingPayout = 0d;
+        }
+
+        if (!entry.HasRuntimeSnapshot)
+        {
+            entry.HasRuntimeSnapshot = true;
+            changed = true;
+        }
+
+        if (entry.WasRunning != wasRunning)
+        {
+            entry.WasRunning = wasRunning;
+            changed = true;
+        }
+
+        if (entry.HasPendingPayout != hasPendingPayout)
+        {
+            entry.HasPendingPayout = hasPendingPayout;
+            changed = true;
+        }
+
+        if (Math.Abs(entry.CycleElapsedSeconds - cycleElapsedSeconds) >= 0.0000001d)
+        {
+            entry.CycleElapsedSeconds = cycleElapsedSeconds;
+            changed = true;
+        }
+
+        if (Math.Abs(entry.PendingPayout - pendingPayout) >= 0.0000001d)
+        {
+            entry.PendingPayout = pendingPayout;
+            changed = true;
+        }
+
+        if (changed && requestSave)
+            RequestSave();
+    }
+
+    public bool ApplyOfflineSessionResult(OfflineSessionResult result, bool requestSave = true)
+    {
+        if (result?.GeneratorStateUpdates == null || result.GeneratorStateUpdates.Count == 0)
+            return false;
+
+        bool changed = false;
+        for (int i = 0; i < result.GeneratorStateUpdates.Count; i++)
+        {
+            var update = result.GeneratorStateUpdates[i];
+            if (update == null || string.IsNullOrWhiteSpace(update.nodeInstanceId))
+                continue;
+
+            var before = Data;
+            SetNodeInstanceRuntimeState(
+                update.nodeInstanceId,
+                update.wasRunning,
+                update.hasPendingPayout,
+                update.cycleElapsedSeconds,
+                update.pendingPayout,
+                requestSave: false
+            );
+            changed = true;
+        }
+
+        if (changed && requestSave)
+            RequestSave();
+
+        return changed;
     }
 
     public void SetUpgradeRank(string upgradeId, int rank, bool requestSave = true)
@@ -422,6 +518,11 @@ public sealed class SaveService : IDisposable
                 Level = 0,
                 IsAutomationPurchased = false,
                 IsAutomated = false,
+                HasRuntimeSnapshot = true,
+                WasRunning = false,
+                HasPendingPayout = false,
+                CycleElapsedSeconds = 0d,
+                PendingPayout = 0d,
             };
             Data.Generators.Add(entry);
             changed = true;
@@ -502,6 +603,11 @@ public sealed class SaveService : IDisposable
                     Level = 0,
                     IsAutomationPurchased = false,
                     IsAutomated = false,
+                    HasRuntimeSnapshot = true,
+                    WasRunning = false,
+                    HasPendingPayout = false,
+                    CycleElapsedSeconds = 0d,
+                    PendingPayout = 0d,
                 }
             );
             changed = true;
@@ -598,6 +704,11 @@ public sealed class SaveService : IDisposable
                         Level = entry.Level,
                         IsAutomationPurchased = entry.IsAutomationPurchased,
                         IsAutomated = entry.IsAutomated,
+                        HasRuntimeSnapshot = entry.HasRuntimeSnapshot,
+                        WasRunning = entry.WasRunning,
+                        HasPendingPayout = entry.HasPendingPayout,
+                        CycleElapsedSeconds = entry.CycleElapsedSeconds,
+                        PendingPayout = entry.PendingPayout,
                     }
                 );
             }
@@ -791,6 +902,11 @@ public sealed class SaveService : IDisposable
                         Level = level,
                         IsAutomationPurchased = false,
                         IsAutomated = false,
+                        HasRuntimeSnapshot = true,
+                        WasRunning = owned,
+                        HasPendingPayout = false,
+                        CycleElapsedSeconds = 0d,
+                        PendingPayout = 0d,
                     }
                 );
 
@@ -1037,6 +1153,27 @@ public sealed class SaveService : IDisposable
             entry.Level = level;
             entry.IsAutomationPurchased = automationPurchased;
             entry.IsAutomated = automationPurchased;
+
+            if (saved.HasRuntimeSnapshot)
+            {
+                entry.HasRuntimeSnapshot = true;
+                entry.WasRunning = saved.WasRunning;
+                entry.HasPendingPayout = saved.HasPendingPayout;
+                entry.CycleElapsedSeconds = saved.CycleElapsedSeconds;
+                entry.PendingPayout = saved.PendingPayout;
+            }
+            else
+            {
+                // Migration path for pre-runtime-snapshot saves.
+                entry.HasRuntimeSnapshot = false;
+                entry.WasRunning = owned;
+                entry.HasPendingPayout = false;
+                entry.CycleElapsedSeconds = 0d;
+                entry.PendingPayout = 0d;
+                changed = true;
+            }
+
+            NormalizeGeneratorRuntimeSnapshot(entry, useLegacyDefaultWhenMissing: !saved.HasRuntimeSnapshot);
         }
 
         merged.Upgrades.Clear();
@@ -1176,6 +1313,100 @@ public sealed class SaveService : IDisposable
         return merged;
     }
 
+    public bool TryGetGeneratorState(string nodeInstanceId, out GameData.GeneratorStateData state)
+    {
+        state = null;
+        var id = NormalizeId(nodeInstanceId);
+        if (string.IsNullOrEmpty(id) || Data?.Generators == null)
+            return false;
+
+        state = Data.Generators.Find(
+            generator =>
+                generator != null && string.Equals(NormalizeId(generator.Id), id, StringComparison.Ordinal)
+        );
+        return state != null;
+    }
+
+    private GameData.GeneratorStateData EnsureGeneratorStateEntry(string nodeInstanceId)
+    {
+        var id = NormalizeId(nodeInstanceId);
+        if (string.IsNullOrEmpty(id))
+        {
+            throw new InvalidOperationException(
+                "SaveService.EnsureGeneratorStateEntry: nodeInstanceId is empty."
+            );
+        }
+
+        EnsureDataInitialized();
+        Data.Generators ??= new List<GameData.GeneratorStateData>();
+
+        var entry = Data.Generators.Find(
+            generator =>
+                generator != null && string.Equals(NormalizeId(generator.Id), id, StringComparison.Ordinal)
+        );
+        if (entry != null)
+            return entry;
+
+        entry = new GameData.GeneratorStateData
+        {
+            Id = id,
+            IsOwned = false,
+            IsEnabled = false,
+            IsAutomationPurchased = false,
+            IsAutomated = false,
+            Level = 0,
+            HasRuntimeSnapshot = true,
+            WasRunning = false,
+            HasPendingPayout = false,
+            CycleElapsedSeconds = 0d,
+            PendingPayout = 0d,
+        };
+        Data.Generators.Add(entry);
+        return entry;
+    }
+
+    private static void NormalizeGeneratorRuntimeSnapshot(
+        GameData.GeneratorStateData state,
+        bool useLegacyDefaultWhenMissing
+    )
+    {
+        if (state == null)
+            return;
+
+        if (!state.HasRuntimeSnapshot)
+        {
+            state.HasRuntimeSnapshot = true;
+            if (useLegacyDefaultWhenMissing)
+            {
+                state.WasRunning = state.IsOwned;
+                state.HasPendingPayout = false;
+                state.CycleElapsedSeconds = 0d;
+                state.PendingPayout = 0d;
+            }
+        }
+
+        state.CycleElapsedSeconds = SanitizeNonNegative(state.CycleElapsedSeconds);
+        state.PendingPayout = SanitizeNonNegative(state.PendingPayout);
+
+        if (!state.IsOwned)
+        {
+            state.WasRunning = false;
+            state.HasPendingPayout = false;
+            state.CycleElapsedSeconds = 0d;
+            state.PendingPayout = 0d;
+            return;
+        }
+
+        if (!state.HasPendingPayout)
+            state.PendingPayout = 0d;
+
+        if (state.HasPendingPayout)
+            state.WasRunning = false;
+
+        if (!state.WasRunning && !state.HasPendingPayout)
+            state.CycleElapsedSeconds = 0d;
+    }
+
     private void EnsureDataInitialized()
     {
         Data ??= new GameData();
@@ -1229,6 +1460,14 @@ public sealed class SaveService : IDisposable
     private static long GetCurrentUnixSeconds()
     {
         return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    }
+
+    private static double SanitizeNonNegative(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+            return 0d;
+
+        return Math.Max(0d, value);
     }
 
     private static string NormalizeId(string id)
