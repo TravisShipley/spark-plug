@@ -200,8 +200,8 @@ public static class GoogleSheetImporter
     [MenuItem("SparkPlug/Import All Definitions")]
     public static void ImportAll()
     {
-        var configs = FindConfigs();
-        if (configs.Count == 0)
+        var configPaths = FindConfigPaths();
+        if (configPaths.Count == 0)
         {
             EditorUtility.DisplayDialog(
                 "Import Failed",
@@ -215,13 +215,21 @@ public static class GoogleSheetImporter
 
         try
         {
-            for (int i = 0; i < configs.Count; i++)
+            for (int i = 0; i < configPaths.Count; i++)
             {
-                var config = configs[i];
+                var configPath = configPaths[i];
+                var config = AssetDatabase.LoadAssetAtPath<GoogleSheetImportConfig>(configPath);
+                if (config == null)
+                {
+                    throw new InvalidOperationException(
+                        $"GoogleSheetImporter: Could not load import config at '{configPath}'."
+                    );
+                }
+
                 EditorUtility.DisplayProgressBar(
                     "SparkPlug Import",
-                    $"Importing definition {i + 1}/{configs.Count}: {config.name}",
-                    configs.Count <= 0 ? 0f : (float)i / configs.Count
+                    $"Importing definition {i + 1}/{configPaths.Count}: {config.name}",
+                    configPaths.Count <= 0 ? 0f : (float)i / configPaths.Count
                 );
                 ImportInternal(config);
             }
@@ -358,14 +366,28 @@ public static class GoogleSheetImporter
     // Config / ID helpers
     // ----------------------------
 
-    private static List<GoogleSheetImportConfig> FindConfigs()
+    private static List<string> FindConfigPaths()
     {
         var guids = AssetDatabase.FindAssets("t:GoogleSheetImportConfig");
-        var configs = new List<GoogleSheetImportConfig>();
+        var paths = new List<string>();
         foreach (var guid in guids)
         {
             var path = AssetDatabase.GUIDToAssetPath(guid);
-            var config = AssetDatabase.LoadAssetAtPath<GoogleSheetImportConfig>(path);
+            if (!string.IsNullOrWhiteSpace(path))
+                paths.Add(path);
+        }
+
+        paths.Sort(StringComparer.OrdinalIgnoreCase);
+        return paths;
+    }
+
+    private static List<GoogleSheetImportConfig> FindConfigs()
+    {
+        var paths = FindConfigPaths();
+        var configs = new List<GoogleSheetImportConfig>(paths.Count);
+        for (int i = 0; i < paths.Count; i++)
+        {
+            var config = AssetDatabase.LoadAssetAtPath<GoogleSheetImportConfig>(paths[i]);
             if (config != null)
                 configs.Add(config);
         }
