@@ -1,4 +1,4 @@
-// Assets/Editor/GoogleSheetImporter.cs
+// Assets/Scripts/Content/Import/Editor/GoogleSheetImporter.cs
 //
 // SparkPlug - Google Sheet Importer (Index-driven, Sheets API v4)
 //
@@ -12,7 +12,7 @@
 // - Commented-out rows (first cell starts with "_" or "//" or blank) are ignored
 //
 // Notes:
-// - Requires a local-only Google Sheet Import Secrets asset for Sheets API v4
+// - Requires a local-only Google Sheets API key file for Sheets API v4
 // - Uses spreadsheet metadata to find sheets by name
 // - Fetches data via Sheets API values endpoint
 
@@ -36,7 +36,8 @@ public static class GoogleSheetImporter
     private const string CsvAiBundlePath = "Assets/Data/Csv/_sheets_export_for_ai.json";
     private const string DataAddressableGroupName = "Data";
     private const string DefaultDefinitionsDirectory = "Assets/Data/Definitions";
-    private const string LocalSheetsApiKeyPath = "Assets/Editor/Local/google_sheets_api_key.txt";
+    private const string LocalSheetsApiKeyPath =
+        "Assets/Scripts/Content/Import/Editor/Local/google_sheets_api_key.txt";
     private const string IndexSheetName = "__Index";
     private const int MaxSchemaValidationErrors = 25;
 

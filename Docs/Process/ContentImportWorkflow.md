@@ -51,17 +51,17 @@ The Google Sheets API key is no longer stored on `GoogleSheetImportConfig` asset
 
 Create a local-only text file at:
 
-- `Assets/Editor/Local/google_sheets_api_key.txt`
+- `Assets/Scripts/Content/Import/Editor/Local/google_sheets_api_key.txt`
 
 Rules:
 
 - put only the raw API key in the file
 - do not add labels, JSON, or extra whitespace intentionally
-- keep the file local; `Assets/Editor/Local/` is ignored by git
+- keep the file local; `Assets/Scripts/Content/Import/Editor/Local/` is ignored by git
 
 Recommended setup:
 
-1. create the folder `Assets/Editor/Local/` if it does not exist
+1. create the folder `Assets/Scripts/Content/Import/Editor/Local/` if it does not exist
 2. create `google_sheets_api_key.txt` inside that folder
 3. paste the Google Sheets API key as the file contents
 4. rerun the importer
