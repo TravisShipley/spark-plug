@@ -17,5 +17,5 @@ MonoBehaviour:
   sceneName: Orange
   gameDefinitionJson: {fileID: 4900000, guid: 3dcd26426a6634e90bbe0d64c17daf69, type: 3}
   saveSlotId: default
-  resetSaveOnBoot: 0
+  resetSaveOnBoot: 1
   verboseLogging: 1

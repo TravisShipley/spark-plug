@@ -14,6 +14,7 @@ public sealed class SaveService : IDisposable
     private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(250);
     private readonly string saveKey;
     private bool hasPendingScopedResetReload;
+    private bool suppressWritesUntilDispose;
 
     public GameData Data { get; private set; }
     public long LastSeenUnixSeconds => Data?.lastSeenUnixSeconds ?? 0;
@@ -33,7 +34,7 @@ public sealed class SaveService : IDisposable
             .Throttle(Debounce)
             .Subscribe(_ =>
             {
-                if (Data != null)
+                if (Data != null && !suppressWritesUntilDispose)
                     SaveSystem.SaveGame(Data, this.saveKey);
             })
             .AddTo(disposables);
@@ -43,6 +44,8 @@ public sealed class SaveService : IDisposable
     {
         if (definition == null)
             throw new ArgumentNullException(nameof(definition));
+
+        suppressWritesUntilDispose = false;
 
         if (resetSaveOnBoot)
         {
@@ -68,15 +71,17 @@ public sealed class SaveService : IDisposable
         if (definition == null)
             throw new ArgumentNullException(nameof(definition));
 
+        suppressWritesUntilDispose = false;
         Data = CreateDefaultSaveData(definition);
         hasPendingScopedResetReload = false;
         SaveSystem.DeleteSaveFile(saveKey);
         SaveNow();
+        suppressWritesUntilDispose = true;
     }
 
     public void RequestSave()
     {
-        if (Data == null)
+        if (Data == null || suppressWritesUntilDispose)
             return;
 
         saveRequests.OnNext(Unit.Default);
@@ -84,7 +89,7 @@ public sealed class SaveService : IDisposable
 
     public void SaveNow()
     {
-        if (Data == null)
+        if (Data == null || suppressWritesUntilDispose)
             return;
 
         SortFactLists();
@@ -834,9 +839,12 @@ public sealed class SaveService : IDisposable
 
         SortFactLists();
         hasPendingScopedResetReload = true;
+        suppressWritesUntilDispose = false;
 
         if (requestSave)
             SaveNow();
+
+        suppressWritesUntilDispose = true;
     }
 
     public GameData CreateDefaultSaveData(GameDefinition definition)
@@ -923,7 +931,8 @@ public sealed class SaveService : IDisposable
     public void Dispose()
     {
         // Flush best-effort
-        SaveNow();
+        if (!suppressWritesUntilDispose)
+            SaveNow();
 
         saveRequests.OnCompleted();
         saveRequests.Dispose();

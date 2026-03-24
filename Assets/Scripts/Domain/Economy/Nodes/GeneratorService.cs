@@ -58,6 +58,7 @@ public class GeneratorService : IDisposable
     private readonly ReactiveProperty<int> nextMilestoneAtLevel;
     private readonly ReactiveProperty<float> milestoneProgressRatio;
     private bool modifierAutomationEnabled;
+    private bool isInitializing;
 
     public IReadOnlyReactiveProperty<int> Level => level;
     public IReadOnlyReactiveProperty<bool> IsOwned => isOwned;
@@ -109,6 +110,7 @@ public class GeneratorService : IDisposable
         nextMilestoneAtLevel = new ReactiveProperty<int>(0);
         milestoneProgressRatio = new ReactiveProperty<float>(0f);
         isRunning = new ReactiveProperty<bool>(false);
+        isInitializing = true;
 
         ValidateMilestoneLevels(definition.MilestoneLevels);
         RefreshFromModifiers();
@@ -118,6 +120,7 @@ public class GeneratorService : IDisposable
         isRunning.Value = ResolveInitialRunningState();
         RefreshEconomyState();
         RefreshCanCollectState();
+        isInitializing = false;
         PersistRuntimeState(requestSave: false);
 
         tickService.OnTick.Subscribe(_ => OnTick()).AddTo(disposables);
@@ -647,7 +650,8 @@ public class GeneratorService : IDisposable
 
         RefreshEconomyState();
         RefreshCanCollectState();
-        PersistRuntimeState(requestSave: false);
+        if (!isInitializing)
+            PersistRuntimeState(requestSave: false);
     }
 
     private void RefreshMilestoneProgress(int currentLevel)
