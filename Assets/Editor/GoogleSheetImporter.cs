@@ -3,7 +3,7 @@
 // SparkPlug - Google Sheet Importer (Index-driven, Sheets API v4)
 //
 // Rules:
-// - Config needs spreadsheetId (can be full URL or ID) and apiKey
+// - Config needs spreadsheetId (can be full URL or ID)
 // - Import list is defined by __Index sheet
 // - __Index defines: sheet, enabled, order (column names are required and case-insensitive)
 // - Sheet names must be unique (throws error if duplicates found)
@@ -12,7 +12,7 @@
 // - Commented-out rows (first cell starts with "_" or "//" or blank) are ignored
 //
 // Notes:
-// - Requires Google API key for Sheets API v4
+// - Requires a local-only Google Sheet Import Secrets asset for Sheets API v4
 // - Uses spreadsheet metadata to find sheets by name
 // - Fetches data via Sheets API values endpoint
 
@@ -36,6 +36,7 @@ public static class GoogleSheetImporter
     private const string CsvAiBundlePath = "Assets/Data/Csv/_sheets_export_for_ai.json";
     private const string DataAddressableGroupName = "Data";
     private const string DefaultDefinitionsDirectory = "Assets/Data/Definitions";
+    private const string LocalSheetsApiKeyPath = "Assets/Editor/Local/google_sheets_api_key.txt";
     private const string IndexSheetName = "__Index";
     private const int MaxSchemaValidationErrors = 25;
 
@@ -285,11 +286,14 @@ public static class GoogleSheetImporter
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(config.apiKey))
+        var apiKey = ResolveSheetsApiKey();
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
             EditorUtility.DisplayDialog(
                 "Import Failed",
-                "Config has no API key. Set it to your Google Sheets API key.",
+                "Google Sheets API key was not found.\n\n"
+                    + $"Create a text file at '{LocalSheetsApiKeyPath}' containing only the API key.\n"
+                    + "That path is intended to stay unversioned.",
                 "OK"
             );
             return;
@@ -311,14 +315,14 @@ public static class GoogleSheetImporter
 
         var sheetSpec = LoadSheetSpecDefinition();
         var rawSheetSnapshots = new List<RawSheetSnapshot>();
-        var tables = FetchAllTables(spreadsheetId, config.apiKey, sheetSpec, rawSheetSnapshots);
+        var tables = FetchAllTables(spreadsheetId, apiKey, sheetSpec, rawSheetSnapshots);
         PersistRawSheetExports(spreadsheetId, rawSheetSnapshots);
         if (tables.Count == 0)
         {
             EditorUtility.DisplayDialog(
                 "Import Failed",
                 "No tables were imported from __Index entries.\n\n"
-                    + "Ensure the __Index sheet exists and your API key is valid.",
+                    + "Ensure the __Index sheet exists and your local Sheets API key is valid.",
                 "OK"
             );
             return;
@@ -394,6 +398,14 @@ public static class GoogleSheetImporter
             "OK"
         );
         return null;
+    }
+
+    private static string ResolveSheetsApiKey()
+    {
+        if (!File.Exists(LocalSheetsApiKeyPath))
+            return string.Empty;
+
+        return File.ReadAllText(LocalSheetsApiKeyPath).Trim();
     }
 
     // Accepts:
@@ -625,7 +637,7 @@ public static class GoogleSheetImporter
         if (string.IsNullOrWhiteSpace(json))
         {
             throw new InvalidOperationException(
-                "Could not fetch spreadsheet metadata. Check your API key and spreadsheet ID."
+                "Could not fetch spreadsheet metadata. Check your local Sheets API key and spreadsheet ID."
             );
         }
 
@@ -1657,9 +1669,10 @@ public static class GoogleSheetImporter
                 return null;
 
             var hint =
-                req.responseCode == 400 ? "Invalid request. Check your API key and spreadsheet ID."
+                req.responseCode == 400
+                    ? "Invalid request. Check your local Sheets API key and spreadsheet ID."
                 : req.responseCode == 403
-                    ? "Access denied. Check your API key has Sheets API v4 enabled."
+                    ? "Access denied. Check your local Sheets API key has Sheets API v4 enabled."
                 : null;
 
             throw new InvalidOperationException(

@@ -108,3 +108,6 @@ InitTestScene*.unity*
 .idea/
 .vscode/
 .config/
+
+# Local editor-only secrets
+/Assets/Editor/Local/

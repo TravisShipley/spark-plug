@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: GoogleSheetImportConfig_orange
   m_EditorClassIdentifier: Assembly-CSharp-Editor::GoogleSheetImportConfig
   spreadsheetId: 1ILzPwrsXiR3u724Fs3OnUHCKHM-hJ8EY60Ukcs1hHZs
-  apiKey: AIzaSyCdCtu_TZrJ-1tm8PShf7Su08C10ctOc9c
   outputJsonPath: Assets/Data/Definitions/game_definition_orange.json
   resourcesFallbackOutputPath: 
   addressableKey: game_def_orange

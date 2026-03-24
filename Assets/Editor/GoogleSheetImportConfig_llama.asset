@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: GoogleSheetImportConfig_llama
   m_EditorClassIdentifier: Assembly-CSharp-Editor::GoogleSheetImportConfig
   spreadsheetId: https://docs.google.com/spreadsheets/d/1NtCj2hX-cuQJTJn0rebwEffye6sxNc2jWkz99pOSF58/edit?gid=1855575755#gid=1855575755
-  apiKey: AIzaSyCdCtu_TZrJ-1tm8PShf7Su08C10ctOc9c
   outputJsonPath: Assets/Data/Definitions/game_definition_llama.json
   resourcesFallbackOutputPath: 
   addressableKey: game_def_llama

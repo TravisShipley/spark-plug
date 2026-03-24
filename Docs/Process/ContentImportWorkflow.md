@@ -45,7 +45,30 @@ This document describes the operational sequence for importing spreadsheet conte
 4. Fix validation errors.
 5. Commit sheet + generated artifacts.
 
-## 5. Output Location
+## 5. Local API Key Setup
+
+The Google Sheets API key is no longer stored on `GoogleSheetImportConfig` assets.
+
+Create a local-only text file at:
+
+- `Assets/Editor/Local/google_sheets_api_key.txt`
+
+Rules:
+
+- put only the raw API key in the file
+- do not add labels, JSON, or extra whitespace intentionally
+- keep the file local; `Assets/Editor/Local/` is ignored by git
+
+Recommended setup:
+
+1. create the folder `Assets/Editor/Local/` if it does not exist
+2. create `google_sheets_api_key.txt` inside that folder
+3. paste the Google Sheets API key as the file contents
+4. rerun the importer
+
+If import fails with a missing key error, verify that the path and filename match exactly.
+
+## 6. Output Location
 
 Imported runtime definitions should be written under:
 
@@ -58,14 +81,13 @@ Examples:
 
 The filename is an editor/import concern only. Runtime identity still comes from `GameSessionConfigAsset.sessionId`.
 
-## 6. Import Profiles
+## 7. Import Profiles
 
 Use one `GoogleSheetImportConfig` asset per generated definition when definitions need different output files or source sheets.
 
 Recommended profile fields:
 
 - `spreadsheetId`
-- `apiKey`
 - `outputJsonPath`
 - optional `resourcesFallbackOutputPath`
 - optional `addressableKey`
@@ -75,7 +97,7 @@ Recommended workflow:
 1. Select a specific import profile and run `SparkPlug/Import Selected Definition`, or
 2. Run `SparkPlug/Import All Definitions` when refreshing every generated definition
 
-## 7. After Import
+## 8. After Import
 
 After a definition import completes:
 
