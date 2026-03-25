@@ -6,23 +6,25 @@
  * addSparkPlugSheetToolsMenuItems_(menu) before addToUi().
  */
 
-var SPARKPLUG_DROPDOWNS_SHEET_NAME_ = 'Dropdowns';
-var SPARKPLUG_VALIDATION_MAX_ROW_ = 5000;
+var SPARKPLUG_DROPDOWNS_SHEET_NAME_ = "Dropdowns";
+var SPARKPLUG_VALIDATION_MAX_ROW_ = 1000;
+var SPARKPLUG_HEADER_FONT_COLOR_ = "#ffffff";
+var SPARKPLUG_HEADER_BACKGROUND_COLOR_ = "#000000";
 
 function addSparkPlugSheetToolsMenuItems_(menu) {
   menu
     .addSeparator()
     .addItem(
-      'Ensure Tabs & Headers (from sheetSpec)',
-      'ensureTabsAndHeadersFromSheetSpec'
+      "Ensure Tabs & Headers (from sheetSpec)",
+      "ensureTabsAndHeadersFromSheetSpec",
     )
     .addItem(
-      'Refresh Dropdowns (from sheetSpec)',
-      'refreshDropdownsFromSheetSpec'
+      "Refresh Dropdowns (from sheetSpec)",
+      "refreshDropdownsFromSheetSpec",
     )
     .addItem(
-      'Validate Sheet Structure (from sheetSpec)',
-      'validateSheetStructureFromSheetSpec'
+      "Validate Sheet Structure (from sheetSpec)",
+      "validateSheetStructureFromSheetSpec",
     );
 
   return menu;
@@ -39,13 +41,13 @@ function ensureTabsAndHeadersFromSheetSpec() {
       createdTabs: [],
       addedColumnsByTab: {},
       frozenTabs: [],
-      skippedOptionalTabs: []
+      skippedOptionalTabs: [],
     };
 
     var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
     for (var i = 0; i < tables.length; i++) {
       var tableSpec = tables[i];
-      var tableName = String((tableSpec && tableSpec.name) || '').trim();
+      var tableName = String((tableSpec && tableSpec.name) || "").trim();
       if (!tableName) {
         continue;
       }
@@ -71,9 +73,9 @@ function ensureTabsAndHeadersFromSheetSpec() {
 
     var summary = buildEnsureTabsSummary_(report);
     Logger.log(summary);
-    ui.alert('SparkPlug', summary, ui.ButtonSet.OK);
+    ui.alert("SparkPlug", summary, ui.ButtonSet.OK);
   } catch (err) {
-    handleSparkPlugError_('Ensure Tabs & Headers failed', err);
+    handleSparkPlugError_("Ensure Tabs & Headers failed", err);
   }
 }
 
@@ -90,7 +92,7 @@ function refreshDropdownsFromSheetSpec() {
     var validationReport = {
       validationsApplied: 0,
       examples: [],
-      warnings: []
+      warnings: [],
     };
     var enumColumnIndexByKey = {};
     var i;
@@ -102,15 +104,16 @@ function refreshDropdownsFromSheetSpec() {
     var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
     for (i = 0; i < tables.length; i++) {
       var tableSpec = tables[i];
-      var tableName = String((tableSpec && tableSpec.name) || '').trim();
+      var tableName = String((tableSpec && tableSpec.name) || "").trim();
       if (!tableName) {
         continue;
       }
 
-      var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+      var sheet =
+        SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
       if (!sheet) {
         validationReport.warnings.push(
-          'Skipped validations for missing sheet "' + tableName + '".'
+          'Skipped validations for missing sheet "' + tableName + '".',
         );
         continue;
       }
@@ -121,12 +124,12 @@ function refreshDropdownsFromSheetSpec() {
 
       for (var c = 0; c < columns.length; c++) {
         var columnSpec = columns[c] || {};
-        var enumRef = String(columnSpec.enumRef || '').trim();
+        var enumRef = String(columnSpec.enumRef || "").trim();
         if (!enumRef) {
           continue;
         }
 
-        var declaredHeader = String(columnSpec.name || '').trim();
+        var declaredHeader = String(columnSpec.name || "").trim();
         if (!declaredHeader) {
           continue;
         }
@@ -137,9 +140,9 @@ function refreshDropdownsFromSheetSpec() {
           validationReport.warnings.push(
             'Skipped validation for "' +
               tableName +
-              '.' +
+              "." +
               declaredHeader +
-              '" because the header is missing.'
+              '" because the header is missing.',
           );
           continue;
         }
@@ -149,41 +152,44 @@ function refreshDropdownsFromSheetSpec() {
           validationReport.warnings.push(
             'Skipped validation for "' +
               tableName +
-              '.' +
+              "." +
               declaredHeader +
               '" because enum "' +
               enumRef +
-              '" was not found.'
+              '" was not found.',
           );
           continue;
         }
 
         var dropdownRange = getDropdownRangeForEnum_(
           dropdownSheet,
-          enumColumnIndexByKey[resolvedEnumKey]
+          enumColumnIndexByKey[resolvedEnumKey],
         );
         if (!dropdownRange) {
           validationReport.warnings.push(
             'Skipped validation for "' +
               tableName +
-              '.' +
+              "." +
               declaredHeader +
               '" because enum "' +
               resolvedEnumKey +
-              '" has no values.'
+              '" has no values.',
           );
           continue;
         }
 
         var startRow = settings.headerRowIndex + 1;
-        var endRow = Math.min(sheet.getMaxRows(), SPARKPLUG_VALIDATION_MAX_ROW_);
+        var endRow = Math.min(
+          sheet.getMaxRows(),
+          SPARKPLUG_VALIDATION_MAX_ROW_,
+        );
         if (endRow < startRow) {
           validationReport.warnings.push(
             'Skipped validation for "' +
               tableName +
-              '.' +
+              "." +
               declaredHeader +
-              '" because there are no editable rows below the header.'
+              '" because there are no editable rows below the header.',
           );
           continue;
         }
@@ -192,7 +198,7 @@ function refreshDropdownsFromSheetSpec() {
           startRow,
           targetColumnIndex,
           endRow - startRow + 1,
-          1
+          1,
         );
         var rule = SpreadsheetApp.newDataValidation()
           .requireValueInRange(dropdownRange, true)
@@ -204,7 +210,7 @@ function refreshDropdownsFromSheetSpec() {
 
         if (validationReport.examples.length < 10) {
           validationReport.examples.push(
-            tableName + '.' + declaredHeader + ' -> ' + resolvedEnumKey
+            tableName + "." + declaredHeader + " -> " + resolvedEnumKey,
           );
         }
       }
@@ -212,9 +218,9 @@ function refreshDropdownsFromSheetSpec() {
 
     var summary = buildRefreshDropdownsSummary_(rewriteInfo, validationReport);
     Logger.log(summary);
-    ui.alert('SparkPlug', summary, ui.ButtonSet.OK);
+    ui.alert("SparkPlug", summary, ui.ButtonSet.OK);
   } catch (err) {
-    handleSparkPlugError_('Refresh Dropdowns failed', err);
+    handleSparkPlugError_("Refresh Dropdowns failed", err);
   }
 }
 
@@ -228,18 +234,19 @@ function validateSheetStructureFromSheetSpec() {
     var report = {
       errors: [],
       warnings: [],
-      okTables: []
+      okTables: [],
     };
 
     var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
     for (var i = 0; i < tables.length; i++) {
       var tableSpec = tables[i] || {};
-      var tableName = String(tableSpec.name || '').trim();
+      var tableName = String(tableSpec.name || "").trim();
       if (!tableName) {
         continue;
       }
 
-      var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+      var sheet =
+        SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
       if (!sheet) {
         if (tableSpec.required === true) {
           report.errors.push('Missing required sheet "' + tableName + '".');
@@ -258,7 +265,7 @@ function validateSheetStructureFromSheetSpec() {
             tableName +
             '" has an empty header row at row ' +
             settings.headerRowIndex +
-            '.'
+            ".",
         );
         tableHasWarnings = true;
       }
@@ -268,8 +275,8 @@ function validateSheetStructureFromSheetSpec() {
           'Sheet "' +
             tableName +
             '" has blank header cells at columns ' +
-            headerInfo.blankColumnIndexes.join(', ') +
-            '.'
+            headerInfo.blankColumnIndexes.join(", ") +
+            ".",
         );
         tableHasWarnings = true;
       }
@@ -279,8 +286,8 @@ function validateSheetStructureFromSheetSpec() {
           'Sheet "' +
             tableName +
             '" has duplicate headers (case-insensitive): ' +
-            headerInfo.duplicates.join(', ') +
-            '.'
+            headerInfo.duplicates.join(", ") +
+            ".",
         );
         tableHasErrors = true;
       }
@@ -297,7 +304,7 @@ function validateSheetStructureFromSheetSpec() {
               tableName +
               '" is missing required column "' +
               declared.name +
-              '".'
+              '".',
           );
           tableHasErrors = true;
         }
@@ -311,7 +318,9 @@ function validateSheetStructureFromSheetSpec() {
             continue;
           }
 
-          if (!declaredColumns.normalizedNameSet[normalizeHeaderName_(headerName)]) {
+          if (
+            !declaredColumns.normalizedNameSet[normalizeHeaderName_(headerName)]
+          ) {
             extraHeaders.push(headerName);
           }
         }
@@ -321,8 +330,8 @@ function validateSheetStructureFromSheetSpec() {
             'Sheet "' +
               tableName +
               '" has extra columns not declared in sheetSpec: ' +
-              extraHeaders.join(', ') +
-              '.'
+              extraHeaders.join(", ") +
+              ".",
           );
           tableHasWarnings = true;
         }
@@ -335,15 +344,15 @@ function validateSheetStructureFromSheetSpec() {
 
     var summary = buildValidateStructureSummary_(report, tables.length);
     Logger.log(summary);
-    ui.alert('SparkPlug', summary, ui.ButtonSet.OK);
+    ui.alert("SparkPlug", summary, ui.ButtonSet.OK);
   } catch (err) {
-    handleSparkPlugError_('Validate Sheet Structure failed', err);
+    handleSparkPlugError_("Validate Sheet Structure failed", err);
   }
 }
 
 function getManifestValue_(key) {
   var layout = getManifestLayout_();
-  var lookupKey = String(key || '').trim();
+  var lookupKey = String(key || "").trim();
   if (!lookupKey) {
     return null;
   }
@@ -357,9 +366,9 @@ function getManifestValue_(key) {
   var width = Math.max(layout.keyColumn, layout.valueColumn);
   var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
   for (var i = 0; i < values.length; i++) {
-    var rowKey = String(values[i][layout.keyColumn - 1] || '').trim();
+    var rowKey = String(values[i][layout.keyColumn - 1] || "").trim();
     if (rowKey === lookupKey) {
-      var value = String(values[i][layout.valueColumn - 1] || '').trim();
+      var value = String(values[i][layout.valueColumn - 1] || "").trim();
       return value || null;
     }
   }
@@ -369,10 +378,10 @@ function getManifestValue_(key) {
 
 function setManifestValue_(key, value) {
   var layout = getManifestLayout_();
-  var writeKey = String(key || '').trim();
-  var writeValue = String(value || '').trim();
+  var writeKey = String(key || "").trim();
+  var writeValue = String(value || "").trim();
   if (!writeKey) {
-    throw new Error('setManifestValue_: key is empty.');
+    throw new Error("setManifestValue_: key is empty.");
   }
 
   var sheet = layout.sheet;
@@ -381,11 +390,11 @@ function setManifestValue_(key, value) {
   if (lastRow >= 2) {
     var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     for (var i = 0; i < values.length; i++) {
-      var rowKey = String(values[i][layout.keyColumn - 1] || '').trim();
+      var rowKey = String(values[i][layout.keyColumn - 1] || "").trim();
       if (rowKey === writeKey) {
         var rowIndex = i + 2;
         var currentValue = String(
-          values[i][layout.valueColumn - 1] || ''
+          values[i][layout.valueColumn - 1] || "",
         ).trim();
         if (currentValue !== writeValue) {
           sheet.getRange(rowIndex, layout.valueColumn).setValue(writeValue);
@@ -402,7 +411,7 @@ function setManifestValue_(key, value) {
 
   var row = [];
   for (var c = 0; c < width; c++) {
-    row.push('');
+    row.push("");
   }
   row[layout.keyColumn - 1] = writeKey;
   row[layout.valueColumn - 1] = writeValue;
@@ -412,57 +421,57 @@ function setManifestValue_(key, value) {
 function promptForSchemaUrl_() {
   var ui = SpreadsheetApp.getUi();
   var result = ui.prompt(
-    'SparkPlug Schema URL',
-    'Enter the schemaUrl for the schema JSON that contains sheetSpec:',
-    ui.ButtonSet.OK_CANCEL
+    "SparkPlug Schema URL",
+    "Enter the schemaUrl for the schema JSON that contains sheetSpec:",
+    ui.ButtonSet.OK_CANCEL,
   );
 
   if (result.getSelectedButton() !== ui.Button.OK) {
-    throw new Error('Schema URL prompt was cancelled.');
+    throw new Error("Schema URL prompt was cancelled.");
   }
 
-  var schemaUrl = String(result.getResponseText() || '').trim();
+  var schemaUrl = String(result.getResponseText() || "").trim();
   if (!schemaUrl) {
-    throw new Error('Schema URL is empty.');
+    throw new Error("Schema URL is empty.");
   }
 
-  setManifestValue_('schemaUrl', schemaUrl);
+  setManifestValue_("schemaUrl", schemaUrl);
   return schemaUrl;
 }
 
 function fetchSchema_(schemaUrl) {
-  var url = String(schemaUrl || '').trim();
+  var url = String(schemaUrl || "").trim();
   if (!url) {
-    throw new Error('fetchSchema_: schemaUrl is empty.');
+    throw new Error("fetchSchema_: schemaUrl is empty.");
   }
 
   var response = UrlFetchApp.fetch(url, {
     followRedirects: true,
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
   });
   var responseCode = response.getResponseCode();
   if (responseCode !== 200) {
-    throw new Error('fetchSchema_: HTTP ' + responseCode + ' for ' + url);
+    throw new Error("fetchSchema_: HTTP " + responseCode + " for " + url);
   }
 
   try {
     return JSON.parse(response.getContentText());
   } catch (err) {
-    throw new Error('fetchSchema_: invalid JSON. ' + err.message);
+    throw new Error("fetchSchema_: invalid JSON. " + err.message);
   }
 }
 
 function getSheetSpec_(schema) {
-  if (!schema || typeof schema !== 'object') {
-    throw new Error('getSheetSpec_: schema is missing or invalid.');
+  if (!schema || typeof schema !== "object") {
+    throw new Error("getSheetSpec_: schema is missing or invalid.");
   }
 
-  if (!schema.sheetSpec || typeof schema.sheetSpec !== 'object') {
-    throw new Error('getSheetSpec_: schema.sheetSpec is missing.');
+  if (!schema.sheetSpec || typeof schema.sheetSpec !== "object") {
+    throw new Error("getSheetSpec_: schema.sheetSpec is missing.");
   }
 
   if (!Array.isArray(schema.sheetSpec.tables)) {
-    throw new Error('getSheetSpec_: schema.sheetSpec.tables must be an array.');
+    throw new Error("getSheetSpec_: schema.sheetSpec.tables must be an array.");
   }
 
   return schema.sheetSpec;
@@ -487,7 +496,7 @@ function readHeader_(sheet, headerRowIndex) {
   var values = sheet.getRange(headerRowIndex, 1, 1, lastColumn).getValues()[0];
   var header = [];
   for (var i = 0; i < values.length; i++) {
-    header.push(String(values[i] || '').trim());
+    header.push(String(values[i] || "").trim());
   }
 
   return header;
@@ -499,7 +508,9 @@ function writeHeader_(sheet, headerRowIndex, headers) {
   }
 
   ensureSheetColumnCapacity_(sheet, headers.length);
-  sheet.getRange(headerRowIndex, 1, 1, headers.length).setValues([headers]);
+  var headerRange = sheet.getRange(headerRowIndex, 1, 1, headers.length);
+  headerRange.setValues([headers]);
+  styleHeaderRange_(headerRange);
 }
 
 function buildEnumTable_(sheetSpec) {
@@ -507,11 +518,11 @@ function buildEnumTable_(sheetSpec) {
   var columns = [];
   var enumsRoot = sheetSpec && sheetSpec.enums;
 
-  if (!enumsRoot || typeof enumsRoot !== 'object') {
+  if (!enumsRoot || typeof enumsRoot !== "object") {
     return { enumKeys: enumKeys, columns: columns };
   }
 
-  flattenEnumNode_(enumsRoot, 'enums', enumKeys, columns);
+  flattenEnumNode_(enumsRoot, "enums", enumKeys, columns);
   return { enumKeys: enumKeys, columns: columns };
 }
 
@@ -527,7 +538,7 @@ function getDropdownRangeForEnum_(dropdownSheet, enumColumnIndex) {
   var lastNonEmptyOffset = 0;
 
   for (var i = 0; i < values.length; i++) {
-    if (String(values[i][0] || '').trim() !== '') {
+    if (String(values[i][0] || "").trim() !== "") {
       lastNonEmptyOffset = i + 1;
     }
   }
@@ -540,14 +551,14 @@ function getDropdownRangeForEnum_(dropdownSheet, enumColumnIndex) {
 }
 
 function loadSheetSpecContext_(promptIfMissing) {
-  var schemaUrl = getManifestValue_('schemaUrl');
+  var schemaUrl = getManifestValue_("schemaUrl");
   if (!schemaUrl && promptIfMissing) {
     schemaUrl = promptForSchemaUrl_();
   }
 
   if (!schemaUrl) {
     throw new Error(
-      'Manifest.schemaUrl is missing. Add it to Manifest or run again and provide it when prompted.'
+      "Manifest.schemaUrl is missing. Add it to Manifest or run again and provide it when prompted.",
     );
   }
 
@@ -559,7 +570,7 @@ function loadSheetSpecContext_(promptIfMissing) {
     schemaUrl: schemaUrl,
     schema: schema,
     sheetSpec: sheetSpec,
-    settings: settings
+    settings: settings,
   };
 }
 
@@ -571,13 +582,13 @@ function getSheetSpecSettings_(sheetSpec) {
   }
 
   var newColumnsPolicy = String(
-    rawSettings.newColumnsPolicy || 'append'
+    rawSettings.newColumnsPolicy || "append",
   ).trim();
-  if (newColumnsPolicy !== 'append') {
+  if (newColumnsPolicy !== "append") {
     throw new Error(
       'sheetSpec.settings.newColumnsPolicy must be "append". Found "' +
         newColumnsPolicy +
-        '".'
+        '".',
     );
   }
 
@@ -585,15 +596,15 @@ function getSheetSpecSettings_(sheetSpec) {
     headerRowIndex: headerRowIndex,
     freezeHeaderRow: rawSettings.freezeHeaderRow !== false,
     allowExtraColumns: rawSettings.allowExtraColumns !== false,
-    newColumnsPolicy: newColumnsPolicy
+    newColumnsPolicy: newColumnsPolicy,
   };
 }
 
 function ensureTableFromSheetSpec_(tableSpec, settings) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tableName = String((tableSpec && tableSpec.name) || '').trim();
+  var tableName = String((tableSpec && tableSpec.name) || "").trim();
   if (!tableName) {
-    throw new Error('ensureTableFromSheetSpec_: table name is empty.');
+    throw new Error("ensureTableFromSheetSpec_: table name is empty.");
   }
 
   var sheet = ss.getSheetByName(tableName);
@@ -622,9 +633,7 @@ function ensureTableFromSheetSpec_(tableSpec, settings) {
     var toAppend = [];
     for (var c = 0; c < declaredColumns.length; c++) {
       var declared = declaredColumns[c];
-      if (
-        !headerInfo.indexByNormalized[normalizeHeaderName_(declared.name)]
-      ) {
+      if (!headerInfo.indexByNormalized[normalizeHeaderName_(declared.name)]) {
         toAppend.push(declared.name);
       }
     }
@@ -632,9 +641,14 @@ function ensureTableFromSheetSpec_(tableSpec, settings) {
     if (toAppend.length > 0) {
       var startColumn = headerInfo.lastUsedColumn + 1;
       ensureSheetColumnCapacity_(sheet, startColumn + toAppend.length - 1);
-      sheet
-        .getRange(settings.headerRowIndex, startColumn, 1, toAppend.length)
-        .setValues([toAppend]);
+      var appendedHeaderRange = sheet.getRange(
+        settings.headerRowIndex,
+        startColumn,
+        1,
+        toAppend.length,
+      );
+      appendedHeaderRange.setValues([toAppend]);
+      styleHeaderRange_(appendedHeaderRange);
       addedColumns = toAppend;
     }
   }
@@ -651,7 +665,7 @@ function ensureTableFromSheetSpec_(tableSpec, settings) {
   return {
     createdSheet: createdSheet,
     addedColumns: addedColumns,
-    frozeHeaderRow: frozeHeaderRow
+    frozeHeaderRow: frozeHeaderRow,
   };
 }
 
@@ -664,7 +678,7 @@ function rewriteDropdownSheet_(dropdownSheet, enumTable) {
     dropdownSheet.setFrozenRows(1);
     return {
       enumCount: 0,
-      optionCount: 0
+      optionCount: 0,
     };
   }
 
@@ -682,7 +696,7 @@ function rewriteDropdownSheet_(dropdownSheet, enumTable) {
   for (var r = 0; r < rowCount; r++) {
     var row = [];
     for (var c = 0; c < columnCount; c++) {
-      row.push('');
+      row.push("");
     }
     matrix.push(row);
   }
@@ -694,13 +708,31 @@ function rewriteDropdownSheet_(dropdownSheet, enumTable) {
     }
   }
 
-  dropdownSheet.getRange(1, 1, rowCount, columnCount).setValues(matrix);
+  var dropdownRange = dropdownSheet.getRange(1, 1, rowCount, columnCount);
+  dropdownRange.setValues(matrix);
+  styleHeaderRange_(dropdownSheet.getRange(1, 1, 1, columnCount));
   dropdownSheet.setFrozenRows(1);
+  dropdownSheet.autoResizeColumns(1, columnCount);
+  SpreadsheetApp.flush();
+
+  for (i = 0; i < columnCount; i++) {
+    var columnIndex = i + 1;
+    dropdownSheet.setColumnWidth(
+      columnIndex,
+      dropdownSheet.getColumnWidth(columnIndex) + 25,
+    );
+  }
 
   return {
     enumCount: enumKeys.length,
-    optionCount: maxValues
+    optionCount: maxValues,
   };
+}
+
+function styleHeaderRange_(range) {
+  range
+    .setFontColor(SPARKPLUG_HEADER_FONT_COLOR_)
+    .setBackground(SPARKPLUG_HEADER_BACKGROUND_COLOR_);
 }
 
 function getDeclaredColumns_(tableSpec) {
@@ -710,7 +742,7 @@ function getDeclaredColumns_(tableSpec) {
 
   for (var i = 0; i < columns.length; i++) {
     var columnSpec = columns[i] || {};
-    var name = String(columnSpec.name || '').trim();
+    var name = String(columnSpec.name || "").trim();
     if (!name) {
       continue;
     }
@@ -718,8 +750,8 @@ function getDeclaredColumns_(tableSpec) {
     result.push({
       name: name,
       required: columnSpec.required === true,
-      type: String(columnSpec.type || '').trim(),
-      enumRef: String(columnSpec.enumRef || '').trim()
+      type: String(columnSpec.type || "").trim(),
+      enumRef: String(columnSpec.enumRef || "").trim(),
     });
     normalizedNameSet[normalizeHeaderName_(name)] = true;
   }
@@ -736,14 +768,14 @@ function analyzeHeader_(header) {
   var blankColumnIndexes = [];
 
   for (var i = 0; i < trimmedHeader.length; i++) {
-    if (String(trimmedHeader[i] || '').trim() !== '') {
+    if (String(trimmedHeader[i] || "").trim() !== "") {
       lastUsedColumn = i + 1;
     }
   }
 
   var headersWithinUsedRange = trimmedHeader.slice(0, lastUsedColumn);
   for (i = 0; i < headersWithinUsedRange.length; i++) {
-    var headerName = String(headersWithinUsedRange[i] || '').trim();
+    var headerName = String(headersWithinUsedRange[i] || "").trim();
     if (!headerName) {
       blankColumnIndexes.push(i + 1);
       continue;
@@ -763,16 +795,18 @@ function analyzeHeader_(header) {
     headersWithinUsedRange: headersWithinUsedRange,
     indexByNormalized: indexByNormalized,
     duplicates: duplicates,
-    blankColumnIndexes: blankColumnIndexes
+    blankColumnIndexes: blankColumnIndexes,
   };
 }
 
 function normalizeHeaderName_(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function resolveEnumKey_(enumRef, enumColumnIndexByKey) {
-  var key = String(enumRef || '').trim();
+  var key = String(enumRef || "").trim();
   if (!key) {
     return null;
   }
@@ -781,13 +815,13 @@ function resolveEnumKey_(enumRef, enumColumnIndexByKey) {
     return key;
   }
 
-  if (key.indexOf('enums.') === 0) {
+  if (key.indexOf("enums.") === 0) {
     var stripped = key.substring(6);
     if (enumColumnIndexByKey[stripped]) {
       return stripped;
     }
   } else {
-    var prefixed = 'enums.' + key;
+    var prefixed = "enums." + key;
     if (enumColumnIndexByKey[prefixed]) {
       return prefixed;
     }
@@ -800,8 +834,8 @@ function flattenEnumNode_(node, prefix, enumKeys, columns) {
   if (Array.isArray(node)) {
     var values = [];
     for (var i = 0; i < node.length; i++) {
-      var value = String(node[i] || '').trim();
-      if (value !== '') {
+      var value = String(node[i] || "").trim();
+      if (value !== "") {
         values.push(value);
       }
     }
@@ -811,23 +845,23 @@ function flattenEnumNode_(node, prefix, enumKeys, columns) {
     return;
   }
 
-  if (!node || typeof node !== 'object') {
+  if (!node || typeof node !== "object") {
     return;
   }
 
   var keys = Object.keys(node);
   for (var k = 0; k < keys.length; k++) {
     var key = keys[k];
-    var nextPrefix = prefix ? prefix + '.' + key : key;
+    var nextPrefix = prefix ? prefix + "." + key : key;
     flattenEnumNode_(node[key], nextPrefix, enumKeys, columns);
   }
 }
 
 function getManifestLayout_() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Manifest');
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Manifest");
   if (!sheet) {
     throw new Error(
-      'Manifest sheet is missing. Create a "Manifest" sheet with "key" and "value" headers.'
+      'Manifest sheet is missing. Create a "Manifest" sheet with "key" and "value" headers.',
     );
   }
 
@@ -836,23 +870,21 @@ function getManifestLayout_() {
   var valueColumn = 0;
   for (var i = 0; i < header.length; i++) {
     var normalized = normalizeHeaderName_(header[i]);
-    if (normalized === 'key' && !keyColumn) {
+    if (normalized === "key" && !keyColumn) {
       keyColumn = i + 1;
-    } else if (normalized === 'value' && !valueColumn) {
+    } else if (normalized === "value" && !valueColumn) {
       valueColumn = i + 1;
     }
   }
 
   if (!keyColumn || !valueColumn) {
-    throw new Error(
-      'Manifest must have "key" and "value" headers in row 1.'
-    );
+    throw new Error('Manifest must have "key" and "value" headers in row 1.');
   }
 
   return {
     sheet: sheet,
     keyColumn: keyColumn,
-    valueColumn: valueColumn
+    valueColumn: valueColumn,
   };
 }
 
@@ -874,90 +906,92 @@ function buildEnsureTabsSummary_(report) {
   var lines = [];
   var tabNames = Object.keys(report.addedColumnsByTab);
 
-  lines.push('Ensure Tabs & Headers complete.');
-  lines.push('Created tabs: ' + formatListOrNone_(report.createdTabs));
+  lines.push("Ensure Tabs & Headers complete.");
+  lines.push("Created tabs: " + formatListOrNone_(report.createdTabs));
   if (tabNames.length === 0) {
-    lines.push('Added columns: none');
+    lines.push("Added columns: none");
   } else {
-    lines.push('Added columns:');
+    lines.push("Added columns:");
     for (var i = 0; i < tabNames.length; i++) {
       var tabName = tabNames[i];
-      lines.push('- ' + tabName + ': ' + report.addedColumnsByTab[tabName].join(', '));
+      lines.push(
+        "- " + tabName + ": " + report.addedColumnsByTab[tabName].join(", "),
+      );
     }
   }
-  lines.push('Header row frozen on: ' + formatListOrNone_(report.frozenTabs));
+  lines.push("Header row frozen on: " + formatListOrNone_(report.frozenTabs));
 
   if (report.skippedOptionalTabs.length > 0) {
     lines.push(
-      'Optional sheets not present and left untouched: ' +
-        report.skippedOptionalTabs.join(', ')
+      "Optional sheets not present and left untouched: " +
+        report.skippedOptionalTabs.join(", "),
     );
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 function buildRefreshDropdownsSummary_(rewriteInfo, validationReport) {
   var lines = [];
-  lines.push('Refresh Dropdowns complete.');
+  lines.push("Refresh Dropdowns complete.");
   lines.push(
-    'Dropdowns rewritten with ' +
+    "Dropdowns rewritten with " +
       rewriteInfo.enumCount +
-      ' enum columns and up to ' +
+      " enum columns and up to " +
       rewriteInfo.optionCount +
-      ' values per enum.'
+      " values per enum.",
   );
-  lines.push('Validations applied: ' + validationReport.validationsApplied);
+  lines.push("Validations applied: " + validationReport.validationsApplied);
 
   if (validationReport.examples.length > 0) {
-    lines.push('Examples:');
+    lines.push("Examples:");
     for (var i = 0; i < validationReport.examples.length; i++) {
-      lines.push('- ' + validationReport.examples[i]);
+      lines.push("- " + validationReport.examples[i]);
     }
   }
 
   if (validationReport.warnings.length > 0) {
-    lines.push('Warnings:');
+    lines.push("Warnings:");
     for (i = 0; i < validationReport.warnings.length; i++) {
-      lines.push('- ' + validationReport.warnings[i]);
+      lines.push("- " + validationReport.warnings[i]);
     }
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 function buildValidateStructureSummary_(report, totalTables) {
   var lines = [];
-  lines.push('Validate Sheet Structure complete.');
-  lines.push('Errors: ' + report.errors.length);
+  lines.push("Validate Sheet Structure complete.");
+  lines.push("Errors: " + report.errors.length);
   if (report.errors.length > 0) {
     for (var i = 0; i < report.errors.length; i++) {
-      lines.push('- ' + report.errors[i]);
+      lines.push("- " + report.errors[i]);
     }
   }
 
-  lines.push('Warnings: ' + report.warnings.length);
+  lines.push("Warnings: " + report.warnings.length);
   if (report.warnings.length > 0) {
     for (i = 0; i < report.warnings.length; i++) {
-      lines.push('- ' + report.warnings[i]);
+      lines.push("- " + report.warnings[i]);
     }
   }
 
-  lines.push('OK tables: ' + report.okTables.length + ' / ' + totalTables);
+  lines.push("OK tables: " + report.okTables.length + " / " + totalTables);
   if (report.okTables.length > 0) {
-    lines.push('OK: ' + report.okTables.join(', '));
+    lines.push("OK: " + report.okTables.join(", "));
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 function formatListOrNone_(items) {
-  return items && items.length > 0 ? items.join(', ') : 'none';
+  return items && items.length > 0 ? items.join(", ") : "none";
 }
 
 function handleSparkPlugError_(prefix, err) {
   var ui = SpreadsheetApp.getUi();
-  var message = prefix + ': ' + (err && err.message ? err.message : err);
+  var message = prefix + ": " + (err && err.message ? err.message : err);
   Logger.log(message);
-  ui.alert('SparkPlug', message, ui.ButtonSet.OK);
+  ui.alert("SparkPlug", message, ui.ButtonSet.OK);
 }
