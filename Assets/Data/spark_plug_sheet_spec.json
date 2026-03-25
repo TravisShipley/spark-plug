@@ -1,23 +1,23 @@
 {
   "sheetSpec": {
     "version": "0.2",
-    "notes": "Spreadsheet contract used to ensure tabs + headers exist. Does not validate row values.",
+    "notes": "Spreadsheet contract used to ensure the authored content definition stays aligned with the authoritative schema. Does not validate row values.",
     "settings": {
       "headerRowIndex": 1,
       "freezeHeaderRow": true,
       "allowExtraColumns": true,
       "newColumnsPolicy": "append",
-      "reservedSheets": ["__Index", "__Enums", "__EnumDropdowns", "Meta"]
+      "reservedSheets": ["__Index", "__Enums", "__EnumDropdowns", "Manifest"]
     },
 
     "tables": [
       {
-        "name": "Meta",
-        "packKey": "meta",
+        "name": "Manifest",
+        "outputKey": "manifest",
         "emit": "object",
         "rowMode": "kv",
         "required": true,
-        "kind": "meta",
+        "kind": "manifest",
         "primaryKey": "key",
         "columns": [
           { "name": "key", "required": true, "type": "string" },
@@ -27,7 +27,7 @@
 
       {
         "name": "EngineConfig",
-        "packKey": "engineConfig",
+        "outputKey": "engineConfig",
         "emit": "object",
         "rowMode": "single",
         "required": true,
@@ -48,7 +48,7 @@
 
       {
         "name": "GameConfig",
-        "packKey": "gameConfig",
+        "outputKey": "gameConfig",
         "emit": "object",
         "rowMode": "single",
         "required": true,
@@ -78,7 +78,7 @@
 
       {
         "name": "UiDefaults",
-        "packKey": "uiDefaults",
+        "outputKey": "uiDefaults",
         "emit": "object",
         "rowMode": "single",
         "columnRenames": [{ "from": "buyModeIds_json", "to": "buyModeIds" }],
@@ -92,7 +92,7 @@
 
       {
         "name": "BuyModes",
-        "packKey": "buyModes",
+        "outputKey": "buyModes",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -113,7 +113,7 @@
 
       {
         "name": "Resources",
-        "packKey": "resources",
+        "outputKey": "resources",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -140,7 +140,7 @@
 
       {
         "name": "Phases",
-        "packKey": "phases",
+        "outputKey": "phases",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -155,7 +155,7 @@
 
       {
         "name": "ComputedVars",
-        "packKey": "computedVars",
+        "outputKey": "computedVars",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -178,7 +178,7 @@
 
       {
         "name": "Zones",
-        "packKey": "zones",
+        "outputKey": "zones",
         "emit": "list",
         "columnRenames": [
           { "from": "localResources_json", "to": "localResources" }
@@ -197,7 +197,7 @@
 
       {
         "name": "NodeInstances",
-        "packKey": "nodeInstances",
+        "outputKey": "nodeInstances",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -219,7 +219,7 @@
 
       {
         "name": "Links",
-        "packKey": "links",
+        "outputKey": "links",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -265,7 +265,7 @@
 
       {
         "name": "Nodes",
-        "packKey": "nodes",
+        "outputKey": "nodes",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -321,7 +321,7 @@
 
       {
         "name": "NodeOutputs",
-        "packKey": "nodes.outputs",
+        "outputKey": "nodes.outputs",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -361,7 +361,7 @@
 
       {
         "name": "NodeInputs",
-        "packKey": "nodes.inputs",
+        "outputKey": "nodes.inputs",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -385,7 +385,7 @@
 
       {
         "name": "NodeCapacities",
-        "packKey": "nodes.capacities",
+        "outputKey": "nodes.capacities",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -420,7 +420,7 @@
 
       {
         "name": "NodeOutputScaling",
-        "packKey": "nodes.outputScaling",
+        "outputKey": "nodes.outputScaling",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -450,7 +450,7 @@
 
       {
         "name": "NodeCapacityScaling",
-        "packKey": "nodes.capacityScaling",
+        "outputKey": "nodes.capacityScaling",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -480,7 +480,7 @@
 
       {
         "name": "NodePriceCurveTable",
-        "packKey": "nodes.leveling.priceCurve.table",
+        "outputKey": "nodes.leveling.priceCurve.table",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -500,7 +500,7 @@
 
       {
         "name": "NodePriceCurveSegments",
-        "packKey": "nodes.leveling.priceCurve.segments",
+        "outputKey": "nodes.leveling.priceCurve.segments",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -537,7 +537,7 @@
 
       {
         "name": "NodeRequirements",
-        "packKey": "nodes.requirements",
+        "outputKey": "nodes.requirements",
         "emit": "subtable",
         "embed": {
           "parentTable": "Nodes",
@@ -558,7 +558,7 @@
 
       {
         "name": "Modifiers",
-        "packKey": "modifiers",
+        "outputKey": "modifiers",
         "emit": "list",
         "required": true,
         "kind": "entity",
@@ -596,7 +596,7 @@
 
       {
         "name": "Upgrades",
-        "packKey": "upgrades",
+        "outputKey": "upgrades",
         "emit": "list",
         "columnRenames": [
           { "from": "cost_json", "to": "cost" },
@@ -625,7 +625,7 @@
 
       {
         "name": "Projects",
-        "packKey": "projects",
+        "outputKey": "projects",
         "emit": "list",
         "columnRenames": [
           { "from": "cost_json", "to": "cost" },
@@ -650,7 +650,7 @@
 
       {
         "name": "Milestones",
-        "packKey": "milestones",
+        "outputKey": "milestones",
         "emit": "list",
         "columnRenames": [
           { "from": "grantEffects_json", "to": "grantEffects" }
@@ -669,7 +669,7 @@
 
       {
         "name": "Buffs",
-        "packKey": "buffs",
+        "outputKey": "buffs",
         "emit": "list",
         "columnRenames": [{ "from": "effects_json", "to": "effects" }],
         "required": true,
@@ -696,7 +696,7 @@
 
       {
         "name": "UnlockGraph",
-        "packKey": "unlockGraph",
+        "outputKey": "unlockGraph",
         "emit": "list",
         "columnRenames": [
           { "from": "unlocks_json", "to": "unlocks" },
@@ -715,7 +715,7 @@
 
       {
         "name": "Triggers",
-        "packKey": "triggers",
+        "outputKey": "triggers",
         "emit": "list",
         "columnRenames": [
           { "from": "scope_json", "to": "scope" },
@@ -753,7 +753,7 @@
 
       {
         "name": "RewardPools",
-        "packKey": "rewardPools",
+        "outputKey": "rewardPools",
         "emit": "list",
         "columnRenames": [{ "from": "rewards_json", "to": "rewards" }],
         "required": true,
@@ -767,7 +767,7 @@
 
       {
         "name": "Prestige",
-        "packKey": "prestige",
+        "outputKey": "prestige",
         "emit": "object",
         "rowMode": "single",
         "columnRenames": [

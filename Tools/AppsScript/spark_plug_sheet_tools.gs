@@ -341,8 +341,8 @@ function validateSheetStructureFromSheetSpec() {
   }
 }
 
-function getPackMetaValue_(key) {
-  var layout = getPackMetaLayout_();
+function getManifestValue_(key) {
+  var layout = getManifestLayout_();
   var lookupKey = String(key || '').trim();
   if (!lookupKey) {
     return null;
@@ -367,12 +367,12 @@ function getPackMetaValue_(key) {
   return null;
 }
 
-function setPackMetaValue_(key, value) {
-  var layout = getPackMetaLayout_();
+function setManifestValue_(key, value) {
+  var layout = getManifestLayout_();
   var writeKey = String(key || '').trim();
   var writeValue = String(value || '').trim();
   if (!writeKey) {
-    throw new Error('setPackMetaValue_: key is empty.');
+    throw new Error('setManifestValue_: key is empty.');
   }
 
   var sheet = layout.sheet;
@@ -426,7 +426,7 @@ function promptForSchemaUrl_() {
     throw new Error('Schema URL is empty.');
   }
 
-  setPackMetaValue_('schemaUrl', schemaUrl);
+  setManifestValue_('schemaUrl', schemaUrl);
   return schemaUrl;
 }
 
@@ -540,14 +540,14 @@ function getDropdownRangeForEnum_(dropdownSheet, enumColumnIndex) {
 }
 
 function loadSheetSpecContext_(promptIfMissing) {
-  var schemaUrl = getPackMetaValue_('schemaUrl');
+  var schemaUrl = getManifestValue_('schemaUrl');
   if (!schemaUrl && promptIfMissing) {
     schemaUrl = promptForSchemaUrl_();
   }
 
   if (!schemaUrl) {
     throw new Error(
-      'PackMeta.schemaUrl is missing. Add it to PackMeta or run again and provide it when prompted.'
+      'Manifest.schemaUrl is missing. Add it to Manifest or run again and provide it when prompted.'
     );
   }
 
@@ -823,12 +823,11 @@ function flattenEnumNode_(node, prefix, enumKeys, columns) {
   }
 }
 
-function getPackMetaLayout_() {
-  var sheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName('PackMeta');
+function getManifestLayout_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Manifest');
   if (!sheet) {
     throw new Error(
-      'PackMeta sheet is missing. Create a "PackMeta" sheet with "key" and "value" headers.'
+      'Manifest sheet is missing. Create a "Manifest" sheet with "key" and "value" headers.'
     );
   }
 
@@ -846,7 +845,7 @@ function getPackMetaLayout_() {
 
   if (!keyColumn || !valueColumn) {
     throw new Error(
-      'PackMeta must have "key" and "value" headers in row 1.'
+      'Manifest must have "key" and "value" headers in row 1.'
     );
   }
 

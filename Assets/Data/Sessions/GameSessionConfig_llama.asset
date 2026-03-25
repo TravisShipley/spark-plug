@@ -15,7 +15,7 @@ MonoBehaviour:
   sessionId: proto_llama
   displayName: LlamaGoUp
   sceneName: Llama
-  gameDefinitionJson: {fileID: 4900000, guid: 6480eaf3e881545058cd1b3d1dd3d1a9, type: 3}
+  gameDefinitionJson: {fileID: 4900000, guid: eab1b1626fb684119a68db50f39c5e6e, type: 3}
   saveSlotId: default
   resetSaveOnBoot: 1
   verboseLogging: 1

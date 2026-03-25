@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: GoogleSheetImportConfig_orange
   m_EditorClassIdentifier: Assembly-CSharp-Editor::GoogleSheetImportConfig
   spreadsheetId: 1ILzPwrsXiR3u724Fs3OnUHCKHM-hJ8EY60Ukcs1hHZs
-  outputJsonPath: Assets/Data/Definitions/game_definition_orange.json
+  outputJsonPath: Assets/Data/Definitions/content_definition_orange.json
   resourcesFallbackOutputPath: 
-  addressableKey: game_def_orange
+  addressableKey: content_def_orange
   rebuildAddressables: 1

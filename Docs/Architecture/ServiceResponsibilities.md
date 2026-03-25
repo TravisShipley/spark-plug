@@ -60,7 +60,7 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 
 ### GameDefinitionService
 
-- Loads and validates game definition data (via `GameDefinitionLoader`).
+- Loads and validates content definition data (via `GameDefinitionLoader`).
 - Exposes read-only runtime catalogs/lookups used by services and UI composition.
 
 Related docs:

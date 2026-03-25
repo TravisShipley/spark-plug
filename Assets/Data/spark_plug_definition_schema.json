@@ -1,12 +1,12 @@
 {
-  "gameId": "string",
+  "contentId": "string",
   "version": 0.2,
 
-  "meta": {
+  "manifest": {
     "schemaVersion": "string",
     "schemaUrl": "string",
 
-    "gameId": "string?",
+    "contentId": "string?",
     "version": "number?",
 
     "numberFormat": {

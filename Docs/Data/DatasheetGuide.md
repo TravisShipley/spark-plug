@@ -8,7 +8,7 @@ status: active
 
 # Spark Plug - Datasheet Guide
 
-This document describes each Google Sheets tab used to author a Spark Plug game definition.
+This document describes each Google Sheets tab used to author a Spark Plug content definition.
 
 Each tab maps directly to a section of `spark_plug_definition_schema.json`.
 
@@ -637,7 +637,7 @@ Validation should ensure:
 
 # Future Extensions
 
-- Display data (separate pack)
+- Display data (separate content definition)
 - Event-specific sheets
 - A/B testing columns
 - Content versioning

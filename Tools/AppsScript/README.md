@@ -60,14 +60,14 @@ The only sheet that may be fully rewritten is:
 
 Your Google Sheet should contain a tab named:
 
-- `PackMeta`
+- `Manifest`
 
 With headers in row 1:
 
 - `key`
 - `value`
 
-`PackMeta` must include (or the script will prompt you to add):
+`Manifest` must include (or the script will prompt you to add):
 
 - `schemaUrl` → URL to the schema JSON containing `sheetSpec`
 
@@ -75,7 +75,7 @@ Optional keys:
 
 - `schemaVersion` → informational (the script may warn if mismatched)
 
-Example `PackMeta` rows:
+Example `Manifest` rows:
 
 | key           | value                           |
 | ------------- | ------------------------------- |
@@ -96,8 +96,6 @@ Example `PackMeta` rows:
 On the next reload of the spreadsheet, you should see a **SparkPlug** menu.
 
 If your Apps Script project already has its own `onOpen()`, keep that as the single entry point and call `addSparkPlugSheetToolsMenuItems_(menu)` from it before `addToUi()`.
-
----
 
 ## First Run (Permissions)
 
@@ -141,7 +139,7 @@ What it does:
 
 Use when:
 
-- before exporting/importing a pack
+- before exporting/importing a content definition
 - you suspect drift
 - you want a report without changing anything
 
@@ -151,7 +149,7 @@ Use when:
 
 ### “schemaUrl missing”
 
-- Add a `schemaUrl` row in PackMeta or run the tool and enter it when prompted.
+- Add a `schemaUrl` row in Manifest or run the tool and enter it when prompted.
 
 ### “Fetch failed” or non-200 response
 

@@ -1,7 +1,7 @@
 __Index
 
 sheet,enabled,order
-Meta,TRUE,1
+Manifest,TRUE,1
 EngineConfig,TRUE,2
 GameConfig,TRUE,3
 UiDefaults,TRUE,4
@@ -33,10 +33,10 @@ Prestige,TRUE,29
 
 ---
 
-Meta
+Manifest
 
 key,value
-gameId,orange
+contentId,orange
 schemaUrl,https://raw.githubusercontent.com/TravisShipley/spark-plug/refs/heads/main/Assets/Data/spark_plug_sheet_spec.json
 schemaVersion,0.2
 numberFormat.type,mantissaExponent

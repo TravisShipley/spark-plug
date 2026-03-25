@@ -13,7 +13,7 @@ This document lists table-to-table relationships in the spreadsheet schema.
 ## Core Structure
 
 ```text
-PackMeta
+Manifest
 ├─ Resources
 ├─ Phases
 └─ Zones

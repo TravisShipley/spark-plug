@@ -33,7 +33,7 @@ public static class SparkPlugSmokeTestRunner
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[SmokeTest] Failed to load game definition: {ex.Message}");
+            Debug.LogError($"[SmokeTest] Failed to load content definition: {ex.Message}");
             return;
         }
 

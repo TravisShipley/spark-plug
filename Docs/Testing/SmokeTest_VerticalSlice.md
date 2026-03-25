@@ -11,7 +11,7 @@ Quickly verify the core loop still works end-to-end after changes:
 - unlock progression check
 - reload and verify persistence
 
-## Content Pack Assumptions
+## Content Definition Assumptions
 This checklist is written for a selected prototype session and its assigned imported definition `TextAsset`.
 
 Typical current examples might look like:
@@ -35,7 +35,7 @@ Example:
 
 - `sparkplug.proto_llama.default`
 
-The rest of this checklist still assumes a pack with:
+The rest of this checklist still assumes a content definition with:
 - zone: `zone.main`
 - node instances:
   - `nodeInstance.producer.apple`
@@ -56,7 +56,7 @@ Use one of these existing reset paths before each smoke run:
 Expected outcome:
 - next play start behaves like a brand-new run from content defaults
 - only `nodeInstance.producer.apple` starts enabled
-- grape/banana are not enabled unless your pack/config unlocks them
+- grape/banana are not enabled unless your content/config unlocks them
 
 ## 2-3 Minute Checklist
 
@@ -64,7 +64,7 @@ Expected outcome:
 Expected:
 - wallet starts near zero soft currency
 - Apple generator row is visible/usable
-- Grape/Banana start locked or disabled unless your pack says otherwise
+- Grape/Banana start locked or disabled unless your content definition says otherwise
 
 2. Earn currency by running/collecting Apple for a few cycles.
 Expected:
@@ -94,8 +94,8 @@ Expected:
 
 7. Unlock progression check (UnlockGraph).
 Expected:
-- if your current pack has unlock graph entries, the next target node instance unlocks when requirements are met
-- if your current pack has `unlockGraph: []` (current default file), treat this as N/A and verify existing enabled set remains stable
+- if your current content definition has unlock graph entries, the next target node instance unlocks when requirements are met
+- if your current content definition has `unlockGraph: []` (current default file), treat this as N/A and verify existing enabled set remains stable
 
 8. Exit play mode, re-enter play mode (or restart app/domain).
 Expected persisted facts:

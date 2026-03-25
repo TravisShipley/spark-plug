@@ -20,7 +20,7 @@ public static class GameDefinitionLoader
     {
         var full = Path.GetFullPath(projectRelativePath);
         if (!File.Exists(full))
-            throw new FileNotFoundException($"Game definition file not found: {full}");
+            throw new FileNotFoundException($"Content definition file not found: {full}");
 
         var json = File.ReadAllText(full);
         return LoadFromJson(json, $"file '{full}'");
@@ -33,7 +33,7 @@ public static class GameDefinitionLoader
     {
         var key = (addressableKey ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(key))
-            throw new InvalidOperationException("Addressable key is required for game definition.");
+            throw new InvalidOperationException("Addressable key is required for the content definition.");
 
 #if UNITY_WEBGL
         // WebGL cannot do synchronous Addressables loading (WaitForCompletion).
@@ -46,7 +46,7 @@ public static class GameDefinitionLoader
             return LoadFromJson(resourcesJson, $"Resources '{key}'");
 
         throw new InvalidOperationException(
-            $"Failed to load game definition '{key}' in WebGL. "
+            $"Failed to load content definition '{key}' in WebGL. "
                 + "WebGL does not support synchronous Addressables loading. "
                 + "Use GameDefinitionLoader.LoadFromAddressableAsync(...) (coroutine) or provide a Resources TextAsset fallback."
         );
@@ -65,7 +65,7 @@ public static class GameDefinitionLoader
         return LoadFromFile(editorFallbackProjectRelativePath);
 #else
         throw new InvalidOperationException(
-            $"Failed to load game definition addressable '{key}'. {loadError}"
+            $"Failed to load content definition addressable '{key}'. {loadError}"
         );
 #endif
 #endif
@@ -94,7 +94,7 @@ public static class GameDefinitionLoader
         if (string.IsNullOrEmpty(key))
         {
             onError?.Invoke(
-                new InvalidOperationException("Addressable key is required for game definition.")
+                new InvalidOperationException("Addressable key is required for the content definition.")
             );
             yield break;
         }
@@ -134,7 +134,7 @@ public static class GameDefinitionLoader
 
                 onError?.Invoke(
                     new InvalidOperationException(
-                        $"Failed to load game definition addressable '{key}'. {err}"
+                        $"Failed to load content definition addressable '{key}'. {err}"
                     )
                 );
             }
@@ -144,21 +144,21 @@ public static class GameDefinitionLoader
     private static GameDefinition LoadFromJson(string json, string source)
     {
         if (string.IsNullOrWhiteSpace(json))
-            throw new InvalidOperationException($"Game definition JSON is empty ({source}).");
+            throw new InvalidOperationException($"Content definition JSON is empty ({source}).");
         try
         {
             // UnityEngine.JsonUtility expects the JSON to map to the class.
             var gd = JsonUtility.FromJson<GameDefinition>(json);
             if (gd == null)
-                throw new InvalidOperationException("Failed to deserialize game definition JSON.");
+                throw new InvalidOperationException("Failed to deserialize content definition JSON.");
 
             // Fail loud on missing required roots.
             if (gd.nodes == null || gd.nodes.Count == 0)
-                throw new InvalidOperationException("GameDefinition: 'nodes' is missing or empty.");
+                throw new InvalidOperationException("Content definition: 'nodes' is missing or empty.");
 
             if (gd.nodeInstances == null || gd.nodeInstances.Count == 0)
                 throw new InvalidOperationException(
-                    "GameDefinition: 'nodeInstances' is missing or empty."
+                    "Content definition: 'nodeInstances' is missing or empty."
                 );
 
             // Optional roots (may be empty, but should not be null if present in schema).
@@ -201,7 +201,7 @@ public static class GameDefinitionLoader
         catch (Exception ex)
         {
             var wrapped = new InvalidOperationException(
-                $"Failed to parse/validate game definition JSON from {source}: {ex.Message}",
+                $"Failed to parse/validate content definition JSON from {source}: {ex.Message}",
                 ex
             );
 

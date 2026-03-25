@@ -16,9 +16,9 @@ Use this for early development or small prototypes.
 
 ## Required Tables
 
-### PackMeta
+### Manifest
 
-Global configuration.
+Content definition manifest.
 
 ---
 

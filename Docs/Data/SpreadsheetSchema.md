@@ -10,7 +10,7 @@ status: active
 
 This document describes the structure of the Spark Plug content spreadsheet used to define game data.
 
-The sheet is treated as **authoritative content data** and is imported into the runtime pack format.
+The sheet is treated as **authoritative content data** and is imported into the runtime content definition format.
 
 ---
 
@@ -29,7 +29,7 @@ The sheet is treated as **authoritative content data** and is imported into the 
 
 | Tab                    | Purpose                                       |
 | ---------------------- | --------------------------------------------- |
-| PackMeta               | Global pack settings                          |
+| Manifest               | Content definition manifest                   |
 | Resources              | Currency and resource definitions             |
 | Phases                 | Progression phases                            |
 | Zones                  | World/grouping context                        |
@@ -59,13 +59,13 @@ The sheet is treated as **authoritative content data** and is imported into the 
 
 ---
 
-## PackMeta
+## Manifest
 
-Defines global pack metadata.
+Defines the content definition manifest.
 
 | Column                 | Description            |
 | ---------------------- | ---------------------- |
-| gameId                 | Unique pack identifier |
+| contentId              | Unique content definition identifier |
 | version                | Schema/content version |
 | numberFormat.type      | Formatting style       |
 | numberFormat.precision | Display precision      |

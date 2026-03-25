@@ -18,7 +18,7 @@ This document describes the operational sequence for importing spreadsheet conte
 
 ## 2. Recommended Import Order
 
-1. PackMeta
+1. Manifest
 2. Resources
 3. Phases
 4. Zones

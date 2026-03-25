@@ -40,7 +40,7 @@ public sealed class GameSessionRequest
         if (config.GameDefinitionJson == null)
         {
             throw new InvalidOperationException(
-                $"GameSessionRequest: '{config.name}' is missing a game definition TextAsset."
+                $"GameSessionRequest: '{config.name}' is missing a content definition TextAsset."
             );
         }
 

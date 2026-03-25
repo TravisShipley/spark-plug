@@ -15,7 +15,7 @@ MonoBehaviour:
   sessionId: proto_orange
   displayName: OrangeYouGlad
   sceneName: Orange
-  gameDefinitionJson: {fileID: 4900000, guid: 3dcd26426a6634e90bbe0d64c17daf69, type: 3}
+  gameDefinitionJson: {fileID: 4900000, guid: e2e2e9b083c82468083532dbf58d69e3, type: 3}
   saveSlotId: default
   resetSaveOnBoot: 1
   verboseLogging: 1

@@ -70,7 +70,7 @@ Generator produces:
 
 Runtime loads:
 
-- Gameplay pack (JSON)
+- Gameplay content definition (JSON)
 - Display assets (Addressables)
 
 Joined by **stable IDs**.
@@ -89,7 +89,7 @@ Display should live in separate tabs or a separate spreadsheet.
 
 Guidelines:
 
-- `nodeId` must match gameplay pack
+- `nodeId` must match the gameplay content definition
 - Text is stored as **localization keys**, not raw strings
 - Addresses follow conventions where possible
 - UI-only metadata is allowed (sort, category, grouping)
@@ -207,7 +207,7 @@ Use ScriptableObjects when:
 
 Runtime loads:
 
-1. Gameplay pack (JSON)
+1. Gameplay content definition (JSON)
 2. Display assets (Addressables)
 
 Join example:

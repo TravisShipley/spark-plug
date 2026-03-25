@@ -65,7 +65,7 @@ public static class GoogleSheetImporter
     private sealed class SheetSpecTable
     {
         public string Name;
-        public string PackKey;
+        public string OutputKey;
         public string Emit;
         public string RowMode;
         public bool Required;
@@ -138,7 +138,7 @@ public static class GoogleSheetImporter
             if (string.IsNullOrWhiteSpace(tableName))
                 return false;
 
-            return byName.TryGetValue(tableName.Trim(), out var table) && table.Required;
+            return TryGet(tableName.Trim(), out var table) && table.Required;
         }
 
         public bool TryGet(string tableName, out SheetSpecTable table)
@@ -347,9 +347,9 @@ public static class GoogleSheetImporter
             $"[GoogleSheetImporter] Imported {importedTableNames.Count} table(s) for '{config.name}': {string.Join(", ", importedTableSummary)}"
         );
 
-        var pack = BuildPackFromSpec(tables, sheetSpec);
-        ValidatePack(pack);
-        WriteJson(pack, outputJsonPath, resourcesFallbackOutputPath);
+        var contentDefinition = BuildContentDefinitionFromSpec(tables, sheetSpec);
+        ValidateContentDefinition(contentDefinition);
+        WriteJson(contentDefinition, outputJsonPath, resourcesFallbackOutputPath);
         AssetDatabase.Refresh();
 
         if (!string.IsNullOrWhiteSpace(addressableKey))
@@ -633,7 +633,7 @@ public static class GoogleSheetImporter
             ValidateTableHeaders(entry.TableName, headerRow, tableDef, sheetSpec.AllowExtraColumns);
             var parsedRows = ParseTableRows(rows, tableDef);
 
-            tables[entry.TableName] = new ParsedTable
+            tables[tableDef.Name] = new ParsedTable
             {
                 Definition = tableDef,
                 Header = new List<string>(headerRow),
@@ -1119,7 +1119,9 @@ public static class GoogleSheetImporter
         }
 
         var missingRequired = sheetSpec
-            .RequiredNonVirtualTableNames.Where(name => !enabledIndexNames.Contains(name))
+            .TablesInOrder.Where(t => t.Required && !t.IsVirtual)
+            .Where(t => !enabledIndexNames.Contains(t.Name))
+            .Select(t => t.Name)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -1232,7 +1234,7 @@ public static class GoogleSheetImporter
             var table = new SheetSpecTable
             {
                 Name = name,
-                PackKey = ReadString(tableObj, "packKey") ?? ReadString(tableObj, "outputKey"),
+                OutputKey = ReadString(tableObj, "outputKey"),
                 Emit = ReadString(tableObj, "emit"),
                 RowMode = ReadString(tableObj, "rowMode"),
                 Required = ReadBool(tableObj, "required"),
@@ -2251,15 +2253,15 @@ public static class GoogleSheetImporter
     }
 
     // ----------------------------
-    // Pack building (spec-driven)
+    // Content definition building (spec-driven)
     // ----------------------------
 
-    private static Dictionary<string, object> BuildPackFromSpec(
+    private static Dictionary<string, object> BuildContentDefinitionFromSpec(
         Dictionary<string, ParsedTable> tables,
         SheetSpecDefinition sheetSpec
     )
     {
-        var pack = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        var contentDefinition = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var tableDef in sheetSpec.TablesInOrder)
         {
@@ -2282,17 +2284,17 @@ public static class GoogleSheetImporter
             if (emit == "subtable")
                 continue;
 
-            var packKey = ResolvePackKey(tableDef);
-            if (string.IsNullOrWhiteSpace(packKey))
+            var outputKey = ResolveOutputKey(tableDef);
+            if (string.IsNullOrWhiteSpace(outputKey))
                 continue;
 
             if (emit == "object")
             {
-                pack[packKey] = EmitObjectRows(parsed.Rows, tableDef);
+                contentDefinition[outputKey] = EmitObjectRows(parsed.Rows, tableDef);
                 continue;
             }
 
-            pack[packKey] = EmitListRows(parsed.Rows);
+            contentDefinition[outputKey] = EmitListRows(parsed.Rows);
         }
 
         foreach (var tableDef in sheetSpec.TablesInOrder)
@@ -2318,19 +2320,19 @@ public static class GoogleSheetImporter
 
             if (tableDef.Embed == null)
             {
-                var packKey = ResolvePackKey(tableDef);
-                if (!string.IsNullOrWhiteSpace(packKey))
-                    pack[packKey] = EmitListRows(parsed.Rows);
+                var outputKey = ResolveOutputKey(tableDef);
+                if (!string.IsNullOrWhiteSpace(outputKey))
+                    contentDefinition[outputKey] = EmitListRows(parsed.Rows);
                 continue;
             }
 
-            EmbedSubtableRows(pack, tableDef, parsed.Rows, sheetSpec);
+            EmbedSubtableRows(contentDefinition, tableDef, parsed.Rows, sheetSpec);
         }
 
-        NormalizeNodePriceCurveTaggedUnion(pack);
-        MirrorMetaIdentityValues(pack);
+        NormalizeNodePriceCurveTaggedUnion(contentDefinition);
+        MirrorManifestIdentityValues(contentDefinition);
 
-        return pack;
+        return contentDefinition;
     }
 
     private static List<object> EmitListRows(List<Dictionary<string, object>> rows)
@@ -2384,7 +2386,7 @@ public static class GoogleSheetImporter
     }
 
     private static void EmbedSubtableRows(
-        Dictionary<string, object> pack,
+        Dictionary<string, object> contentDefinition,
         SheetSpecTable subtableDef,
         List<Dictionary<string, object>> rows,
         SheetSpecDefinition sheetSpec
@@ -2404,12 +2406,12 @@ public static class GoogleSheetImporter
             );
         }
 
-        var parentPackKey = embed.ParentTable;
+        var parentOutputKey = embed.ParentTable;
         if (sheetSpec.TryGet(embed.ParentTable, out var parentDef))
-            parentPackKey = ResolvePackKey(parentDef);
+            parentOutputKey = ResolveOutputKey(parentDef);
 
         if (
-            !pack.TryGetValue(parentPackKey, out var parentObj)
+            !contentDefinition.TryGetValue(parentOutputKey, out var parentObj)
             || parentObj is not List<object> parentRows
         )
         {
@@ -2417,7 +2419,7 @@ public static class GoogleSheetImporter
                 return;
 
             throw new InvalidOperationException(
-                $"Subtable '{subtableDef.Name}' cannot embed into '{embed.ParentTable}' because pack key '{parentPackKey}' is missing or not a list."
+                $"Subtable '{subtableDef.Name}' cannot embed into '{embed.ParentTable}' because output key '{parentOutputKey}' is missing or not a list."
             );
         }
 
@@ -2455,10 +2457,12 @@ public static class GoogleSheetImporter
         }
     }
 
-    private static void NormalizeNodePriceCurveTaggedUnion(Dictionary<string, object> pack)
+    private static void NormalizeNodePriceCurveTaggedUnion(
+        Dictionary<string, object> contentDefinition
+    )
     {
         if (
-            !pack.TryGetValue("nodes", out var nodesObj)
+            !contentDefinition.TryGetValue("nodes", out var nodesObj)
             || nodesObj is not List<object> nodes
             || nodes.Count == 0
         )
@@ -2520,27 +2524,29 @@ public static class GoogleSheetImporter
         }
     }
 
-    private static void MirrorMetaIdentityValues(Dictionary<string, object> pack)
+    private static void MirrorManifestIdentityValues(
+        Dictionary<string, object> contentDefinition
+    )
     {
         if (
-            !pack.TryGetValue("meta", out var metaObj)
-            || metaObj is not Dictionary<string, object> meta
+            !contentDefinition.TryGetValue("manifest", out var manifestObj)
+            || manifestObj is not Dictionary<string, object> manifest
         )
             return;
 
         if (
-            !pack.ContainsKey("gameId")
-            && meta.TryGetValue("gameId", out var gameId)
-            && gameId != null
+            !contentDefinition.ContainsKey("contentId")
+            && manifest.TryGetValue("contentId", out var contentId)
+            && contentId != null
         )
-            pack["gameId"] = gameId;
+            contentDefinition["contentId"] = contentId;
 
         if (
-            !pack.ContainsKey("version")
-            && meta.TryGetValue("version", out var version)
+            !contentDefinition.ContainsKey("version")
+            && manifest.TryGetValue("version", out var version)
             && version != null
         )
-            pack["version"] = version;
+            contentDefinition["version"] = version;
     }
 
     private static object GetValueByPath(Dictionary<string, object> dict, string path)
@@ -2621,13 +2627,13 @@ public static class GoogleSheetImporter
             .ToList();
     }
 
-    private static string ResolvePackKey(SheetSpecTable table)
+    private static string ResolveOutputKey(SheetSpecTable table)
     {
         if (table == null)
             return null;
 
-        if (!string.IsNullOrWhiteSpace(table.PackKey))
-            return table.PackKey.Trim();
+        if (!string.IsNullOrWhiteSpace(table.OutputKey))
+            return table.OutputKey.Trim();
 
         return ToLowerCamelCase(table.Name);
     }
@@ -2648,29 +2654,44 @@ public static class GoogleSheetImporter
     // Validation + Write
     // ----------------------------
 
-    private static void ValidatePack(Dictionary<string, object> pack)
+    private static void ValidateContentDefinition(Dictionary<string, object> contentDefinition)
     {
-        if (!pack.ContainsKey("gameId") || pack["gameId"] == null)
-            throw new InvalidOperationException("Pack must have gameId.");
+        if (
+            !contentDefinition.ContainsKey("contentId")
+            || contentDefinition["contentId"] == null
+        )
+        {
+            throw new InvalidOperationException("Content definition must have contentId.");
+        }
 
         if (
-            !pack.TryGetValue("resources", out var resObj)
+            !contentDefinition.TryGetValue("resources", out var resObj)
             || resObj is not List<object> res
             || res.Count == 0
         )
-            throw new InvalidOperationException("Pack must have at least one resource.");
+        {
+            throw new InvalidOperationException(
+                "Content definition must have at least one resource."
+            );
+        }
 
         if (
-            !pack.TryGetValue("zones", out var zonesObj)
+            !contentDefinition.TryGetValue("zones", out var zonesObj)
             || zonesObj is not List<object> zones
             || zones.Count == 0
         )
-            throw new InvalidOperationException("Pack must have at least one zone.");
+        {
+            throw new InvalidOperationException(
+                "Content definition must have at least one zone."
+            );
+        }
 
-        ValidatePackAgainstSchema(pack);
+        ValidateContentDefinitionAgainstSchema(contentDefinition);
     }
 
-    private static void ValidatePackAgainstSchema(Dictionary<string, object> pack)
+    private static void ValidateContentDefinitionAgainstSchema(
+        Dictionary<string, object> contentDefinition
+    )
     {
         if (!File.Exists(SchemaPath))
         {
@@ -2689,12 +2710,12 @@ public static class GoogleSheetImporter
         }
 
         var errors = new List<string>();
-        ValidateNodeAgainstSchema(pack, schemaRoot, "$", errors);
+        ValidateNodeAgainstSchema(contentDefinition, schemaRoot, "$", errors);
 
         if (errors.Count > 0)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Pack failed spark_plug_definition_schema validation:");
+            sb.AppendLine("Content definition failed spark_plug_definition_schema validation:");
             for (int i = 0; i < errors.Count; i++)
                 sb.AppendLine($"- {errors[i]}");
 
@@ -2935,12 +2956,12 @@ public static class GoogleSheetImporter
     }
 
     private static void WriteJson(
-        Dictionary<string, object> pack,
+        Dictionary<string, object> contentDefinition,
         string outputPath,
         string resourcesFallbackOutputPath
     )
     {
-        var json = ToJson(pack);
+        var json = ToJson(contentDefinition);
         WriteTextAsset(outputPath, json);
         if (!string.IsNullOrWhiteSpace(resourcesFallbackOutputPath))
             WriteTextAsset(resourcesFallbackOutputPath, json);
