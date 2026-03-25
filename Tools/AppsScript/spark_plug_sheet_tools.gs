@@ -1,148 +1,433 @@
 /**
- * Spark Plug sheet tools:
- * - Reads schema.sheetSpec from schemaUrl in PackMeta
- * - Ensures tabs and headers exist without modifying data rows
+ * Spark Plug sheet tooling driven by schema.sheetSpec.
+ *
+ * This file does not declare its own onOpen() because this Apps Script project
+ * already has one in code.gs. That onOpen() should call
+ * addSparkPlugSheetToolsMenuItems_(menu) before addToUi().
  */
 
-function onOpen() {
-  var ui = SpreadsheetApp.getUi();
-  var menu = ui.createMenu('SparkPlug');
-  menu.addItem(
-    'Ensure Tabs & Headers (from sheetSpec)',
-    'ensureTabsAndHeadersFromSheetSpec'
-  );
-  menu.addToUi();
+var SPARKPLUG_DROPDOWNS_SHEET_NAME_ = 'Dropdowns';
+var SPARKPLUG_VALIDATION_MAX_ROW_ = 5000;
+
+function addSparkPlugSheetToolsMenuItems_(menu) {
+  menu
+    .addSeparator()
+    .addItem(
+      'Ensure Tabs & Headers (from sheetSpec)',
+      'ensureTabsAndHeadersFromSheetSpec'
+    )
+    .addItem(
+      'Refresh Dropdowns (from sheetSpec)',
+      'refreshDropdownsFromSheetSpec'
+    )
+    .addItem(
+      'Validate Sheet Structure (from sheetSpec)',
+      'validateSheetStructureFromSheetSpec'
+    );
+
+  return menu;
 }
 
 function ensureTabsAndHeadersFromSheetSpec() {
   var ui = SpreadsheetApp.getUi();
-  var report = {
-    createdTabs: [],
-    addedColumnsByTab: {},
-    requiredTabsCreated: [],
-    requiredColumnsAddedByTab: {},
-    warnings: []
-  };
 
   try {
-    var schemaUrl = getPackMetaValue_('schemaUrl');
-    if (!schemaUrl) {
-      var prompt = ui.prompt(
-        'Schema URL missing',
-        'Enter schemaUrl (raw JSON URL) to read sheetSpec:',
-        ui.ButtonSet.OK_CANCEL
-      );
-
-      if (prompt.getSelectedButton() !== ui.Button.OK) {
-        var cancelled = 'Ensure Tabs & Headers cancelled: schemaUrl not provided.';
-        Logger.log(cancelled);
-        ui.alert(cancelled);
-        return;
-      }
-
-      schemaUrl = (prompt.getResponseText() || '').trim();
-      if (!schemaUrl) {
-        throw new Error('schemaUrl is empty.');
-      }
-
-      setPackMetaValue_('schemaUrl', schemaUrl);
-      report.warnings.push('schemaUrl was missing in PackMeta and was added.');
-    }
-
-    var schema = fetchSchema_(schemaUrl);
-    var sheetSpec = getSheetSpec_(schema);
-    var settings = sheetSpec.settings || {};
-
-    var headerRowIndex = Number(settings.headerRowIndex);
-    if (!isFinite(headerRowIndex) || headerRowIndex < 1) {
-      headerRowIndex = 1;
-    } else {
-      headerRowIndex = Math.floor(headerRowIndex);
-    }
-
-    var freezeHeaderRow = settings.freezeHeaderRow !== false;
-    var allowExtraColumns = settings.allowExtraColumns !== false;
-    var newColumnsPolicy = String(settings.newColumnsPolicy || 'append').trim();
-    if (newColumnsPolicy !== 'append') {
-      throw new Error(
-        'sheetSpec.settings.newColumnsPolicy must be "append". Received: "' +
-          newColumnsPolicy +
-          '".'
-      );
-    }
-
-    if (!allowExtraColumns) {
-      report.warnings.push(
-        'allowExtraColumns is false in sheetSpec; this tool still does not delete columns.'
-      );
-    }
-
-    var packMetaSchemaVersion = getPackMetaValue_('schemaVersion');
-    var expectedVersion = String(sheetSpec.version || schema.version || '').trim();
-    if (
-      packMetaSchemaVersion &&
-      expectedVersion &&
-      String(packMetaSchemaVersion).trim() !== expectedVersion
-    ) {
-      report.warnings.push(
-        'PackMeta schemaVersion (' +
-          packMetaSchemaVersion +
-          ') does not match schema sheetSpec/version (' +
-          expectedVersion +
-          ').'
-      );
-    }
+    var context = loadSheetSpecContext_(true);
+    var sheetSpec = context.sheetSpec;
+    var settings = context.settings;
+    var report = {
+      createdTabs: [],
+      addedColumnsByTab: {},
+      frozenTabs: [],
+      skippedOptionalTabs: []
+    };
 
     var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
     for (var i = 0; i < tables.length; i++) {
       var tableSpec = tables[i];
-      if (!tableSpec || !tableSpec.name) {
+      var tableName = String((tableSpec && tableSpec.name) || '').trim();
+      if (!tableName) {
         continue;
       }
 
-      var sheetName = String(tableSpec.name).trim();
-      if (!sheetName) {
+      var existingSheet =
+        SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+      if (tableSpec.required !== true && !existingSheet) {
+        report.skippedOptionalTabs.push(tableName);
         continue;
       }
 
-      var existing = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-      var shouldEnsure = tableSpec.required === true || !!existing;
-      if (!shouldEnsure) {
-        continue;
-      }
-
-      var perTableSettings = {
-        headerRowIndex: headerRowIndex,
-        freezeHeaderRow: freezeHeaderRow,
-        allowExtraColumns: allowExtraColumns,
-        newColumnsPolicy: newColumnsPolicy
-      };
-
-      var result = ensureTable_(tableSpec, perTableSettings);
+      var result = ensureTableFromSheetSpec_(tableSpec, settings);
       if (result.createdSheet) {
-        report.createdTabs.push(sheetName);
-        if (tableSpec.required === true) {
-          report.requiredTabsCreated.push(sheetName);
-        }
+        report.createdTabs.push(tableName);
       }
-
       if (result.addedColumns.length > 0) {
-        report.addedColumnsByTab[sheetName] = result.addedColumns;
+        report.addedColumnsByTab[tableName] = result.addedColumns;
       }
-
-      if (result.addedRequiredColumns.length > 0) {
-        report.requiredColumnsAddedByTab[sheetName] = result.addedRequiredColumns;
+      if (result.frozeHeaderRow) {
+        report.frozenTabs.push(tableName);
       }
     }
 
-    var summary = buildSummary_(report);
+    var summary = buildEnsureTabsSummary_(report);
     Logger.log(summary);
-    ui.alert(summary);
+    ui.alert('SparkPlug', summary, ui.ButtonSet.OK);
   } catch (err) {
-    var message = 'Ensure Tabs & Headers failed: ' + (err && err.message ? err.message : err);
-    Logger.log(message);
-    ui.alert(message);
+    handleSparkPlugError_('Ensure Tabs & Headers failed', err);
   }
+}
+
+function refreshDropdownsFromSheetSpec() {
+  var ui = SpreadsheetApp.getUi();
+
+  try {
+    var context = loadSheetSpecContext_(true);
+    var sheetSpec = context.sheetSpec;
+    var settings = context.settings;
+    var enumTable = buildEnumTable_(sheetSpec);
+    var dropdownSheet = getOrCreateSheet_(SPARKPLUG_DROPDOWNS_SHEET_NAME_);
+    var rewriteInfo = rewriteDropdownSheet_(dropdownSheet, enumTable);
+    var validationReport = {
+      validationsApplied: 0,
+      examples: [],
+      warnings: []
+    };
+    var enumColumnIndexByKey = {};
+    var i;
+
+    for (i = 0; i < enumTable.enumKeys.length; i++) {
+      enumColumnIndexByKey[enumTable.enumKeys[i]] = i + 1;
+    }
+
+    var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
+    for (i = 0; i < tables.length; i++) {
+      var tableSpec = tables[i];
+      var tableName = String((tableSpec && tableSpec.name) || '').trim();
+      if (!tableName) {
+        continue;
+      }
+
+      var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+      if (!sheet) {
+        validationReport.warnings.push(
+          'Skipped validations for missing sheet "' + tableName + '".'
+        );
+        continue;
+      }
+
+      var header = readHeader_(sheet, settings.headerRowIndex);
+      var headerInfo = analyzeHeader_(header);
+      var columns = Array.isArray(tableSpec.columns) ? tableSpec.columns : [];
+
+      for (var c = 0; c < columns.length; c++) {
+        var columnSpec = columns[c] || {};
+        var enumRef = String(columnSpec.enumRef || '').trim();
+        if (!enumRef) {
+          continue;
+        }
+
+        var declaredHeader = String(columnSpec.name || '').trim();
+        if (!declaredHeader) {
+          continue;
+        }
+
+        var normalizedHeader = normalizeHeaderName_(declaredHeader);
+        var targetColumnIndex = headerInfo.indexByNormalized[normalizedHeader];
+        if (!targetColumnIndex) {
+          validationReport.warnings.push(
+            'Skipped validation for "' +
+              tableName +
+              '.' +
+              declaredHeader +
+              '" because the header is missing.'
+          );
+          continue;
+        }
+
+        var resolvedEnumKey = resolveEnumKey_(enumRef, enumColumnIndexByKey);
+        if (!resolvedEnumKey) {
+          validationReport.warnings.push(
+            'Skipped validation for "' +
+              tableName +
+              '.' +
+              declaredHeader +
+              '" because enum "' +
+              enumRef +
+              '" was not found.'
+          );
+          continue;
+        }
+
+        var dropdownRange = getDropdownRangeForEnum_(
+          dropdownSheet,
+          enumColumnIndexByKey[resolvedEnumKey]
+        );
+        if (!dropdownRange) {
+          validationReport.warnings.push(
+            'Skipped validation for "' +
+              tableName +
+              '.' +
+              declaredHeader +
+              '" because enum "' +
+              resolvedEnumKey +
+              '" has no values.'
+          );
+          continue;
+        }
+
+        var startRow = settings.headerRowIndex + 1;
+        var endRow = Math.min(sheet.getMaxRows(), SPARKPLUG_VALIDATION_MAX_ROW_);
+        if (endRow < startRow) {
+          validationReport.warnings.push(
+            'Skipped validation for "' +
+              tableName +
+              '.' +
+              declaredHeader +
+              '" because there are no editable rows below the header.'
+          );
+          continue;
+        }
+
+        var targetRange = sheet.getRange(
+          startRow,
+          targetColumnIndex,
+          endRow - startRow + 1,
+          1
+        );
+        var rule = SpreadsheetApp.newDataValidation()
+          .requireValueInRange(dropdownRange, true)
+          .setAllowInvalid(true)
+          .build();
+
+        targetRange.setDataValidation(rule);
+        validationReport.validationsApplied += 1;
+
+        if (validationReport.examples.length < 10) {
+          validationReport.examples.push(
+            tableName + '.' + declaredHeader + ' -> ' + resolvedEnumKey
+          );
+        }
+      }
+    }
+
+    var summary = buildRefreshDropdownsSummary_(rewriteInfo, validationReport);
+    Logger.log(summary);
+    ui.alert('SparkPlug', summary, ui.ButtonSet.OK);
+  } catch (err) {
+    handleSparkPlugError_('Refresh Dropdowns failed', err);
+  }
+}
+
+function validateSheetStructureFromSheetSpec() {
+  var ui = SpreadsheetApp.getUi();
+
+  try {
+    var context = loadSheetSpecContext_(true);
+    var sheetSpec = context.sheetSpec;
+    var settings = context.settings;
+    var report = {
+      errors: [],
+      warnings: [],
+      okTables: []
+    };
+
+    var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
+    for (var i = 0; i < tables.length; i++) {
+      var tableSpec = tables[i] || {};
+      var tableName = String(tableSpec.name || '').trim();
+      if (!tableName) {
+        continue;
+      }
+
+      var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+      if (!sheet) {
+        if (tableSpec.required === true) {
+          report.errors.push('Missing required sheet "' + tableName + '".');
+        }
+        continue;
+      }
+
+      var header = readHeader_(sheet, settings.headerRowIndex);
+      var headerInfo = analyzeHeader_(header);
+      var tableHasErrors = false;
+      var tableHasWarnings = false;
+
+      if (headerInfo.lastUsedColumn === 0) {
+        report.warnings.push(
+          'Sheet "' +
+            tableName +
+            '" has an empty header row at row ' +
+            settings.headerRowIndex +
+            '.'
+        );
+        tableHasWarnings = true;
+      }
+
+      if (headerInfo.blankColumnIndexes.length > 0) {
+        report.warnings.push(
+          'Sheet "' +
+            tableName +
+            '" has blank header cells at columns ' +
+            headerInfo.blankColumnIndexes.join(', ') +
+            '.'
+        );
+        tableHasWarnings = true;
+      }
+
+      if (headerInfo.duplicates.length > 0) {
+        report.errors.push(
+          'Sheet "' +
+            tableName +
+            '" has duplicate headers (case-insensitive): ' +
+            headerInfo.duplicates.join(', ') +
+            '.'
+        );
+        tableHasErrors = true;
+      }
+
+      var declaredColumns = getDeclaredColumns_(tableSpec);
+      for (var c = 0; c < declaredColumns.length; c++) {
+        var declared = declaredColumns[c];
+        if (
+          declared.required &&
+          !headerInfo.indexByNormalized[normalizeHeaderName_(declared.name)]
+        ) {
+          report.errors.push(
+            'Sheet "' +
+              tableName +
+              '" is missing required column "' +
+              declared.name +
+              '".'
+          );
+          tableHasErrors = true;
+        }
+      }
+
+      if (!settings.allowExtraColumns) {
+        var extraHeaders = [];
+        for (var h = 0; h < headerInfo.headersWithinUsedRange.length; h++) {
+          var headerName = headerInfo.headersWithinUsedRange[h];
+          if (!headerName) {
+            continue;
+          }
+
+          if (!declaredColumns.normalizedNameSet[normalizeHeaderName_(headerName)]) {
+            extraHeaders.push(headerName);
+          }
+        }
+
+        if (extraHeaders.length > 0) {
+          report.warnings.push(
+            'Sheet "' +
+              tableName +
+              '" has extra columns not declared in sheetSpec: ' +
+              extraHeaders.join(', ') +
+              '.'
+          );
+          tableHasWarnings = true;
+        }
+      }
+
+      if (!tableHasErrors && !tableHasWarnings) {
+        report.okTables.push(tableName);
+      }
+    }
+
+    var summary = buildValidateStructureSummary_(report, tables.length);
+    Logger.log(summary);
+    ui.alert('SparkPlug', summary, ui.ButtonSet.OK);
+  } catch (err) {
+    handleSparkPlugError_('Validate Sheet Structure failed', err);
+  }
+}
+
+function getPackMetaValue_(key) {
+  var layout = getPackMetaLayout_();
+  var lookupKey = String(key || '').trim();
+  if (!lookupKey) {
+    return null;
+  }
+
+  var sheet = layout.sheet;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return null;
+  }
+
+  var width = Math.max(layout.keyColumn, layout.valueColumn);
+  var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var rowKey = String(values[i][layout.keyColumn - 1] || '').trim();
+    if (rowKey === lookupKey) {
+      var value = String(values[i][layout.valueColumn - 1] || '').trim();
+      return value || null;
+    }
+  }
+
+  return null;
+}
+
+function setPackMetaValue_(key, value) {
+  var layout = getPackMetaLayout_();
+  var writeKey = String(key || '').trim();
+  var writeValue = String(value || '').trim();
+  if (!writeKey) {
+    throw new Error('setPackMetaValue_: key is empty.');
+  }
+
+  var sheet = layout.sheet;
+  var width = Math.max(layout.keyColumn, layout.valueColumn);
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+    for (var i = 0; i < values.length; i++) {
+      var rowKey = String(values[i][layout.keyColumn - 1] || '').trim();
+      if (rowKey === writeKey) {
+        var rowIndex = i + 2;
+        var currentValue = String(
+          values[i][layout.valueColumn - 1] || ''
+        ).trim();
+        if (currentValue !== writeValue) {
+          sheet.getRange(rowIndex, layout.valueColumn).setValue(writeValue);
+        }
+        return;
+      }
+    }
+  }
+
+  var appendRow = Math.max(2, lastRow + 1);
+  if (appendRow > sheet.getMaxRows()) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), appendRow - sheet.getMaxRows());
+  }
+
+  var row = [];
+  for (var c = 0; c < width; c++) {
+    row.push('');
+  }
+  row[layout.keyColumn - 1] = writeKey;
+  row[layout.valueColumn - 1] = writeValue;
+  sheet.getRange(appendRow, 1, 1, width).setValues([row]);
+}
+
+function promptForSchemaUrl_() {
+  var ui = SpreadsheetApp.getUi();
+  var result = ui.prompt(
+    'SparkPlug Schema URL',
+    'Enter the schemaUrl for the schema JSON that contains sheetSpec:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    throw new Error('Schema URL prompt was cancelled.');
+  }
+
+  var schemaUrl = String(result.getResponseText() || '').trim();
+  if (!schemaUrl) {
+    throw new Error('Schema URL is empty.');
+  }
+
+  setPackMetaValue_('schemaUrl', schemaUrl);
+  return schemaUrl;
 }
 
 function fetchSchema_(schemaUrl) {
@@ -151,17 +436,19 @@ function fetchSchema_(schemaUrl) {
     throw new Error('fetchSchema_: schemaUrl is empty.');
   }
 
-  var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  var code = response.getResponseCode();
-  if (code !== 200) {
-    throw new Error('fetchSchema_: HTTP ' + code + ' for URL: ' + url);
+  var response = UrlFetchApp.fetch(url, {
+    followRedirects: true,
+    muteHttpExceptions: true
+  });
+  var responseCode = response.getResponseCode();
+  if (responseCode !== 200) {
+    throw new Error('fetchSchema_: HTTP ' + responseCode + ' for ' + url);
   }
 
-  var body = response.getContentText();
   try {
-    return JSON.parse(body);
+    return JSON.parse(response.getContentText());
   } catch (err) {
-    throw new Error('fetchSchema_: schema JSON parse failed. ' + err.message);
+    throw new Error('fetchSchema_: invalid JSON. ' + err.message);
   }
 }
 
@@ -181,275 +468,497 @@ function getSheetSpec_(schema) {
   return schema.sheetSpec;
 }
 
-function getPackMetaValue_(key) {
-  var lookupKey = String(key || '').trim();
-  if (!lookupKey) {
-    return null;
-  }
-
+function getOrCreateSheet_(name) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('PackMeta');
-  if (!sheet) {
-    return null;
+  var sheet = ss.getSheetByName(name);
+  if (sheet) {
+    return sheet;
   }
 
-  var header = readPackMetaHeader_(sheet);
-  var keyCol = header.keyCol;
-  var valueCol = header.valueCol;
+  return ss.insertSheet(name);
+}
 
-  var lastRow = sheet.getLastRow();
-  var width = Math.max(sheet.getLastColumn(), Math.max(keyCol, valueCol));
-  if (lastRow <= 1 || width <= 0) {
-    return null;
+function readHeader_(sheet, headerRowIndex) {
+  var lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) {
+    return [];
   }
 
-  var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+  var values = sheet.getRange(headerRowIndex, 1, 1, lastColumn).getValues()[0];
+  var header = [];
   for (var i = 0; i < values.length; i++) {
-    var row = values[i];
-    var rowKey = String(row[keyCol - 1] || '').trim();
-    if (rowKey === lookupKey) {
-      var value = String(row[valueCol - 1] || '').trim();
-      return value || null;
+    header.push(String(values[i] || '').trim());
+  }
+
+  return header;
+}
+
+function writeHeader_(sheet, headerRowIndex, headers) {
+  if (!headers || headers.length === 0) {
+    return;
+  }
+
+  ensureSheetColumnCapacity_(sheet, headers.length);
+  sheet.getRange(headerRowIndex, 1, 1, headers.length).setValues([headers]);
+}
+
+function buildEnumTable_(sheetSpec) {
+  var enumKeys = [];
+  var columns = [];
+  var enumsRoot = sheetSpec && sheetSpec.enums;
+
+  if (!enumsRoot || typeof enumsRoot !== 'object') {
+    return { enumKeys: enumKeys, columns: columns };
+  }
+
+  flattenEnumNode_(enumsRoot, 'enums', enumKeys, columns);
+  return { enumKeys: enumKeys, columns: columns };
+}
+
+function getDropdownRangeForEnum_(dropdownSheet, enumColumnIndex) {
+  var lastRow = dropdownSheet.getLastRow();
+  if (lastRow < 2) {
+    return null;
+  }
+
+  var values = dropdownSheet
+    .getRange(2, enumColumnIndex, lastRow - 1, 1)
+    .getDisplayValues();
+  var lastNonEmptyOffset = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0] || '').trim() !== '') {
+      lastNonEmptyOffset = i + 1;
+    }
+  }
+
+  if (lastNonEmptyOffset === 0) {
+    return null;
+  }
+
+  return dropdownSheet.getRange(2, enumColumnIndex, lastNonEmptyOffset, 1);
+}
+
+function loadSheetSpecContext_(promptIfMissing) {
+  var schemaUrl = getPackMetaValue_('schemaUrl');
+  if (!schemaUrl && promptIfMissing) {
+    schemaUrl = promptForSchemaUrl_();
+  }
+
+  if (!schemaUrl) {
+    throw new Error(
+      'PackMeta.schemaUrl is missing. Add it to PackMeta or run again and provide it when prompted.'
+    );
+  }
+
+  var schema = fetchSchema_(schemaUrl);
+  var sheetSpec = getSheetSpec_(schema);
+  var settings = getSheetSpecSettings_(sheetSpec);
+
+  return {
+    schemaUrl: schemaUrl,
+    schema: schema,
+    sheetSpec: sheetSpec,
+    settings: settings
+  };
+}
+
+function getSheetSpecSettings_(sheetSpec) {
+  var rawSettings = (sheetSpec && sheetSpec.settings) || {};
+  var headerRowIndex = parseInt(rawSettings.headerRowIndex, 10);
+  if (!isFinite(headerRowIndex) || headerRowIndex < 1) {
+    headerRowIndex = 1;
+  }
+
+  var newColumnsPolicy = String(
+    rawSettings.newColumnsPolicy || 'append'
+  ).trim();
+  if (newColumnsPolicy !== 'append') {
+    throw new Error(
+      'sheetSpec.settings.newColumnsPolicy must be "append". Found "' +
+        newColumnsPolicy +
+        '".'
+    );
+  }
+
+  return {
+    headerRowIndex: headerRowIndex,
+    freezeHeaderRow: rawSettings.freezeHeaderRow !== false,
+    allowExtraColumns: rawSettings.allowExtraColumns !== false,
+    newColumnsPolicy: newColumnsPolicy
+  };
+}
+
+function ensureTableFromSheetSpec_(tableSpec, settings) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tableName = String((tableSpec && tableSpec.name) || '').trim();
+  if (!tableName) {
+    throw new Error('ensureTableFromSheetSpec_: table name is empty.');
+  }
+
+  var sheet = ss.getSheetByName(tableName);
+  var createdSheet = false;
+  if (!sheet) {
+    sheet = ss.insertSheet(tableName);
+    createdSheet = true;
+  }
+
+  var declaredColumns = getDeclaredColumns_(tableSpec);
+  var header = readHeader_(sheet, settings.headerRowIndex);
+  var headerInfo = analyzeHeader_(header);
+  var addedColumns = [];
+
+  if (headerInfo.lastUsedColumn === 0) {
+    var orderedHeaders = [];
+    for (var i = 0; i < declaredColumns.length; i++) {
+      orderedHeaders.push(declaredColumns[i].name);
+    }
+
+    if (orderedHeaders.length > 0) {
+      writeHeader_(sheet, settings.headerRowIndex, orderedHeaders);
+      addedColumns = orderedHeaders.slice();
+    }
+  } else {
+    var toAppend = [];
+    for (var c = 0; c < declaredColumns.length; c++) {
+      var declared = declaredColumns[c];
+      if (
+        !headerInfo.indexByNormalized[normalizeHeaderName_(declared.name)]
+      ) {
+        toAppend.push(declared.name);
+      }
+    }
+
+    if (toAppend.length > 0) {
+      var startColumn = headerInfo.lastUsedColumn + 1;
+      ensureSheetColumnCapacity_(sheet, startColumn + toAppend.length - 1);
+      sheet
+        .getRange(settings.headerRowIndex, startColumn, 1, toAppend.length)
+        .setValues([toAppend]);
+      addedColumns = toAppend;
+    }
+  }
+
+  var frozeHeaderRow = false;
+  if (
+    settings.freezeHeaderRow &&
+    sheet.getFrozenRows() !== settings.headerRowIndex
+  ) {
+    sheet.setFrozenRows(settings.headerRowIndex);
+    frozeHeaderRow = true;
+  }
+
+  return {
+    createdSheet: createdSheet,
+    addedColumns: addedColumns,
+    frozeHeaderRow: frozeHeaderRow
+  };
+}
+
+function rewriteDropdownSheet_(dropdownSheet, enumTable) {
+  dropdownSheet.clear();
+
+  var enumKeys = enumTable.enumKeys || [];
+  var columns = enumTable.columns || [];
+  if (enumKeys.length === 0) {
+    dropdownSheet.setFrozenRows(1);
+    return {
+      enumCount: 0,
+      optionCount: 0
+    };
+  }
+
+  var maxValues = 0;
+  for (var i = 0; i < columns.length; i++) {
+    maxValues = Math.max(maxValues, columns[i].length);
+  }
+
+  var rowCount = Math.max(1, maxValues + 1);
+  var columnCount = enumKeys.length;
+  ensureSheetRowCapacity_(dropdownSheet, rowCount);
+  ensureSheetColumnCapacity_(dropdownSheet, columnCount);
+
+  var matrix = [];
+  for (var r = 0; r < rowCount; r++) {
+    var row = [];
+    for (var c = 0; c < columnCount; c++) {
+      row.push('');
+    }
+    matrix.push(row);
+  }
+
+  for (i = 0; i < enumKeys.length; i++) {
+    matrix[0][i] = enumKeys[i];
+    for (r = 0; r < columns[i].length; r++) {
+      matrix[r + 1][i] = columns[i][r];
+    }
+  }
+
+  dropdownSheet.getRange(1, 1, rowCount, columnCount).setValues(matrix);
+  dropdownSheet.setFrozenRows(1);
+
+  return {
+    enumCount: enumKeys.length,
+    optionCount: maxValues
+  };
+}
+
+function getDeclaredColumns_(tableSpec) {
+  var columns = Array.isArray(tableSpec.columns) ? tableSpec.columns : [];
+  var result = [];
+  var normalizedNameSet = {};
+
+  for (var i = 0; i < columns.length; i++) {
+    var columnSpec = columns[i] || {};
+    var name = String(columnSpec.name || '').trim();
+    if (!name) {
+      continue;
+    }
+
+    result.push({
+      name: name,
+      required: columnSpec.required === true,
+      type: String(columnSpec.type || '').trim(),
+      enumRef: String(columnSpec.enumRef || '').trim()
+    });
+    normalizedNameSet[normalizeHeaderName_(name)] = true;
+  }
+
+  result.normalizedNameSet = normalizedNameSet;
+  return result;
+}
+
+function analyzeHeader_(header) {
+  var trimmedHeader = header || [];
+  var lastUsedColumn = 0;
+  var indexByNormalized = {};
+  var duplicates = [];
+  var blankColumnIndexes = [];
+
+  for (var i = 0; i < trimmedHeader.length; i++) {
+    if (String(trimmedHeader[i] || '').trim() !== '') {
+      lastUsedColumn = i + 1;
+    }
+  }
+
+  var headersWithinUsedRange = trimmedHeader.slice(0, lastUsedColumn);
+  for (i = 0; i < headersWithinUsedRange.length; i++) {
+    var headerName = String(headersWithinUsedRange[i] || '').trim();
+    if (!headerName) {
+      blankColumnIndexes.push(i + 1);
+      continue;
+    }
+
+    var normalized = normalizeHeaderName_(headerName);
+    if (indexByNormalized[normalized]) {
+      duplicates.push(headerName);
+      continue;
+    }
+
+    indexByNormalized[normalized] = i + 1;
+  }
+
+  return {
+    lastUsedColumn: lastUsedColumn,
+    headersWithinUsedRange: headersWithinUsedRange,
+    indexByNormalized: indexByNormalized,
+    duplicates: duplicates,
+    blankColumnIndexes: blankColumnIndexes
+  };
+}
+
+function normalizeHeaderName_(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function resolveEnumKey_(enumRef, enumColumnIndexByKey) {
+  var key = String(enumRef || '').trim();
+  if (!key) {
+    return null;
+  }
+
+  if (enumColumnIndexByKey[key]) {
+    return key;
+  }
+
+  if (key.indexOf('enums.') === 0) {
+    var stripped = key.substring(6);
+    if (enumColumnIndexByKey[stripped]) {
+      return stripped;
+    }
+  } else {
+    var prefixed = 'enums.' + key;
+    if (enumColumnIndexByKey[prefixed]) {
+      return prefixed;
     }
   }
 
   return null;
 }
 
-function setPackMetaValue_(key, value) {
-  var writeKey = String(key || '').trim();
-  var writeValue = String(value || '').trim();
-  if (!writeKey) {
-    throw new Error('setPackMetaValue_: key is empty.');
-  }
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('PackMeta');
-  if (!sheet) {
-    sheet = ss.insertSheet('PackMeta');
-  }
-
-  var header = readPackMetaHeader_(sheet);
-  var keyCol = header.keyCol;
-  var valueCol = header.valueCol;
-  var width = Math.max(sheet.getLastColumn(), Math.max(keyCol, valueCol));
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    var values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
-    for (var i = 0; i < values.length; i++) {
-      var rowKey = String(values[i][keyCol - 1] || '').trim();
-      if (rowKey === writeKey) {
-        sheet.getRange(i + 2, valueCol).setValue(writeValue);
-        return;
+function flattenEnumNode_(node, prefix, enumKeys, columns) {
+  if (Array.isArray(node)) {
+    var values = [];
+    for (var i = 0; i < node.length; i++) {
+      var value = String(node[i] || '').trim();
+      if (value !== '') {
+        values.push(value);
       }
     }
+
+    enumKeys.push(prefix);
+    columns.push(values);
+    return;
   }
 
-  var appendAt = Math.max(2, lastRow + 1);
-  if (sheet.getMaxRows() < appendAt) {
-    sheet.insertRowsAfter(sheet.getMaxRows(), appendAt - sheet.getMaxRows());
+  if (!node || typeof node !== 'object') {
+    return;
   }
 
-  var out = [];
-  for (var c = 0; c < width; c++) {
-    out.push('');
+  var keys = Object.keys(node);
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    var nextPrefix = prefix ? prefix + '.' + key : key;
+    flattenEnumNode_(node[key], nextPrefix, enumKeys, columns);
   }
-  out[keyCol - 1] = writeKey;
-  out[valueCol - 1] = writeValue;
-  sheet.getRange(appendAt, 1, 1, width).setValues([out]);
 }
 
-function ensureTable_(tableSpec, settings) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var tableName = String(tableSpec.name || '').trim();
-  if (!tableName) {
-    throw new Error('ensureTable_: table name is empty.');
-  }
-
-  var headerRowIndex = Number(settings.headerRowIndex);
-  if (!isFinite(headerRowIndex) || headerRowIndex < 1) {
-    headerRowIndex = 1;
-  } else {
-    headerRowIndex = Math.floor(headerRowIndex);
-  }
-
-  var declaredColumns = Array.isArray(tableSpec.columns) ? tableSpec.columns : [];
-  var normalizedColumns = [];
-  for (var i = 0; i < declaredColumns.length; i++) {
-    var col = declaredColumns[i] || {};
-    var name = String(col.name || '').trim();
-    if (!name) {
-      continue;
-    }
-    normalizedColumns.push({
-      name: name,
-      required: col.required === true,
-      type: String(col.type || '').trim()
-    });
-  }
-
-  var createdSheet = false;
-  var sheet = ss.getSheetByName(tableName);
+function getPackMetaLayout_() {
+  var sheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName('PackMeta');
   if (!sheet) {
-    sheet = ss.insertSheet(tableName);
-    createdSheet = true;
+    throw new Error(
+      'PackMeta sheet is missing. Create a "PackMeta" sheet with "key" and "value" headers.'
+    );
   }
 
-  if (sheet.getMaxRows() < headerRowIndex) {
-    sheet.insertRowsAfter(sheet.getMaxRows(), headerRowIndex - sheet.getMaxRows());
-  }
-
-  var currentLastCol = Math.max(sheet.getLastColumn(), 1);
-  var headerRange = sheet.getRange(headerRowIndex, 1, 1, currentLastCol);
-  var headerValues = headerRange.getValues()[0];
-
-  var isHeaderBlank = true;
-  for (var h = 0; h < headerValues.length; h++) {
-    if (String(headerValues[h] || '').trim() !== '') {
-      isHeaderBlank = false;
-      break;
+  var header = readHeader_(sheet, 1);
+  var keyColumn = 0;
+  var valueColumn = 0;
+  for (var i = 0; i < header.length; i++) {
+    var normalized = normalizeHeaderName_(header[i]);
+    if (normalized === 'key' && !keyColumn) {
+      keyColumn = i + 1;
+    } else if (normalized === 'value' && !valueColumn) {
+      valueColumn = i + 1;
     }
   }
 
-  var addedColumns = [];
-  var addedRequiredColumns = [];
-
-  if (isHeaderBlank) {
-    var ordered = normalizedColumns.map(function(col) {
-      return col.name;
-    });
-
-    if (ordered.length > 0) {
-      sheet.getRange(headerRowIndex, 1, 1, ordered.length).setValues([ordered]);
-      addedColumns = ordered.slice();
-      for (var r = 0; r < normalizedColumns.length; r++) {
-        if (normalizedColumns[r].required) {
-          addedRequiredColumns.push(normalizedColumns[r].name);
-        }
-      }
-    }
-  } else {
-    var existingHeaderSet = {};
-    for (var e = 0; e < headerValues.length; e++) {
-      var existingName = String(headerValues[e] || '').trim();
-      if (!existingName) {
-        continue;
-      }
-      existingHeaderSet[existingName] = true;
-    }
-
-    var toAppend = [];
-    for (var cIdx = 0; cIdx < normalizedColumns.length; cIdx++) {
-      var declared = normalizedColumns[cIdx];
-      if (!existingHeaderSet[declared.name]) {
-        toAppend.push(declared.name);
-        existingHeaderSet[declared.name] = true;
-        if (declared.required) {
-          addedRequiredColumns.push(declared.name);
-        }
-      }
-    }
-
-    if (toAppend.length > 0) {
-      var startCol = Math.max(sheet.getLastColumn(), 1) + 1;
-      sheet.getRange(headerRowIndex, startCol, 1, toAppend.length).setValues([toAppend]);
-      addedColumns = toAppend;
-    }
-  }
-
-  if (settings.freezeHeaderRow !== false) {
-    sheet.setFrozenRows(headerRowIndex);
+  if (!keyColumn || !valueColumn) {
+    throw new Error(
+      'PackMeta must have "key" and "value" headers in row 1.'
+    );
   }
 
   return {
-    createdSheet: createdSheet,
-    addedColumns: addedColumns,
-    addedRequiredColumns: addedRequiredColumns
+    sheet: sheet,
+    keyColumn: keyColumn,
+    valueColumn: valueColumn
   };
 }
 
-function readPackMetaHeader_(sheet) {
-  var minWidth = Math.max(sheet.getLastColumn(), 2);
-  var headerValues = sheet.getRange(1, 1, 1, minWidth).getValues()[0];
-
-  var keyCol = -1;
-  var valueCol = -1;
-  for (var i = 0; i < headerValues.length; i++) {
-    var header = String(headerValues[i] || '').trim();
-    if (header === 'key') {
-      keyCol = i + 1;
-    } else if (header === 'value') {
-      valueCol = i + 1;
-    }
+function ensureSheetRowCapacity_(sheet, requiredRows) {
+  var maxRows = sheet.getMaxRows();
+  if (maxRows < requiredRows) {
+    sheet.insertRowsAfter(maxRows, requiredRows - maxRows);
   }
-
-  if (keyCol <= 0) {
-    keyCol = Math.max(sheet.getLastColumn(), 0) + 1;
-    sheet.getRange(1, keyCol).setValue('key');
-  }
-
-  if (valueCol <= 0) {
-    valueCol = Math.max(sheet.getLastColumn(), 0) + 1;
-    sheet.getRange(1, valueCol).setValue('value');
-  }
-
-  return { keyCol: keyCol, valueCol: valueCol };
 }
 
-function buildSummary_(report) {
+function ensureSheetColumnCapacity_(sheet, requiredColumns) {
+  var maxColumns = sheet.getMaxColumns();
+  if (maxColumns < requiredColumns) {
+    sheet.insertColumnsAfter(maxColumns, requiredColumns - maxColumns);
+  }
+}
+
+function buildEnsureTabsSummary_(report) {
   var lines = [];
-  lines.push('Ensure Tabs & Headers (from sheetSpec) complete.');
-  lines.push('');
-
-  if (report.createdTabs.length > 0) {
-    lines.push('Created tabs:');
-    for (var i = 0; i < report.createdTabs.length; i++) {
-      lines.push('- ' + report.createdTabs[i]);
-    }
-  } else {
-    lines.push('Created tabs: none');
-  }
-
-  lines.push('');
   var tabNames = Object.keys(report.addedColumnsByTab);
-  if (tabNames.length > 0) {
-    lines.push('Added columns by tab:');
-    for (var t = 0; t < tabNames.length; t++) {
-      var tab = tabNames[t];
-      lines.push('- ' + tab + ': ' + report.addedColumnsByTab[tab].join(', '));
+
+  lines.push('Ensure Tabs & Headers complete.');
+  lines.push('Created tabs: ' + formatListOrNone_(report.createdTabs));
+  if (tabNames.length === 0) {
+    lines.push('Added columns: none');
+  } else {
+    lines.push('Added columns:');
+    for (var i = 0; i < tabNames.length; i++) {
+      var tabName = tabNames[i];
+      lines.push('- ' + tabName + ': ' + report.addedColumnsByTab[tabName].join(', '));
     }
-  } else {
-    lines.push('Added columns by tab: none');
+  }
+  lines.push('Header row frozen on: ' + formatListOrNone_(report.frozenTabs));
+
+  if (report.skippedOptionalTabs.length > 0) {
+    lines.push(
+      'Optional sheets not present and left untouched: ' +
+        report.skippedOptionalTabs.join(', ')
+    );
   }
 
-  lines.push('');
-  if (report.requiredTabsCreated.length > 0) {
-    lines.push('Required tabs created: ' + report.requiredTabsCreated.join(', '));
-  } else {
-    lines.push('Required tabs created: none');
-  }
+  return lines.join('\n');
+}
 
-  var reqTabNames = Object.keys(report.requiredColumnsAddedByTab);
-  if (reqTabNames.length > 0) {
-    lines.push('Required columns added:');
-    for (var r = 0; r < reqTabNames.length; r++) {
-      var reqTab = reqTabNames[r];
-      lines.push(
-        '- ' + reqTab + ': ' + report.requiredColumnsAddedByTab[reqTab].join(', ')
-      );
+function buildRefreshDropdownsSummary_(rewriteInfo, validationReport) {
+  var lines = [];
+  lines.push('Refresh Dropdowns complete.');
+  lines.push(
+    'Dropdowns rewritten with ' +
+      rewriteInfo.enumCount +
+      ' enum columns and up to ' +
+      rewriteInfo.optionCount +
+      ' values per enum.'
+  );
+  lines.push('Validations applied: ' + validationReport.validationsApplied);
+
+  if (validationReport.examples.length > 0) {
+    lines.push('Examples:');
+    for (var i = 0; i < validationReport.examples.length; i++) {
+      lines.push('- ' + validationReport.examples[i]);
     }
-  } else {
-    lines.push('Required columns added: none');
   }
 
-  if (report.warnings.length > 0) {
-    lines.push('');
+  if (validationReport.warnings.length > 0) {
     lines.push('Warnings:');
-    for (var w = 0; w < report.warnings.length; w++) {
-      lines.push('- ' + report.warnings[w]);
+    for (i = 0; i < validationReport.warnings.length; i++) {
+      lines.push('- ' + validationReport.warnings[i]);
     }
   }
 
   return lines.join('\n');
+}
+
+function buildValidateStructureSummary_(report, totalTables) {
+  var lines = [];
+  lines.push('Validate Sheet Structure complete.');
+  lines.push('Errors: ' + report.errors.length);
+  if (report.errors.length > 0) {
+    for (var i = 0; i < report.errors.length; i++) {
+      lines.push('- ' + report.errors[i]);
+    }
+  }
+
+  lines.push('Warnings: ' + report.warnings.length);
+  if (report.warnings.length > 0) {
+    for (i = 0; i < report.warnings.length; i++) {
+      lines.push('- ' + report.warnings[i]);
+    }
+  }
+
+  lines.push('OK tables: ' + report.okTables.length + ' / ' + totalTables);
+  if (report.okTables.length > 0) {
+    lines.push('OK: ' + report.okTables.join(', '));
+  }
+
+  return lines.join('\n');
+}
+
+function formatListOrNone_(items) {
+  return items && items.length > 0 ? items.join(', ') : 'none';
+}
+
+function handleSparkPlugError_(prefix, err) {
+  var ui = SpreadsheetApp.getUi();
+  var message = prefix + ': ' + (err && err.message ? err.message : err);
+  Logger.log(message);
+  ui.alert('SparkPlug', message, ui.ButtonSet.OK);
 }
