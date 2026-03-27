@@ -6,26 +6,23 @@
  * addSparkPlugSheetToolsMenuItems_(menu) before addToUi().
  */
 
-var SPARKPLUG_DROPDOWNS_SHEET_NAME_ = "Dropdowns";
-var SPARKPLUG_VALIDATION_MAX_ROW_ = 1000;
-var SPARKPLUG_HEADER_FONT_COLOR_ = "#ffffff";
-var SPARKPLUG_HEADER_BACKGROUND_COLOR_ = "#000000";
+var SPARK_PLUG_DROPDOWNS_SHEET_NAME_ = "Dropdowns";
+var SPARK_PLUG_VALIDATION_MAX_ROW_ = 1000;
+var SPARK_PLUG_HEADER_FONT_COLOR_ = "#ffffff";
+var SPARK_PLUG_HEADER_BACKGROUND_COLOR_ = "#000000";
+
+function installMenu() {
+  var menu = SpreadsheetApp.getUi().createMenu("SparkPlug");
+  addSparkPlugSheetToolsMenuItems_(menu);
+  menu.addToUi();
+}
 
 function addSparkPlugSheetToolsMenuItems_(menu) {
   menu
     .addSeparator()
-    .addItem(
-      "Ensure Tabs & Headers (from sheetSpec)",
-      "ensureTabsAndHeadersFromSheetSpec",
-    )
-    .addItem(
-      "Refresh Dropdowns (from sheetSpec)",
-      "refreshDropdownsFromSheetSpec",
-    )
-    .addItem(
-      "Validate Sheet Structure (from sheetSpec)",
-      "validateSheetStructureFromSheetSpec",
-    );
+    .addItem("Ensure Tabs & Headers", "ensureTabsAndHeadersFromSheetSpec")
+    .addItem("Refresh Dropdowns", "refreshDropdownsFromSheetSpec")
+    .addItem("Validate Sheet Structure", "validateSheetStructureFromSheetSpec");
 
   return menu;
 }
@@ -87,7 +84,7 @@ function refreshDropdownsFromSheetSpec() {
     var sheetSpec = context.sheetSpec;
     var settings = context.settings;
     var enumTable = buildEnumTable_(sheetSpec);
-    var dropdownSheet = getOrCreateSheet_(SPARKPLUG_DROPDOWNS_SHEET_NAME_);
+    var dropdownSheet = getOrCreateSheet_(SPARK_PLUG_DROPDOWNS_SHEET_NAME_);
     var rewriteInfo = rewriteDropdownSheet_(dropdownSheet, enumTable);
     var validationReport = {
       validationsApplied: 0,
@@ -181,7 +178,7 @@ function refreshDropdownsFromSheetSpec() {
         var startRow = settings.headerRowIndex + 1;
         var endRow = Math.min(
           sheet.getMaxRows(),
-          SPARKPLUG_VALIDATION_MAX_ROW_,
+          SPARK_PLUG_VALIDATION_MAX_ROW_,
         );
         if (endRow < startRow) {
           validationReport.warnings.push(
@@ -731,8 +728,8 @@ function rewriteDropdownSheet_(dropdownSheet, enumTable) {
 
 function styleHeaderRange_(range) {
   range
-    .setFontColor(SPARKPLUG_HEADER_FONT_COLOR_)
-    .setBackground(SPARKPLUG_HEADER_BACKGROUND_COLOR_);
+    .setFontColor(SPARK_PLUG_HEADER_FONT_COLOR_)
+    .setBackground(SPARK_PLUG_HEADER_BACKGROUND_COLOR_);
 }
 
 function getDeclaredColumns_(tableSpec) {
