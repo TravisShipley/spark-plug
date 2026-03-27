@@ -13,9 +13,15 @@ function onOpen() {
 function ensureTabsAndHeadersFromSheetSpec() {
   SparkPlugSheetTools.ensureTabsAndHeadersFromSheetSpec();
 }
+function validateSheetStructureFromSheetSpec() {
+  SparkPlugSheetTools.validateSheetStructureFromSheetSpec();
+}
 function refreshDropdownsFromSheetSpec() {
   SparkPlugSheetTools.refreshDropdownsFromSheetSpec();
 }
-function validateSheetStructureFromSheetSpec() {
-  SparkPlugSheetTools.validateSheetStructureFromSheetSpec();
+function applyValidationsAndStylingFromSheetSpec() {
+  SparkPlugSheetTools.applyValidationsAndStylingFromSheetSpec();
+}
+function clearValidationsAndStylingFromSheetSpec() {
+  SparkPlugSheetTools.clearValidationsAndStylingFromSheetSpec();
 }

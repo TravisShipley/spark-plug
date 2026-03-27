@@ -10,6 +10,9 @@ var SPARK_PLUG_DROPDOWNS_SHEET_NAME_ = "Dropdowns";
 var SPARK_PLUG_VALIDATION_MAX_ROW_ = 1000;
 var SPARK_PLUG_HEADER_FONT_COLOR_ = "#ffffff";
 var SPARK_PLUG_HEADER_BACKGROUND_COLOR_ = "#000000";
+var SPARK_PLUG_DROPDOWN_BACKGROUND_COLOR_ = "#FDF3D0";
+var SPARK_PLUG_TRUE_BACKGROUND_COLOR_ = "#D9ECC0";
+var SPARK_PLUG_FALSE_BACKGROUND_COLOR_ = "#F7D1CA";
 
 function installMenu() {
   var menu = SpreadsheetApp.getUi().createMenu("SparkPlug");
@@ -22,6 +25,14 @@ function addSparkPlugSheetToolsMenuItems_(menu) {
     .addSeparator()
     .addItem("Ensure Tabs & Headers", "ensureTabsAndHeadersFromSheetSpec")
     .addItem("Refresh Dropdowns", "refreshDropdownsFromSheetSpec")
+    .addItem(
+      "Apply Validations & Styling",
+      "applyValidationsAndStylingFromSheetSpec",
+    )
+    .addItem(
+      "Clear Validations & Styling",
+      "clearValidationsAndStylingFromSheetSpec",
+    )
     .addItem("Validate Sheet Structure", "validateSheetStructureFromSheetSpec");
 
   return menu;
@@ -78,7 +89,6 @@ function ensureTabsAndHeadersFromSheetSpec() {
 
 function refreshDropdownsFromSheetSpec() {
   var ui = SpreadsheetApp.getUi();
-
   try {
     var context = loadSheetSpecContext_(true);
     var sheetSpec = context.sheetSpec;
@@ -86,6 +96,22 @@ function refreshDropdownsFromSheetSpec() {
     var enumTable = buildEnumTable_(sheetSpec);
     var dropdownSheet = getOrCreateSheet_(SPARK_PLUG_DROPDOWNS_SHEET_NAME_);
     var rewriteInfo = rewriteDropdownSheet_(dropdownSheet, enumTable);
+    var summary = buildRefreshDropdownsSummary_(rewriteInfo);
+    Logger.log(summary);
+    ui.alert("SparkPlug", summary, ui.ButtonSet.OK);
+  } catch (err) {
+    handleSparkPlugError_("Refresh Dropdowns failed", err);
+  }
+}
+
+function applyValidationsAndStylingFromSheetSpec() {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var context = loadSheetSpecContext_(true);
+    var sheetSpec = context.sheetSpec;
+    var settings = context.settings;
+    var enumTable = buildEnumTable_(sheetSpec);
+    var dropdownSheet = getOrCreateSheet_(SPARK_PLUG_DROPDOWNS_SHEET_NAME_);
     var validationReport = {
       validationsApplied: 0,
       examples: [],
@@ -93,11 +119,9 @@ function refreshDropdownsFromSheetSpec() {
     };
     var enumColumnIndexByKey = {};
     var i;
-
     for (i = 0; i < enumTable.enumKeys.length; i++) {
       enumColumnIndexByKey[enumTable.enumKeys[i]] = i + 1;
     }
-
     var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
     for (i = 0; i < tables.length; i++) {
       var tableSpec = tables[i];
@@ -105,7 +129,6 @@ function refreshDropdownsFromSheetSpec() {
       if (!tableName) {
         continue;
       }
-
       var sheet =
         SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
       if (!sheet) {
@@ -114,23 +137,48 @@ function refreshDropdownsFromSheetSpec() {
         );
         continue;
       }
-
       var header = readHeader_(sheet, settings.headerRowIndex);
       var headerInfo = analyzeHeader_(header);
       var columns = Array.isArray(tableSpec.columns) ? tableSpec.columns : [];
-
+      // --- BEGIN: Compute rowsToApply and rowGroupsToApply ---
+      var startRow = settings.headerRowIndex + 1;
+      var scanEndRow = Math.min(
+        sheet.getLastRow(),
+        SPARK_PLUG_VALIDATION_MAX_ROW_,
+      );
+      var scanColumnCount = Math.max(1, headerInfo.lastUsedColumn || 1);
+      var rowsToApply = [];
+      // Always include the first editable row (typically row 2).
+      if (scanEndRow >= startRow) {
+        rowsToApply.push(startRow);
+      }
+      // Include rows that already have data anywhere in the used header range.
+      var dataRows = getRowsWithAnyData_(
+        sheet,
+        startRow,
+        scanEndRow,
+        scanColumnCount,
+      );
+      for (var dr = 0; dr < dataRows.length; dr++) {
+        if (rowsToApply.indexOf(dataRows[dr]) === -1) {
+          rowsToApply.push(dataRows[dr]);
+        }
+      }
+      rowsToApply.sort(function (a, b) {
+        return a - b;
+      });
+      var rowGroupsToApply = groupContiguousRows_(rowsToApply);
+      // --- END: Compute rowsToApply and rowGroupsToApply ---
       for (var c = 0; c < columns.length; c++) {
         var columnSpec = columns[c] || {};
-        var enumRef = String(columnSpec.enumRef || "").trim();
-        if (!enumRef) {
-          continue;
-        }
-
         var declaredHeader = String(columnSpec.name || "").trim();
         if (!declaredHeader) {
           continue;
         }
-
+        var enumRef = String(columnSpec.enumRef || "").trim();
+        var declaredType = String(columnSpec.type || "")
+          .trim()
+          .toLowerCase();
         var normalizedHeader = normalizeHeaderName_(declaredHeader);
         var targetColumnIndex = headerInfo.indexByNormalized[normalizedHeader];
         if (!targetColumnIndex) {
@@ -143,82 +191,397 @@ function refreshDropdownsFromSheetSpec() {
           );
           continue;
         }
-
-        var resolvedEnumKey = resolveEnumKey_(enumRef, enumColumnIndexByKey);
-        if (!resolvedEnumKey) {
+        // Instead of previous startRow/endRow/targetRange, use rowGroupsToApply
+        if (!rowGroupsToApply || rowGroupsToApply.length === 0) {
           validationReport.warnings.push(
             'Skipped validation for "' +
               tableName +
               "." +
               declaredHeader +
-              '" because enum "' +
-              enumRef +
-              '" was not found.',
+              '" because there are no rows to apply validations to.',
           );
           continue;
         }
-
-        var dropdownRange = getDropdownRangeForEnum_(
-          dropdownSheet,
-          enumColumnIndexByKey[resolvedEnumKey],
+        // Create a contiguous column range for conditional formatting (booleans) and as a fallback.
+        var endRowForColumn = Math.min(
+          sheet.getLastRow(),
+          SPARK_PLUG_VALIDATION_MAX_ROW_,
         );
-        if (!dropdownRange) {
-          validationReport.warnings.push(
-            'Skipped validation for "' +
-              tableName +
-              "." +
-              declaredHeader +
-              '" because enum "' +
-              resolvedEnumKey +
-              '" has no values.',
+        if (endRowForColumn < settings.headerRowIndex + 1) {
+          endRowForColumn = settings.headerRowIndex + 1;
+        }
+        var fullColumnRange = sheet.getRange(
+          settings.headerRowIndex + 1,
+          targetColumnIndex,
+          endRowForColumn - (settings.headerRowIndex + 1) + 1,
+          1,
+        );
+        // Clear any existing validations for this column within our managed range.
+        // We re-apply validations only to row 2 and rows that already contain data.
+        fullColumnRange.clearDataValidations();
+        // Apply validations/background only to rows that are row2 OR already contain data.
+        var targetRanges = [];
+        for (var g = 0; g < rowGroupsToApply.length; g++) {
+          var grp = rowGroupsToApply[g];
+          var grpCount = grp.endRow - grp.startRow + 1;
+          targetRanges.push(
+            sheet.getRange(grp.startRow, targetColumnIndex, grpCount, 1),
           );
+        }
+        // 1) Enum dropdowns
+        if (enumRef) {
+          var resolvedEnumKey = resolveEnumKey_(enumRef, enumColumnIndexByKey);
+          if (!resolvedEnumKey) {
+            validationReport.warnings.push(
+              'Skipped validation for "' +
+                tableName +
+                "." +
+                declaredHeader +
+                '" because enum "' +
+                enumRef +
+                '" was not found.',
+            );
+            continue;
+          }
+          var dropdownRange = getDropdownRangeForEnum_(
+            dropdownSheet,
+            enumColumnIndexByKey[resolvedEnumKey],
+          );
+          if (!dropdownRange) {
+            validationReport.warnings.push(
+              'Skipped validation for "' +
+                tableName +
+                "." +
+                declaredHeader +
+                '" because enum "' +
+                resolvedEnumKey +
+                '" has no values.',
+            );
+            continue;
+          }
+          var rule = SpreadsheetApp.newDataValidation()
+            .requireValueInRange(dropdownRange, true)
+            .setAllowInvalid(true)
+            .build();
+          clearSparkPlugDropdownTint_(fullColumnRange);
+          for (var tr = 0; tr < targetRanges.length; tr++) {
+            targetRanges[tr].setDataValidation(rule);
+            targetRanges[tr].setBackground(
+              SPARK_PLUG_DROPDOWN_BACKGROUND_COLOR_,
+            );
+          }
+          validationReport.validationsApplied += 1;
+          if (validationReport.examples.length < 10) {
+            validationReport.examples.push(
+              tableName + "." + declaredHeader + " -> " + resolvedEnumKey,
+            );
+          }
+          continue;
+        }
+        // 2) Booleans: checkbox + true/false conditional formatting
+        if (declaredType === "bool" || declaredType === "boolean") {
+          var checkboxRule = SpreadsheetApp.newDataValidation()
+            .requireCheckbox()
+            .setAllowInvalid(true)
+            .build();
+          for (var trb = 0; trb < targetRanges.length; trb++) {
+            targetRanges[trb].setDataValidation(checkboxRule);
+          }
+          // Apply conditional formatting for TRUE/FALSE backgrounds.
+          // Remove any prior SparkPlug TRUE/FALSE rules that target this exact range to keep this idempotent.
+          var a1Col = columnIndexToA1Letter_(targetColumnIndex);
+          var trueFormula =
+            "=$" + a1Col + (settings.headerRowIndex + 1) + "=TRUE";
+          var falseFormula =
+            "=$" + a1Col + (settings.headerRowIndex + 1) + "=FALSE";
+          var existingRules = sheet.getConditionalFormatRules();
+          var keptRules = [];
+          for (var r = 0; r < existingRules.length; r++) {
+            var ruleToCheck = existingRules[r];
+            var ranges = ruleToCheck.getRanges();
+            var matchesRange =
+              ranges &&
+              ranges.length === 1 &&
+              ranges[0].getA1Notation() === fullColumnRange.getA1Notation();
+            if (!matchesRange) {
+              keptRules.push(ruleToCheck);
+              continue;
+            }
+            var cond = ruleToCheck.getBooleanCondition
+              ? ruleToCheck.getBooleanCondition()
+              : null;
+            // Keep rules we can't confidently identify.
+            if (!cond) {
+              keptRules.push(ruleToCheck);
+              continue;
+            }
+            var condType = cond.getCriteriaType();
+            var condValues = cond.getCriteriaValues();
+            var isSparkPlugBoolRule =
+              condType === SpreadsheetApp.BooleanCriteria.CUSTOM_FORMULA &&
+              condValues &&
+              condValues.length === 1 &&
+              (condValues[0] === trueFormula || condValues[0] === falseFormula);
+            if (!isSparkPlugBoolRule) {
+              keptRules.push(ruleToCheck);
+            }
+          }
+          var trueRule = SpreadsheetApp.newConditionalFormatRule()
+            .whenFormulaSatisfied(trueFormula)
+            .setBackground(SPARK_PLUG_TRUE_BACKGROUND_COLOR_)
+            .setRanges([fullColumnRange])
+            .build();
+          var falseRule = SpreadsheetApp.newConditionalFormatRule()
+            .whenFormulaSatisfied(falseFormula)
+            .setBackground(SPARK_PLUG_FALSE_BACKGROUND_COLOR_)
+            .setRanges([fullColumnRange])
+            .build();
+          keptRules.push(trueRule);
+          keptRules.push(falseRule);
+          sheet.setConditionalFormatRules(keptRules);
+          validationReport.validationsApplied += 1;
+          if (validationReport.examples.length < 10) {
+            validationReport.examples.push(
+              tableName + "." + declaredHeader + " -> bool",
+            );
+          }
+          continue;
+        }
+      }
+    }
+    var summary = buildApplyValidationsSummary_(validationReport);
+    Logger.log(summary);
+    ui.alert("SparkPlug", summary, ui.ButtonSet.OK);
+  } catch (err) {
+    handleSparkPlugError_("Apply Validations & Styling failed", err);
+  }
+}
+function clearValidationsAndStylingFromSheetSpec() {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var context = loadSheetSpecContext_(true);
+    var sheetSpec = context.sheetSpec;
+    var settings = context.settings;
+
+    var report = {
+      columnsCleared: 0,
+      boolRulesRemoved: 0,
+      warnings: [],
+    };
+
+    var tables = Array.isArray(sheetSpec.tables) ? sheetSpec.tables : [];
+    for (var i = 0; i < tables.length; i++) {
+      var tableSpec = tables[i] || {};
+      var tableName = String((tableSpec && tableSpec.name) || "").trim();
+      if (!tableName) {
+        continue;
+      }
+
+      var sheet =
+        SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tableName);
+      if (!sheet) {
+        continue;
+      }
+
+      var header = readHeader_(sheet, settings.headerRowIndex);
+      var headerInfo = analyzeHeader_(header);
+
+      var columns = Array.isArray(tableSpec.columns) ? tableSpec.columns : [];
+      for (var c = 0; c < columns.length; c++) {
+        var columnSpec = columns[c] || {};
+        var declaredHeader = String(columnSpec.name || "").trim();
+        if (!declaredHeader) {
+          continue;
+        }
+
+        var enumRef = String(columnSpec.enumRef || "").trim();
+        var declaredType = String(columnSpec.type || "")
+          .trim()
+          .toLowerCase();
+
+        var isEnum = !!enumRef;
+        var isBool = declaredType === "bool" || declaredType === "boolean";
+        if (!isEnum && !isBool) {
+          continue;
+        }
+
+        var normalizedHeader = normalizeHeaderName_(declaredHeader);
+        var targetColumnIndex = headerInfo.indexByNormalized[normalizedHeader];
+        if (!targetColumnIndex) {
           continue;
         }
 
         var startRow = settings.headerRowIndex + 1;
-        var endRow = Math.min(
+        var endRowForColumn = Math.min(
           sheet.getMaxRows(),
           SPARK_PLUG_VALIDATION_MAX_ROW_,
         );
-        if (endRow < startRow) {
-          validationReport.warnings.push(
-            'Skipped validation for "' +
-              tableName +
-              "." +
-              declaredHeader +
-              '" because there are no editable rows below the header.',
-          );
-          continue;
+        if (endRowForColumn < startRow) {
+          endRowForColumn = startRow;
         }
 
-        var targetRange = sheet.getRange(
+        var fullColumnRange = sheet.getRange(
           startRow,
           targetColumnIndex,
-          endRow - startRow + 1,
+          endRowForColumn - startRow + 1,
           1,
         );
-        var rule = SpreadsheetApp.newDataValidation()
-          .requireValueInRange(dropdownRange, true)
-          .setAllowInvalid(true)
-          .build();
 
-        targetRange.setDataValidation(rule);
-        validationReport.validationsApplied += 1;
+        // Clear validations (removes dropdown/checkbox affordances).
+        fullColumnRange.clearDataValidations();
 
-        if (validationReport.examples.length < 10) {
-          validationReport.examples.push(
-            tableName + "." + declaredHeader + " -> " + resolvedEnumKey,
+        // Clear only SparkPlug dropdown tint (keeps other colors).
+        clearSparkPlugDropdownTint_(fullColumnRange);
+
+        // Remove SparkPlug TRUE/FALSE conditional formatting rules for boolean columns.
+        if (isBool) {
+          report.boolRulesRemoved += removeSparkPlugBoolRulesForRange_(
+            sheet,
+            fullColumnRange,
+            startRow,
+            targetColumnIndex,
           );
         }
+
+        report.columnsCleared += 1;
       }
     }
 
-    var summary = buildRefreshDropdownsSummary_(rewriteInfo, validationReport);
+    var lines = [];
+    lines.push("Clear Validations & Styling complete.");
+    lines.push("Columns cleared: " + report.columnsCleared);
+    lines.push("Bool rules removed: " + report.boolRulesRemoved);
+    if (report.warnings.length > 0) {
+      lines.push("Warnings:");
+      for (var w = 0; w < report.warnings.length; w++) {
+        lines.push("- " + report.warnings[w]);
+      }
+    }
+
+    var summary = lines.join("\n");
     Logger.log(summary);
     ui.alert("SparkPlug", summary, ui.ButtonSet.OK);
   } catch (err) {
-    handleSparkPlugError_("Refresh Dropdowns failed", err);
+    handleSparkPlugError_("Clear Validations & Styling failed", err);
   }
+}
+
+// Removes SparkPlug-owned TRUE/FALSE conditional formatting rules that target the provided range.
+// Returns number of rules removed.
+function removeSparkPlugBoolRulesForRange_(
+  sheet,
+  range,
+  startRow,
+  targetColumnIndex,
+) {
+  var removed = 0;
+
+  var a1Col = columnIndexToA1Letter_(targetColumnIndex);
+  var trueFormula = "=$" + a1Col + startRow + "=TRUE";
+  var falseFormula = "=$" + a1Col + startRow + "=FALSE";
+
+  var rules = sheet.getConditionalFormatRules();
+  var kept = [];
+
+  for (var i = 0; i < rules.length; i++) {
+    var rule = rules[i];
+    var ranges = rule.getRanges();
+
+    var matchesRange =
+      ranges &&
+      ranges.length === 1 &&
+      ranges[0].getA1Notation() === range.getA1Notation();
+
+    if (!matchesRange) {
+      kept.push(rule);
+      continue;
+    }
+
+    var cond = rule.getBooleanCondition ? rule.getBooleanCondition() : null;
+    if (!cond) {
+      kept.push(rule);
+      continue;
+    }
+
+    var condType = cond.getCriteriaType();
+    var condValues = cond.getCriteriaValues();
+    var isSparkPlugBoolRule =
+      condType === SpreadsheetApp.BooleanCriteria.CUSTOM_FORMULA &&
+      condValues &&
+      condValues.length === 1 &&
+      (condValues[0] === trueFormula || condValues[0] === falseFormula);
+
+    if (isSparkPlugBoolRule) {
+      removed += 1;
+      continue;
+    }
+
+    kept.push(rule);
+  }
+
+  if (removed > 0) {
+    sheet.setConditionalFormatRules(kept);
+  }
+
+  return removed;
+}
+// Helper: Get all row numbers (1-based) from startRow to endRow (inclusive)
+// within the first scanColumnCount columns that have any non-empty cell.
+function getRowsWithAnyData_(sheet, startRow, endRow, scanColumnCount) {
+  var rows = [];
+  if (endRow < startRow) {
+    return rows;
+  }
+
+  var colCount = Math.max(1, parseInt(scanColumnCount, 10) || 1);
+  var values = sheet
+    .getRange(startRow, 1, endRow - startRow + 1, colCount)
+    .getDisplayValues();
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var hasAny = false;
+    for (var c = 0; c < row.length; c++) {
+      if (String(row[c] || "").trim() !== "") {
+        hasAny = true;
+        break;
+      }
+    }
+    if (hasAny) {
+      rows.push(startRow + i);
+    }
+  }
+
+  return rows;
+}
+
+// Helper: Group sorted row numbers into contiguous ranges [{startRow, endRow}, ...]
+function groupContiguousRows_(rows) {
+  if (!rows || rows.length === 0) {
+    return [];
+  }
+
+  var sorted = rows.slice().sort(function (a, b) {
+    return a - b;
+  });
+  var groups = [];
+  var start = sorted[0];
+  var prev = sorted[0];
+
+  for (var i = 1; i < sorted.length; i++) {
+    var current = sorted[i];
+    if (current === prev + 1) {
+      prev = current;
+      continue;
+    }
+
+    groups.push({ startRow: start, endRow: prev });
+    start = current;
+    prev = current;
+  }
+
+  groups.push({ startRow: start, endRow: prev });
+  return groups;
 }
 
 function validateSheetStructureFromSheetSpec() {
@@ -928,7 +1291,7 @@ function buildEnsureTabsSummary_(report) {
   return lines.join("\n");
 }
 
-function buildRefreshDropdownsSummary_(rewriteInfo, validationReport) {
+function buildRefreshDropdownsSummary_(rewriteInfo) {
   var lines = [];
   lines.push("Refresh Dropdowns complete.");
   lines.push(
@@ -938,22 +1301,25 @@ function buildRefreshDropdownsSummary_(rewriteInfo, validationReport) {
       rewriteInfo.optionCount +
       " values per enum.",
   );
-  lines.push("Validations applied: " + validationReport.validationsApplied);
+  return lines.join("\n");
+}
 
+function buildApplyValidationsSummary_(validationReport) {
+  var lines = [];
+  lines.push("Apply Validations & Styling complete.");
+  lines.push("Validations applied: " + validationReport.validationsApplied);
   if (validationReport.examples.length > 0) {
     lines.push("Examples:");
     for (var i = 0; i < validationReport.examples.length; i++) {
       lines.push("- " + validationReport.examples[i]);
     }
   }
-
   if (validationReport.warnings.length > 0) {
     lines.push("Warnings:");
     for (i = 0; i < validationReport.warnings.length; i++) {
       lines.push("- " + validationReport.warnings[i]);
     }
   }
-
   return lines.join("\n");
 }
 
@@ -984,6 +1350,42 @@ function buildValidateStructureSummary_(report, totalTables) {
 
 function formatListOrNone_(items) {
   return items && items.length > 0 ? items.join(", ") : "none";
+}
+
+// Helper to convert 1-based column index to A1 column letter(s)
+function columnIndexToA1Letter_(columnIndex) {
+  var index = parseInt(columnIndex, 10);
+  if (!isFinite(index) || index < 1) {
+    throw new Error(
+      "columnIndexToA1Letter_: invalid columnIndex " + columnIndex,
+    );
+  }
+
+  var letters = "";
+  while (index > 0) {
+    var rem = (index - 1) % 26;
+    letters = String.fromCharCode(65 + rem) + letters;
+    index = Math.floor((index - 1) / 26);
+  }
+  return letters;
+}
+
+function clearSparkPlugDropdownTint_(range) {
+  var backgrounds = range.getBackgrounds();
+  var changed = false;
+
+  for (var r = 0; r < backgrounds.length; r++) {
+    for (var c = 0; c < backgrounds[r].length; c++) {
+      if (backgrounds[r][c] === SPARK_PLUG_DROPDOWN_BACKGROUND_COLOR_) {
+        backgrounds[r][c] = "#ffffff";
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    range.setBackgrounds(backgrounds);
+  }
 }
 
 function handleSparkPlugError_(prefix, err) {
