@@ -192,6 +192,15 @@ public static class GameDefinitionLoader
             if (gd.computedVars == null)
                 gd.computedVars = new List<ComputedVarDefinition>();
 
+            if (gd.zones == null)
+                gd.zones = new List<ZoneDefinition>();
+
+            if (gd.stateVars == null)
+                gd.stateVars = new List<StateVarDefinition>();
+
+            if (gd.nodeStateCapacities == null)
+                gd.nodeStateCapacities = new List<NodeStateCapacityDefinition>();
+
             NormalizeBuffEffects(gd.buffs);
             NormalizeParameterizedPaths(gd);
 

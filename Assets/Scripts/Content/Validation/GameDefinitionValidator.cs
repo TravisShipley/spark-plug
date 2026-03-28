@@ -52,6 +52,7 @@ public static class GameDefinitionValidator
         "nextMilestone",
         "maxAffordable",
     };
+    private static readonly string[] SupportedStateVarKinds = { "quantity", "counter", "timer" };
 
     public static void Validate(GameDefinition gd)
     {
@@ -126,6 +127,9 @@ public static class GameDefinitionValidator
         }
 
         ValidateTopLevelNodeInputsReferences(gd.nodeInputs, nodeIds, resourceIds, errors);
+
+        var stateVarIds = ValidateStateVars(gd.stateVars, errors);
+        ValidateNodeStateCapacities(gd.nodeStateCapacities, nodeIds, stateVarIds, errors);
 
         // ---- NodeInstances -> Nodes
         if (gd.nodeInstances == null)
@@ -941,6 +945,109 @@ public static class GameDefinitionValidator
         }
     }
 
+    private static HashSet<string> ValidateStateVars(
+        IReadOnlyList<StateVarDefinition> stateVars,
+        List<string> errors
+    )
+    {
+        var stateVarIds = new HashSet<string>(StringComparer.Ordinal);
+        if (stateVars == null)
+            return stateVarIds;
+
+        for (int i = 0; i < stateVars.Count; i++)
+        {
+            var stateVar = stateVars[i];
+            if (stateVar == null)
+            {
+                errors.Add($"stateVars[{i}] is null.");
+                continue;
+            }
+
+            var id = NormalizeId(stateVar.id);
+            if (string.IsNullOrEmpty(id))
+            {
+                errors.Add($"stateVars[{i}].id is empty.");
+                continue;
+            }
+
+            if (!stateVarIds.Add(id))
+                errors.Add($"Duplicate stateVars id '{id}'.");
+
+            var kind = NormalizeId(stateVar.kind);
+            if (string.IsNullOrEmpty(kind))
+            {
+                errors.Add($"stateVars[{i}] ('{id}') kind is empty.");
+            }
+            else if (!ContainsIgnoreCase(SupportedStateVarKinds, kind))
+            {
+                errors.Add(
+                    $"stateVars[{i}] ('{id}') kind '{kind}' is unsupported. Allowed: quantity, counter, timer."
+                );
+            }
+
+            if (double.IsNaN(stateVar.defaultValue) || double.IsInfinity(stateVar.defaultValue))
+            {
+                errors.Add(
+                    $"stateVars[{i}] ('{id}') defaultValue must be a parseable finite number."
+                );
+            }
+        }
+
+        return stateVarIds;
+    }
+
+    private static void ValidateNodeStateCapacities(
+        IReadOnlyList<NodeStateCapacityDefinition> nodeStateCapacities,
+        HashSet<string> nodeIds,
+        HashSet<string> stateVarIds,
+        List<string> errors
+    )
+    {
+        if (nodeStateCapacities == null)
+            return;
+
+        for (int i = 0; i < nodeStateCapacities.Count; i++)
+        {
+            var capacity = nodeStateCapacities[i];
+            if (capacity == null)
+            {
+                errors.Add($"nodeStateCapacities[{i}] is null.");
+                continue;
+            }
+
+            var nodeId = NormalizeId(capacity.nodeId);
+            if (string.IsNullOrEmpty(nodeId))
+            {
+                errors.Add($"nodeStateCapacities[{i}].nodeId is empty.");
+            }
+            else if (!nodeIds.Contains(nodeId))
+            {
+                errors.Add(
+                    $"nodeStateCapacities[{i}].nodeId '{nodeId}' references missing nodes.id."
+                );
+            }
+
+            var varId = NormalizeId(capacity.varId);
+            if (string.IsNullOrEmpty(varId))
+            {
+                errors.Add($"nodeStateCapacities[{i}].varId is empty.");
+            }
+            else if (!stateVarIds.Contains(varId))
+            {
+                errors.Add(
+                    $"nodeStateCapacities[{i}].varId '{varId}' references missing stateVars.id."
+                );
+            }
+
+            if (double.IsNaN(capacity.baseCapacity) || double.IsInfinity(capacity.baseCapacity))
+            {
+                errors.Add(
+                    $"nodeStateCapacities[{i}] ('{nodeId}' -> '{varId}') baseCapacity must be a parseable finite number."
+                );
+            }
+        }
+    }
+
     private static void ValidateModifier(
         ModifierDefinition modifier,
         int modifierIndex,
@@ -1311,5 +1418,10 @@ public static class GameDefinitionValidator
             return;
 
         errors.Add($"{fieldPath} resource '{parsed.ParameterId}' references missing resources.id.");
+    }
+
+    private static string NormalizeId(string id)
+    {
+        return (id ?? string.Empty).Trim();
     }
 }

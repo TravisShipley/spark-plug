@@ -40,6 +40,13 @@ public sealed class GameDefinitionService
 
     public IReadOnlyList<ResourceDefinition> Resources =>
         resourceCatalog?.Resources ?? Array.Empty<ResourceDefinition>();
+    public IReadOnlyList<ZoneDefinition> Zones =>
+        (IReadOnlyList<ZoneDefinition>)definition.zones ?? Array.Empty<ZoneDefinition>();
+    public IReadOnlyList<StateVarDefinition> StateVars =>
+        (IReadOnlyList<StateVarDefinition>)definition.stateVars ?? Array.Empty<StateVarDefinition>();
+    public IReadOnlyList<NodeStateCapacityDefinition> NodeStateCapacities =>
+        (IReadOnlyList<NodeStateCapacityDefinition>)definition.nodeStateCapacities
+        ?? Array.Empty<NodeStateCapacityDefinition>();
     public IReadOnlyList<NodeDefinition> Nodes =>
         nodeCatalog?.Nodes ?? Array.Empty<NodeDefinition>();
     public IReadOnlyList<NodeInputDefinition> NodeInputs =>

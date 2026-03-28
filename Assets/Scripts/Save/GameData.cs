@@ -49,10 +49,133 @@ public class GameData : ISerializationCallbackReceiver
         public int PurchasedCount;
     }
 
+    [Serializable]
+    public class ZoneStateVarValueData
+    {
+        public string VarId;
+        public double Value;
+    }
+
+    [Serializable]
+    public class ZoneStateData
+    {
+        public string ZoneId;
+
+        [NonSerialized]
+        public Dictionary<string, double> StateVars = new(StringComparer.Ordinal);
+
+        [NonSerialized]
+        public Dictionary<string, double> StateCapacities = new(StringComparer.Ordinal);
+
+        [SerializeField]
+        private List<ZoneStateVarValueData> stateVarEntries = new();
+
+        public void EnsureInitialized()
+        {
+            StateVars ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            StateCapacities ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            stateVarEntries ??= new List<ZoneStateVarValueData>();
+            ZoneId = (ZoneId ?? string.Empty).Trim();
+            NormalizeRuntimeState();
+        }
+
+        public void PrepareForSerialization()
+        {
+            EnsureInitialized();
+            NormalizeRuntimeState();
+            stateVarEntries.Clear();
+
+            var orderedVarIds = new List<string>(StateVars.Keys);
+            orderedVarIds.Sort(StringComparer.Ordinal);
+            for (int i = 0; i < orderedVarIds.Count; i++)
+            {
+                var varId = NormalizeId(orderedVarIds[i]);
+                if (string.IsNullOrEmpty(varId))
+                    continue;
+
+                stateVarEntries.Add(
+                    new ZoneStateVarValueData
+                    {
+                        VarId = varId,
+                        Value = SanitizeStateVarValue(StateVars[varId]),
+                    }
+                );
+            }
+        }
+
+        public void LoadFromSerialized()
+        {
+            StateVars ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            StateCapacities ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            stateVarEntries ??= new List<ZoneStateVarValueData>();
+            StateVars.Clear();
+
+            for (int i = 0; i < stateVarEntries.Count; i++)
+            {
+                var entry = stateVarEntries[i];
+                var varId = NormalizeId(entry?.VarId);
+                if (string.IsNullOrEmpty(varId) || StateVars.ContainsKey(varId))
+                    continue;
+
+                StateVars[varId] = SanitizeStateVarValue(entry.Value);
+            }
+
+            NormalizeRuntimeState();
+        }
+
+        private void NormalizeRuntimeState()
+        {
+            ZoneId = NormalizeId(ZoneId);
+            StateVars ??= new Dictionary<string, double>(StringComparer.Ordinal);
+            StateCapacities ??= new Dictionary<string, double>(StringComparer.Ordinal);
+
+            if (StateVars.Count > 0)
+            {
+                var normalized = new Dictionary<string, double>(StringComparer.Ordinal);
+                foreach (var pair in StateVars)
+                {
+                    var varId = NormalizeId(pair.Key);
+                    if (string.IsNullOrEmpty(varId) || normalized.ContainsKey(varId))
+                        continue;
+
+                    normalized[varId] = SanitizeStateVarValue(pair.Value);
+                }
+
+                StateVars = normalized;
+            }
+
+            if (StateCapacities.Count > 0)
+            {
+                var normalizedCapacities = new Dictionary<string, double>(StringComparer.Ordinal);
+                foreach (var pair in StateCapacities)
+                {
+                    var varId = NormalizeId(pair.Key);
+                    if (string.IsNullOrEmpty(varId) || normalizedCapacities.ContainsKey(varId))
+                        continue;
+
+                    normalizedCapacities[varId] = SanitizeStateVarValue(pair.Value);
+                }
+
+                StateCapacities = normalizedCapacities;
+            }
+        }
+
+        private static string NormalizeId(string id)
+        {
+            return (id ?? string.Empty).Trim();
+        }
+
+        private static double SanitizeStateVarValue(double value)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value) ? 0d : value;
+        }
+    }
+
     public List<GeneratorStateData> Generators = new();
     public List<UpgradeStateData> Upgrades = new();
     public List<ResourceBalanceData> Resources = new();
     public List<LifetimeEarningData> LifetimeEarnings = new();
+    public List<ZoneStateData> ZoneStates = new();
     public string ActiveBuffId;
     public long ActiveBuffExpiresAtUnixSeconds;
     public long lastSeenUnixSeconds;
@@ -78,6 +201,7 @@ public class GameData : ISerializationCallbackReceiver
         Upgrades ??= new List<UpgradeStateData>();
         Resources ??= new List<ResourceBalanceData>();
         LifetimeEarnings ??= new List<LifetimeEarningData>();
+        ZoneStates ??= new List<ZoneStateData>();
         ActiveBuffId = (ActiveBuffId ?? string.Empty).Trim();
         if (ActiveBuffExpiresAtUnixSeconds < 0)
             ActiveBuffExpiresAtUnixSeconds = 0;
@@ -109,12 +233,15 @@ public class GameData : ISerializationCallbackReceiver
         }
 
         NormalizeGeneratorStates();
+        NormalizeZoneStateRuntime();
     }
 
     public void OnBeforeSerialize()
     {
         EnsureInitialized();
         NormalizeGeneratorStates();
+        NormalizeZoneStateRuntime();
+        PrepareZoneStatesForSerialization();
         firedMilestoneIds.Clear();
 
         foreach (var id in FiredMilestoneIds)
@@ -164,6 +291,14 @@ public class GameData : ISerializationCallbackReceiver
 
             UnlockedNodeInstanceIds.Add(normalized);
         }
+
+        if (ZoneStates != null)
+        {
+            for (int i = 0; i < ZoneStates.Count; i++)
+                ZoneStates[i]?.LoadFromSerialized();
+        }
+
+        NormalizeZoneStateRuntime();
     }
 
     private void NormalizeGeneratorStates()
@@ -216,5 +351,37 @@ public class GameData : ISerializationCallbackReceiver
             // Write legacy field for forward/backward compatibility.
             state.IsAutomated = state.IsAutomationPurchased;
         }
+    }
+
+    private void NormalizeZoneStateRuntime()
+    {
+        if (ZoneStates == null)
+            return;
+
+        for (int i = 0; i < ZoneStates.Count; i++)
+            ZoneStates[i]?.EnsureInitialized();
+
+        ZoneStates.Sort(
+            (a, b) =>
+                string.Compare(
+                    NormalizeId(a?.ZoneId),
+                    NormalizeId(b?.ZoneId),
+                    StringComparison.Ordinal
+                )
+        );
+    }
+
+    private void PrepareZoneStatesForSerialization()
+    {
+        if (ZoneStates == null)
+            return;
+
+        for (int i = 0; i < ZoneStates.Count; i++)
+            ZoneStates[i]?.PrepareForSerialization();
+    }
+
+    private static string NormalizeId(string id)
+    {
+        return (id ?? string.Empty).Trim();
     }
 }

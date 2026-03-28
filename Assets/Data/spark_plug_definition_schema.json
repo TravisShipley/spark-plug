@@ -85,6 +85,24 @@
     }
   ],
 
+  "stateVars": [
+    {
+      "id": "varId",
+      "displayName": "string?",
+      "kind": "quantity|counter|timer",
+      "defaultValue": "numberString",
+      "tags": ["string"]
+    }
+  ],
+
+  "nodeStateCapacities": [
+    {
+      "nodeId": "nodeTypeId",
+      "varId": "varId",
+      "baseCapacity": "bigNumberString"
+    }
+  ],
+
   "nodes": [
     {
       "id": "nodeTypeId",

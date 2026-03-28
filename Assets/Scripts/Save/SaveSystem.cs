@@ -123,6 +123,7 @@ public static class SaveSystem
             Upgrades = new List<GameData.UpgradeStateData>(),
             Resources = new List<GameData.ResourceBalanceData>(),
             LifetimeEarnings = new List<GameData.LifetimeEarningData>(),
+            ZoneStates = new List<GameData.ZoneStateData>(),
             ActiveBuffId = string.Empty,
             ActiveBuffExpiresAtUnixSeconds = 0,
             lastSeenUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),

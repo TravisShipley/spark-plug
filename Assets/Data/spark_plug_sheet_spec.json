@@ -177,6 +177,27 @@
       },
 
       {
+        "name": "StateVars",
+        "outputKey": "stateVars",
+        "emit": "list",
+        "required": true,
+        "kind": "entity",
+        "primaryKey": "id",
+        "columns": [
+          { "name": "id", "required": true, "type": "varId" },
+          { "name": "displayName", "required": false, "type": "string" },
+          {
+            "name": "kind",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.stateVarKind"
+          },
+          { "name": "defaultValue", "required": true, "type": "numberString" },
+          { "name": "tags", "required": false, "type": "stringList" }
+        ]
+      },
+
+      {
         "name": "Zones",
         "outputKey": "zones",
         "emit": "list",
@@ -413,6 +434,23 @@
           {
             "name": "baseCapacityPerSecond",
             "required": false,
+            "type": "bigNumberString"
+          }
+        ]
+      },
+
+      {
+        "name": "NodeStateCapacities",
+        "outputKey": "nodeStateCapacities",
+        "emit": "list",
+        "required": false,
+        "kind": "entity",
+        "columns": [
+          { "name": "nodeId", "required": true, "type": "nodeTypeId" },
+          { "name": "varId", "required": true, "type": "varId" },
+          {
+            "name": "baseCapacity",
+            "required": true,
             "type": "bigNumberString"
           }
         ]
@@ -889,6 +927,7 @@
         "upgrade.purchased"
       ],
       "varValueType": ["numberString", "bigNumberString"],
+      "stateVarKind": ["quantity", "counter", "timer"],
       "linkMode": ["push", "pull"],
       "scalingOperation": ["add", "multiply", "set"]
     }
