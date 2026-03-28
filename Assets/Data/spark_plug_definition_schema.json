@@ -81,7 +81,7 @@
         "type": "constant|add|multiply|power|log10|min|max|clamp|if",
         "args": []
       },
-      "dependsOn": ["resource[resourceId]", "state.run.someKey", "var.otherVar"]
+      "dependsOn": ["resource[resourceId]", "stateQuantity[varId]", "var[varId]"]
     }
   ],
 
@@ -122,7 +122,9 @@
       ],
       "outputs": [
         {
-          "resource": "resourceId",
+          "kind": "resource|stateDelta",
+          "resource": "resourceId?",
+          "varId": "varId?",
           "mode": "rate|cycle",
           "basePerSecond": "bigNumberString?",
           "basePayout": "bigNumberString?",

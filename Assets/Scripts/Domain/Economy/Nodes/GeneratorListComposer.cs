@@ -19,6 +19,7 @@ public class GeneratorListComposer
     private readonly BuyModeService buyModeService;
     private readonly SaveService saveService;
     private readonly GameDefinitionService gameDefinitionService;
+    private readonly ComputedVarService computedVarService;
     private readonly UnlockService unlockService;
     private readonly CompositeDisposable disposables;
 
@@ -48,6 +49,7 @@ public class GeneratorListComposer
         UiServiceRegistry uiService,
         SaveService saveService,
         GameDefinitionService gameDefinitionService,
+        ComputedVarService computedVarService,
         UnlockService unlockService,
         CompositeDisposable disposables,
         List<GeneratorModel> generatorModels,
@@ -67,6 +69,7 @@ public class GeneratorListComposer
         this.uiService = uiService;
         this.saveService = saveService;
         this.gameDefinitionService = gameDefinitionService;
+        this.computedVarService = computedVarService;
         this.unlockService = unlockService;
         this.disposables = disposables;
         this.generatorModels = generatorModels;
@@ -120,7 +123,7 @@ public class GeneratorListComposer
                 currentZoneId = (nodeInstance.zoneId ?? string.Empty).Trim();
 
             var generatorDefinition = CreateRuntimeDefinition(nodeDef, nodeInstance);
-            ComposeSingle(generatorDefinition, nodeInstance, nodeTypeId);
+            ComposeSingle(generatorDefinition, nodeDef, nodeInstance, nodeTypeId);
 
             orderedGeneratorInstanceIds.Add(instanceId);
             nodeInstancesById[instanceId] = nodeInstance;
@@ -161,6 +164,7 @@ public class GeneratorListComposer
 
     private void ComposeSingle(
         GeneratorDefinition generatorDefinition,
+        NodeDefinition nodeDefinition,
         NodeInstanceDefinition nodeInstance,
         string nodeTypeId
     )
@@ -170,6 +174,7 @@ public class GeneratorListComposer
         LoadGeneratorState(
             saveService,
             id,
+            nodeDefinition,
             nodeInstance,
             out bool isOwned,
             out bool isAutomated,
@@ -200,6 +205,7 @@ public class GeneratorListComposer
             walletService,
             tickService,
             modifierService,
+            computedVarService,
             saveService,
             gameEventStream
         );
@@ -288,6 +294,7 @@ public class GeneratorListComposer
         var definition = new GeneratorDefinition();
 
         definition.Id = (nodeInstance.id ?? string.Empty).Trim();
+        definition.ZoneId = (nodeInstance.zoneId ?? string.Empty).Trim();
 
         var displayNameOverride = (nodeInstance.displayNameOverride ?? string.Empty).Trim();
         definition.DisplayName = string.IsNullOrEmpty(displayNameOverride)
@@ -299,9 +306,17 @@ public class GeneratorListComposer
             nodeDef?.cycle?.baseDurationSeconds ?? 1.0
         );
 
-        // v1 runtime mapping: use first output entry (fallback to 0)
-        var output =
-            nodeDef?.outputs != null && nodeDef.outputs.Count > 0 ? nodeDef.outputs[0] : null;
+        definition.Outputs = CloneOutputs(nodeDef?.outputs);
+
+        // v1 runtime mapping: use first resource output entry (fallback to 0)
+        var output = definition.Outputs.Find(outputDef =>
+            outputDef != null
+            && !string.Equals(
+                (outputDef.kind ?? string.Empty).Trim(),
+                "stateDelta",
+                StringComparison.OrdinalIgnoreCase
+            )
+        );
         var payout = output?.basePayout ?? 0.0;
         var perSecond = output?.basePerSecond ?? 0.0;
         definition.BaseOutputPerCycle =
@@ -325,6 +340,37 @@ public class GeneratorListComposer
         );
 
         return definition;
+    }
+
+    private static List<NodeOutputDefinition> CloneOutputs(List<NodeOutputDefinition> outputs)
+    {
+        var cloned = new List<NodeOutputDefinition>();
+        if (outputs == null)
+            return cloned;
+
+        for (int i = 0; i < outputs.Count; i++)
+        {
+            var output = outputs[i];
+            if (output == null)
+                continue;
+
+            cloned.Add(
+                new NodeOutputDefinition
+                {
+                    kind = (output.kind ?? string.Empty).Trim(),
+                    resource = (output.resource ?? string.Empty).Trim(),
+                    varId = (output.varId ?? string.Empty).Trim(),
+                    mode = (output.mode ?? string.Empty).Trim(),
+                    basePerSecond = output.basePerSecond,
+                    basePayout = output.basePayout,
+                    amountPerCycle = output.amountPerCycle,
+                    amountPerCycleFromVar = (output.amountPerCycleFromVar ?? string.Empty).Trim(),
+                    amountPerCycleFromState = (output.amountPerCycleFromState ?? string.Empty).Trim(),
+                }
+            );
+        }
+
+        return cloned;
     }
 
     private int[] ResolveMilestoneLevelsForNode(string nodeId, string zoneId)
@@ -550,6 +596,7 @@ public class GeneratorListComposer
     private static void LoadGeneratorState(
         SaveService saveService,
         string id,
+        NodeDefinition nodeDefinition,
         NodeInstanceDefinition nodeInstance,
         out bool isOwned,
         out bool isAutomated,
@@ -561,7 +608,7 @@ public class GeneratorListComposer
     )
     {
         isOwned = nodeInstance?.initialState?.enabled ?? false;
-        isAutomated = false;
+        isAutomated = isOwned && IsAutomationEnabledByDefault(nodeDefinition?.automation?.policy);
         level = Math.Max(0, nodeInstance?.initialState?.level ?? 0);
         wasRunning = isOwned;
         hasPendingPayout = false;
@@ -600,6 +647,13 @@ public class GeneratorListComposer
             wasRunning = false;
         else if (!wasRunning)
             cycleElapsedSeconds = 0d;
+    }
+
+    private static bool IsAutomationEnabledByDefault(string policy)
+    {
+        var normalizedPolicy = (policy ?? string.Empty).Trim();
+        return string.Equals(normalizedPolicy, "autoRepeat", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedPolicy, "alwaysOn", StringComparison.OrdinalIgnoreCase);
     }
 
     private void WireGeneratorPersistence(string id, GeneratorService service)

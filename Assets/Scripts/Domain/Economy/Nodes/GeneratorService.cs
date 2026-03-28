@@ -11,6 +11,7 @@ public class GeneratorService : IDisposable
     private readonly WalletService wallet;
     private readonly TickService tickService;
     private readonly ModifierService modifierService;
+    private readonly ComputedVarService computedVarService;
     private readonly SaveService saveService;
     private readonly GameEventStream gameEventStream;
 
@@ -87,6 +88,7 @@ public class GeneratorService : IDisposable
         WalletService wallet,
         TickService tickService,
         ModifierService modifierService,
+        ComputedVarService computedVarService,
         SaveService saveService,
         GameEventStream gameEventStream
     )
@@ -97,6 +99,7 @@ public class GeneratorService : IDisposable
         this.tickService = tickService ?? throw new ArgumentNullException(nameof(tickService));
         this.modifierService =
             modifierService ?? throw new ArgumentNullException(nameof(modifierService));
+        this.computedVarService = computedVarService;
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
         this.gameEventStream =
             gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
@@ -203,6 +206,7 @@ public class GeneratorService : IDisposable
         }
 
         var dt = tickService.Interval.TotalSeconds;
+        var zoneStateChanged = ApplyRateStateDeltaOutputs(dt);
         // Authoritative effective duration (Option A: base / speedMultiplier)
         var interval = cycleDurationSeconds.Value;
         lastIntervalSeconds = interval;
@@ -215,6 +219,7 @@ public class GeneratorService : IDisposable
             while (model.CycleElapsedSeconds >= interval)
             {
                 model.CycleElapsedSeconds -= interval;
+                zoneStateChanged |= ApplyCycleStateDeltaOutputs();
                 QueueCompletedCyclePayout();
                 CollectInternal(requestSave: false, publishCycleCompleted: true);
             }
@@ -225,12 +230,14 @@ public class GeneratorService : IDisposable
             if (model.CycleElapsedSeconds >= interval)
             {
                 model.CycleElapsedSeconds = 0;
+                zoneStateChanged |= ApplyCycleStateDeltaOutputs();
                 QueueCompletedCyclePayout();
                 isRunning.Value = false;
                 PersistRuntimeState(requestSave: true);
             }
         }
 
+        zoneStateChanged |= saveService.ClampZoneStateVars(definition.ZoneId, requestSave: true);
         cycleProgress.Value = model.CycleElapsedSeconds / interval;
         if (isAutomated.Value || model.WasRunning || model.CycleElapsedSeconds > 0d)
             PersistRuntimeState(requestSave: false);
@@ -260,8 +267,7 @@ public class GeneratorService : IDisposable
 
     private double CalculateOutput()
     {
-        // Use reactive level + multiplier as the authoritative values.
-        return definition.BaseOutputPerCycle * level.Value * outputMultiplier.Value;
+        return CalculatePrimaryResourceOutputPerCycle() * level.Value * outputMultiplier.Value;
     }
 
     private void QueueCompletedCyclePayout()
@@ -885,5 +891,210 @@ public class GeneratorService : IDisposable
         }
 
         return payout * gainMultiplier;
+    }
+
+    private double CalculatePrimaryResourceOutputPerCycle()
+    {
+        var output = ResolvePrimaryResourceOutput();
+        if (output == null)
+            return 0d;
+
+        return ResolveOutputAmountPerCycle(output);
+    }
+
+    private bool ApplyRateStateDeltaOutputs(double dt)
+    {
+        if (definition.Outputs == null || definition.Outputs.Count == 0 || dt <= 0d)
+            return false;
+
+        var changed = false;
+        for (int i = 0; i < definition.Outputs.Count; i++)
+        {
+            var output = definition.Outputs[i];
+            if (!IsStateDeltaOutput(output) || !IsRateOutput(output))
+                continue;
+
+            var varId = NormalizeId(output.varId);
+            if (string.IsNullOrEmpty(varId))
+                continue;
+
+            var deltaPerSecond = ResolveRateAmountPerSecond(output);
+            if (deltaPerSecond == 0d)
+                continue;
+
+            changed |= saveService.AddZoneStateVar(
+                definition.ZoneId,
+                varId,
+                deltaPerSecond * dt,
+                requestSave: true
+            );
+        }
+
+        return changed;
+    }
+
+    private bool ApplyCycleStateDeltaOutputs()
+    {
+        if (definition.Outputs == null || definition.Outputs.Count == 0)
+            return false;
+
+        var changed = false;
+        for (int i = 0; i < definition.Outputs.Count; i++)
+        {
+            var output = definition.Outputs[i];
+            if (!IsStateDeltaOutput(output) || !IsCycleOutput(output))
+                continue;
+
+            var varId = NormalizeId(output.varId);
+            if (string.IsNullOrEmpty(varId))
+                continue;
+
+            var delta = ResolveOutputAmountPerCycle(output);
+            if (delta == 0d)
+                continue;
+
+            changed |= saveService.AddZoneStateVar(
+                definition.ZoneId,
+                varId,
+                delta,
+                requestSave: true
+            );
+        }
+
+        return changed;
+    }
+
+    private NodeOutputDefinition ResolvePrimaryResourceOutput()
+    {
+        if (definition.Outputs == null || definition.Outputs.Count == 0)
+            return null;
+
+        for (int i = 0; i < definition.Outputs.Count; i++)
+        {
+            var output = definition.Outputs[i];
+            if (output == null || IsStateDeltaOutput(output))
+                continue;
+
+            if (
+                string.Equals(
+                    NormalizeId(output.resource),
+                    NormalizeId(definition.OutputResourceId),
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return output;
+            }
+        }
+
+        for (int i = 0; i < definition.Outputs.Count; i++)
+        {
+            var output = definition.Outputs[i];
+            if (output != null && !IsStateDeltaOutput(output))
+                return output;
+        }
+
+        return null;
+    }
+
+    private double ResolveOutputAmountPerCycle(NodeOutputDefinition output)
+    {
+        if (output == null)
+            return 0d;
+
+        var cycleDuration = Math.Max(0.0001d, cycleDurationSeconds.Value);
+        if (IsRateOutput(output))
+        {
+            var perSecond = ResolveRateAmountPerSecond(output);
+            return perSecond * cycleDuration;
+        }
+
+        var fromVar = ResolveFormulaAmount(output.amountPerCycleFromVar);
+        if (fromVar.HasValue)
+            return fromVar.Value;
+
+        var fromState = ResolveFormulaAmount(output.amountPerCycleFromState);
+        if (fromState.HasValue)
+            return fromState.Value;
+
+        if (output.basePayout != 0d)
+            return output.basePayout;
+
+        if (output.amountPerCycle != 0d)
+            return output.amountPerCycle;
+
+        if (output.basePerSecond != 0d)
+            return output.basePerSecond * cycleDuration;
+
+        return 0d;
+    }
+
+    private double ResolveRateAmountPerSecond(NodeOutputDefinition output)
+    {
+        if (output == null)
+            return 0d;
+
+        if (output.basePerSecond != 0d)
+            return output.basePerSecond;
+
+        var fromVar = ResolveFormulaAmount(output.amountPerCycleFromVar);
+        if (fromVar.HasValue)
+            return fromVar.Value;
+
+        var fromState = ResolveFormulaAmount(output.amountPerCycleFromState);
+        if (fromState.HasValue)
+            return fromState.Value;
+
+        return 0d;
+    }
+
+    private double? ResolveFormulaAmount(string raw)
+    {
+        var value = NormalizeId(raw);
+        if (string.IsNullOrEmpty(value))
+            return null;
+
+        if (
+            double.TryParse(
+                value,
+                NumberStyles.Float | NumberStyles.AllowThousands,
+                CultureInfo.InvariantCulture,
+                out var literal
+            )
+        )
+        {
+            return literal;
+        }
+
+        if (ParameterizedPathParser.TryParseFormulaParameterizedPath(value, out _))
+            return computedVarService?.ResolvePathOrZero(value, definition.ZoneId) ?? 0d;
+
+        return computedVarService?.EvaluateOrZero(value, definition.ZoneId) ?? 0d;
+    }
+
+    private static bool IsStateDeltaOutput(NodeOutputDefinition output)
+    {
+        return string.Equals(
+            NormalizeId(output?.kind),
+            "stateDelta",
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private static bool IsRateOutput(NodeOutputDefinition output)
+    {
+        return string.Equals(NormalizeId(output?.mode), "rate", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCycleOutput(NodeOutputDefinition output)
+    {
+        var mode = NormalizeId(output?.mode);
+        return string.IsNullOrEmpty(mode)
+            || string.Equals(mode, "cycle", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeId(string value)
+    {
+        return (value ?? string.Empty).Trim();
     }
 }

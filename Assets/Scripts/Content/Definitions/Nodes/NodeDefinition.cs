@@ -61,13 +61,17 @@ public sealed class AutomationDefinition
 [Serializable]
 public sealed class NodeOutputDefinition
 {
+    public string kind;
     public string resource;
+    public string varId;
 
     // Only one of these is typically used depending on mode
     public string mode; // perCycle / perSecond / payout
     public double basePerSecond;
     public double basePayout;
     public double amountPerCycle;
+    public string amountPerCycleFromVar;
+    public string amountPerCycleFromState;
 }
 
 [Serializable]

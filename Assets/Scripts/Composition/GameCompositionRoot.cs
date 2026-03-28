@@ -70,6 +70,7 @@ public class GameCompositionRoot : MonoBehaviour
     private OfflineProgressCalculator offlineProgressCalculator;
     private TimeWarpService timeWarpService;
     private GameDefinitionService gameDefinitionService;
+    private ComputedVarService computedVarService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
     private SaveService saveService;
@@ -238,6 +239,7 @@ public class GameCompositionRoot : MonoBehaviour
             uiService,
             saveService,
             gameDefinitionService,
+            computedVarService,
             unlockService,
             disposables,
             generatorModels,
@@ -289,6 +291,11 @@ public class GameCompositionRoot : MonoBehaviour
             gameEventStream
         );
         walletViewModel = new WalletViewModel(walletService);
+        computedVarService = new ComputedVarService(
+            gameDefinitionService,
+            saveService,
+            walletService
+        );
 
         tickService = new TickService(TickInterval);
 

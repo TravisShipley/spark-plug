@@ -355,7 +355,14 @@
         "parent": { "table": "Nodes", "column": "nodeId", "ref": "Nodes.id" },
         "columns": [
           { "name": "nodeId", "required": true, "type": "nodeTypeId" },
-          { "name": "resource", "required": true, "type": "resourceId" },
+          {
+            "name": "kind",
+            "required": false,
+            "type": "enum",
+            "enumRef": "enums.outputKind"
+          },
+          { "name": "resource", "required": false, "type": "resourceId" },
+          { "name": "varId", "required": false, "type": "varId" },
           {
             "name": "mode",
             "required": true,
@@ -376,6 +383,16 @@
             "name": "amountPerCycle",
             "required": false,
             "type": "bigNumberString"
+          },
+          {
+            "name": "amountPerCycleFromVar",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "amountPerCycleFromState",
+            "required": false,
+            "type": "string"
           }
         ]
       },
@@ -901,6 +918,7 @@
         "manualStart"
       ],
       "priceCurveType": ["exponential", "linear", "piecewise", "table"],
+      "outputKind": ["resource", "stateDelta"],
       "outputMode": ["rate", "cycle"],
       "capacityMode": ["capacity", "throughputPerSecond"],
       "scopeKind": ["global", "zone", "node", "nodeTag", "resource"],

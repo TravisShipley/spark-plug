@@ -45,6 +45,10 @@ public static class ParameterizedPathParser
 
     public static bool TryParseFormulaParameterizedPath(string raw, out ParsedPath parsed)
     {
+        if (TryParse(raw, "stateQuantity", out parsed))
+            return true;
+        if (TryParse(raw, "var", out parsed))
+            return true;
         if (TryParse(raw, "lifetimeEarnings", out parsed))
             return true;
         if (TryParse(raw, "resource", out parsed))

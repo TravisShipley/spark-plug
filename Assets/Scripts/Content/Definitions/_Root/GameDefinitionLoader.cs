@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -201,6 +202,8 @@ public static class GameDefinitionLoader
             if (gd.nodeStateCapacities == null)
                 gd.nodeStateCapacities = new List<NodeStateCapacityDefinition>();
 
+            HydrateComputedVarsFromJson(json, gd);
+            NormalizeNodeOutputs(gd);
             NormalizeBuffEffects(gd.buffs);
             NormalizeParameterizedPaths(gd);
 
@@ -757,6 +760,17 @@ public static class GameDefinitionLoader
             }
         }
 
+        if (definition.computedVars != null)
+        {
+            for (int i = 0; i < definition.computedVars.Count; i++)
+            {
+                NormalizeComputedExpressionPaths(
+                    definition.computedVars[i]?.expression,
+                    $"computedVars[{i}].expression"
+                );
+            }
+        }
+
         if (definition.prestige?.formula != null)
         {
             NormalizeFormulaPath(
@@ -812,5 +826,360 @@ public static class GameDefinitionLoader
             );
         }
 #endif
+    }
+
+    private static void HydrateComputedVarsFromJson(string json, GameDefinition definition)
+    {
+        if (
+            definition?.computedVars == null
+            || definition.computedVars.Count == 0
+            || string.IsNullOrWhiteSpace(json)
+        )
+        {
+            return;
+        }
+
+        if (ParseJsonLikeValue(json.TrimStart('\uFEFF')) is not Dictionary<string, object> root)
+            return;
+
+        if (!root.TryGetValue("computedVars", out var computedVarsObj) || computedVarsObj is not List<object> computedVarsList)
+            return;
+
+        for (int index = 0; index < computedVarsList.Count && index < definition.computedVars.Count; index++)
+        {
+            var computedVar = definition.computedVars[index];
+            if (computedVar == null || computedVarsList[index] is not Dictionary<string, object> computedVarElement)
+                continue;
+
+            if (
+                computedVarElement.TryGetValue("expression", out var expressionObj)
+                && expressionObj is Dictionary<string, object> expressionElement
+            )
+            {
+                computedVar.expression = ParseComputedExpression(
+                    expressionElement,
+                    $"computedVars[{index}].expression"
+                );
+            }
+        }
+    }
+
+    private static ComputedExpressionDefinition ParseComputedExpression(
+        Dictionary<string, object> expressionElement,
+        string context
+    )
+    {
+        var definition = new ComputedExpressionDefinition();
+        if (expressionElement != null && expressionElement.TryGetValue("type", out var typeElement))
+            definition.type = typeElement?.ToString();
+
+        if (
+            expressionElement != null
+            && expressionElement.TryGetValue("args", out var argsElement)
+            && argsElement is List<object> argsList
+        )
+        {
+            for (int i = 0; i < argsList.Count; i++)
+                definition.args.Add(ParseComputedExpressionArgument(argsList[i], context));
+        }
+
+        return definition;
+    }
+
+    private static ComputedExpressionArgument ParseComputedExpressionArgument(
+        object argElement,
+        string context
+    )
+    {
+        var argument = new ComputedExpressionArgument();
+        switch (argElement)
+        {
+            case null:
+                break;
+
+            case double numberValue:
+                argument.IsNumber = true;
+                argument.NumberValue = numberValue;
+                break;
+
+            case bool boolValue:
+                argument.IsNumber = true;
+                argument.NumberValue = boolValue ? 1d : 0d;
+                break;
+
+            case string stringValue:
+                if (
+                    double.TryParse(
+                        stringValue,
+                        NumberStyles.Float | NumberStyles.AllowThousands,
+                        CultureInfo.InvariantCulture,
+                        out var parsedNumber
+                    )
+                )
+                {
+                    argument.IsNumber = true;
+                    argument.NumberValue = parsedNumber;
+                    break;
+                }
+
+                argument.PathValue = stringValue;
+                break;
+
+            case Dictionary<string, object> expressionObject:
+                argument.ExpressionValue = ParseComputedExpression(expressionObject, context);
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"GameDefinitionLoader: unsupported expression arg in {context}."
+                );
+        }
+
+        return argument;
+    }
+
+    private static object ParseJsonLikeValue(string s)
+    {
+        s = (s ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(s))
+            return new List<object>();
+
+        if (s == "[]")
+            return new List<object>();
+        if (s == "{}")
+            return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        if (s.StartsWith("[", StringComparison.Ordinal))
+        {
+            if (!s.EndsWith("]", StringComparison.Ordinal))
+                throw new InvalidOperationException($"Invalid JSON-like array: {s}");
+
+            var list = new List<object>();
+            var inner = s.Substring(1, s.Length - 2).Trim();
+            if (string.IsNullOrEmpty(inner))
+                return list;
+
+            var items = SplitJsonArray(inner);
+            for (int i = 0; i < items.Count; i++)
+                list.Add(ParseJsonLikeValue(items[i]));
+
+            return list;
+        }
+
+        if (s.StartsWith("{", StringComparison.Ordinal))
+        {
+            if (!s.EndsWith("}", StringComparison.Ordinal))
+                throw new InvalidOperationException($"Invalid JSON-like object: {s}");
+
+            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            var inner = s.Substring(1, s.Length - 2).Trim();
+            if (string.IsNullOrEmpty(inner))
+                return dict;
+
+            var pairs = SplitJsonObject(inner);
+            for (int i = 0; i < pairs.Count; i++)
+                dict[pairs[i].Key] = ParseJsonLikeValue(pairs[i].Value);
+
+            return dict;
+        }
+
+        if (
+            s.StartsWith("\"", StringComparison.Ordinal)
+            && s.EndsWith("\"", StringComparison.Ordinal)
+            && s.Length >= 2
+        )
+        {
+            return s.Substring(1, s.Length - 2).Replace("\\\"", "\"");
+        }
+
+        if (bool.TryParse(s, out var boolValue))
+            return boolValue;
+
+        if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var numericValue))
+            return numericValue;
+
+        return s;
+    }
+
+    private static List<string> SplitJsonArray(string inner)
+    {
+        var items = new List<string>();
+        var depth = 0;
+        var start = 0;
+        var inString = false;
+        var escape = false;
+
+        for (int i = 0; i < inner.Length; i++)
+        {
+            var c = inner[i];
+
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (inString)
+            {
+                if (c == '\\')
+                    escape = true;
+                else if (c == '"')
+                    inString = false;
+
+                continue;
+            }
+
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (c == '{' || c == '[')
+                depth++;
+            else if (c == '}' || c == ']')
+                depth--;
+            else if (c == ',' && depth == 0)
+            {
+                items.Add(inner.Substring(start, i - start).Trim());
+                start = i + 1;
+            }
+        }
+
+        if (start < inner.Length)
+            items.Add(inner.Substring(start).Trim());
+
+        return items;
+    }
+
+    private static List<KeyValuePair<string, string>> SplitJsonObject(string inner)
+    {
+        var pairs = new List<KeyValuePair<string, string>>();
+        var depth = 0;
+        var start = 0;
+        var inString = false;
+        var escape = false;
+
+        for (int i = 0; i < inner.Length; i++)
+        {
+            var c = inner[i];
+
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (inString)
+            {
+                if (c == '\\')
+                    escape = true;
+                else if (c == '"')
+                    inString = false;
+
+                continue;
+            }
+
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (c == '{' || c == '[')
+                depth++;
+            else if (c == '}' || c == ']')
+                depth--;
+            else if (c == ',' && depth == 0)
+            {
+                AddJsonObjectPair(inner.Substring(start, i - start).Trim(), pairs);
+                start = i + 1;
+            }
+        }
+
+        if (start < inner.Length)
+            AddJsonObjectPair(inner.Substring(start).Trim(), pairs);
+
+        return pairs;
+    }
+
+    private static void AddJsonObjectPair(
+        string segment,
+        List<KeyValuePair<string, string>> pairs
+    )
+    {
+        var colonIndex = segment.IndexOf(':');
+        if (colonIndex <= 0)
+            throw new InvalidOperationException($"Invalid JSON-like object pair: {segment}");
+
+        var key = segment.Substring(0, colonIndex).Trim().Trim('"');
+        var value = segment.Substring(colonIndex + 1).Trim();
+        pairs.Add(new KeyValuePair<string, string>(key, value));
+    }
+
+    private static void NormalizeComputedExpressionPaths(
+        ComputedExpressionDefinition expression,
+        string context
+    )
+    {
+        if (expression?.args == null)
+            return;
+
+        for (int i = 0; i < expression.args.Count; i++)
+        {
+            var argument = expression.args[i];
+            if (argument == null)
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(argument.PathValue))
+            {
+                NormalizeFormulaPath(ref argument.PathValue, $"{context}.args[{i}]");
+            }
+
+            if (argument.ExpressionValue != null)
+            {
+                NormalizeComputedExpressionPaths(
+                    argument.ExpressionValue,
+                    $"{context}.args[{i}]"
+                );
+            }
+        }
+    }
+
+    private static void NormalizeNodeOutputs(GameDefinition definition)
+    {
+        if (definition?.nodes == null)
+            return;
+
+        for (int i = 0; i < definition.nodes.Count; i++)
+        {
+            var node = definition.nodes[i];
+            if (node?.outputs == null)
+                continue;
+
+            for (int o = 0; o < node.outputs.Count; o++)
+            {
+                var output = node.outputs[o];
+                if (output == null)
+                    continue;
+
+                output.kind = string.IsNullOrWhiteSpace(output.kind)
+                    ? "resource"
+                    : output.kind.Trim();
+                output.resource = (output.resource ?? string.Empty).Trim();
+                output.varId = (output.varId ?? string.Empty).Trim();
+                output.mode = (output.mode ?? string.Empty).Trim();
+                output.amountPerCycleFromVar = (output.amountPerCycleFromVar ?? string.Empty).Trim();
+                output.amountPerCycleFromState = (output.amountPerCycleFromState ?? string.Empty).Trim();
+                NormalizeFormulaPath(
+                    ref output.amountPerCycleFromVar,
+                    $"nodes[{i}].outputs[{o}].amountPerCycleFromVar"
+                );
+                NormalizeFormulaPath(
+                    ref output.amountPerCycleFromState,
+                    $"nodes[{i}].outputs[{o}].amountPerCycleFromState"
+                );
+            }
+        }
     }
 }

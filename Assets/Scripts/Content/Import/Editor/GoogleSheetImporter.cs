@@ -2329,6 +2329,7 @@ public static class GoogleSheetImporter
             EmbedSubtableRows(contentDefinition, tableDef, parsed.Rows, sheetSpec);
         }
 
+        NormalizeNodeOutputs(contentDefinition);
         NormalizeNodePriceCurveTaggedUnion(contentDefinition);
         MirrorManifestIdentityValues(contentDefinition);
 
@@ -2524,6 +2525,71 @@ public static class GoogleSheetImporter
         }
     }
 
+    private static void NormalizeNodeOutputs(Dictionary<string, object> contentDefinition)
+    {
+        if (
+            !contentDefinition.TryGetValue("nodes", out var nodesObj)
+            || nodesObj is not List<object> nodes
+            || nodes.Count == 0
+        )
+        {
+            return;
+        }
+
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (nodes[i] is not Dictionary<string, object> node)
+                continue;
+
+            if (!node.TryGetValue("outputs", out var outputsObj) || outputsObj is not List<object> outputs)
+                continue;
+
+            var nodeId = GetValueByPath(node, "id")?.ToString()?.Trim() ?? $"nodes[{i}]";
+            for (int o = 0; o < outputs.Count; o++)
+            {
+                if (outputs[o] is not Dictionary<string, object> output)
+                    continue;
+
+                var kind = NormalizeOptionalString(GetValueByPath(output, "kind"));
+                if (string.IsNullOrEmpty(kind))
+                    kind = "resource";
+
+                output["kind"] = kind;
+
+                NormalizeStringPath(output, "resource");
+                NormalizeStringPath(output, "varId");
+                NormalizeStringPath(output, "mode");
+                NormalizeStringPath(output, "amountPerCycleFromVar");
+                NormalizeStringPath(output, "amountPerCycleFromState");
+
+                var resource = NormalizeOptionalString(GetValueByPath(output, "resource"));
+                var varId = NormalizeOptionalString(GetValueByPath(output, "varId"));
+
+                if (string.Equals(kind, "stateDelta", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrEmpty(varId))
+                    {
+                        throw new InvalidOperationException(
+                            $"Node '{nodeId}' outputs[{o}] kind='stateDelta' requires varId."
+                        );
+                    }
+
+                    if (!string.IsNullOrEmpty(resource))
+                    {
+                        throw new InvalidOperationException(
+                            $"Node '{nodeId}' outputs[{o}] kind='stateDelta' must not define resource."
+                        );
+                    }
+
+                    RemoveByPath(output, "resource");
+                    continue;
+                }
+
+                RemoveByPath(output, "varId");
+            }
+        }
+    }
+
     private static void MirrorManifestIdentityValues(
         Dictionary<string, object> contentDefinition
     )
@@ -2593,6 +2659,26 @@ public static class GoogleSheetImporter
         }
 
         current.Remove(parts[^1]);
+    }
+
+    private static void NormalizeStringPath(Dictionary<string, object> dict, string path)
+    {
+        if (dict == null || string.IsNullOrWhiteSpace(path))
+            return;
+
+        var value = NormalizeOptionalString(GetValueByPath(dict, path));
+        if (string.IsNullOrEmpty(value))
+        {
+            RemoveByPath(dict, path);
+            return;
+        }
+
+        SetByPathRaw(dict, path, value);
+    }
+
+    private static string NormalizeOptionalString(object value)
+    {
+        return (value?.ToString() ?? string.Empty).Trim();
     }
 
     private static Dictionary<string, object> CloneDictionary(Dictionary<string, object> source)

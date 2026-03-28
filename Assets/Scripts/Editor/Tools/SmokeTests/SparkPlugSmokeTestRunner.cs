@@ -84,6 +84,8 @@ public static class SparkPlugSmokeTestRunner
         report.AppendLine();
 
         AppendNodeSection(report, definition, data);
+        AppendResourceSection(report, data);
+        AppendZoneStateSection(report, data);
         AppendUpgradeSection(report, data);
         AppendUnlockedSection(report, data);
         AppendAutomationSection(report, data);
@@ -161,6 +163,82 @@ public static class SparkPlugSmokeTestRunner
             report.AppendLine(
                 $"- {instanceId} | level={level} | owned={owned} | enabled={enabled} | automation={automation} | milestoneRank={milestoneRank}"
             );
+        }
+
+        report.AppendLine();
+    }
+
+    private static void AppendResourceSection(StringBuilder report, GameData data)
+    {
+        report.AppendLine("Resources:");
+        if (data?.Resources == null || data.Resources.Count == 0)
+        {
+            report.AppendLine("- (none)");
+            report.AppendLine();
+            return;
+        }
+
+        var resources = new List<GameData.ResourceBalanceData>(data.Resources);
+        resources.Sort(
+            (a, b) =>
+                string.Compare(NormalizeId(a?.ResourceId), NormalizeId(b?.ResourceId), StringComparison.Ordinal)
+        );
+
+        for (int i = 0; i < resources.Count; i++)
+        {
+            var entry = resources[i];
+            var resourceId = NormalizeId(entry?.ResourceId);
+            if (string.IsNullOrEmpty(resourceId))
+                continue;
+
+            report.AppendLine($"- {resourceId} = {entry.Amount:0.###}");
+        }
+
+        report.AppendLine();
+    }
+
+    private static void AppendZoneStateSection(StringBuilder report, GameData data)
+    {
+        report.AppendLine("Zone State:");
+        if (data?.ZoneStates == null || data.ZoneStates.Count == 0)
+        {
+            report.AppendLine("- (none)");
+            report.AppendLine();
+            return;
+        }
+
+        var zones = new List<GameData.ZoneStateData>(data.ZoneStates);
+        zones.Sort(
+            (a, b) =>
+                string.Compare(NormalizeId(a?.ZoneId), NormalizeId(b?.ZoneId), StringComparison.Ordinal)
+        );
+
+        for (int i = 0; i < zones.Count; i++)
+        {
+            var zone = zones[i];
+            var zoneId = NormalizeId(zone?.ZoneId);
+            if (string.IsNullOrEmpty(zoneId))
+                continue;
+
+            report.AppendLine($"- {zoneId}");
+
+            if (zone.StateVars != null && zone.StateVars.Count > 0)
+            {
+                var stateVarIds = new List<string>(zone.StateVars.Keys);
+                stateVarIds.Sort(StringComparer.Ordinal);
+                for (int v = 0; v < stateVarIds.Count; v++)
+                {
+                    var varId = stateVarIds[v];
+                    zone.StateVars.TryGetValue(varId, out var value);
+                    var capacity = 0d;
+                    zone.StateCapacities?.TryGetValue(varId, out capacity);
+                    report.AppendLine($"  {varId} = {value:0.###} / {capacity:0.###}");
+                }
+            }
+            else
+            {
+                report.AppendLine("  (no vars)");
+            }
         }
 
         report.AppendLine();

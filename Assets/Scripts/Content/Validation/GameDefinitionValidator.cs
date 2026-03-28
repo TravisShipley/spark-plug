@@ -52,6 +52,7 @@ public static class GameDefinitionValidator
         "nextMilestone",
         "maxAffordable",
     };
+    private static readonly string[] SupportedNodeOutputKinds = { "resource", "stateDelta" };
     private static readonly string[] SupportedStateVarKinds = { "quantity", "counter", "timer" };
 
     public static void Validate(GameDefinition gd)
@@ -89,6 +90,8 @@ public static class GameDefinitionValidator
             }
         }
 
+        var stateVarIds = ValidateStateVars(gd.stateVars, errors);
+
         // ---- Nodes
         if (gd.nodes == null)
             errors.Add("nodes is null. Use [] when no nodes are defined.");
@@ -122,13 +125,11 @@ public static class GameDefinitionValidator
                 }
             }
 
-            ValidateNodeResourceReferences(n, i, resourceIds, errors);
+            ValidateNodeResourceReferences(n, i, resourceIds, stateVarIds, errors);
             ValidateNodeLocalInputsReferences(n, i, resourceIds, errors);
         }
 
         ValidateTopLevelNodeInputsReferences(gd.nodeInputs, nodeIds, resourceIds, errors);
-
-        var stateVarIds = ValidateStateVars(gd.stateVars, errors);
         ValidateNodeStateCapacities(gd.nodeStateCapacities, nodeIds, stateVarIds, errors);
 
         // ---- NodeInstances -> Nodes
@@ -238,7 +239,7 @@ public static class GameDefinitionValidator
         var rewardPoolIds = ValidateRewardPools(gd.rewardPools, resourceIds, errors);
         ValidateTriggers(gd.triggers, nodeIds, milestoneIds, rewardPoolIds, errors);
         ValidateBuyModes(gd.buyModes, errors);
-        ValidateFormulaPaths(gd, resourceIds, errors);
+        ValidateFormulaPaths(gd, resourceIds, stateVarIds, errors);
         ValidatePrestigeConfiguration(gd, resourceIds, errors);
 
         // Optional reference check: when modifier.source is set, it should point to a known content id.
@@ -793,6 +794,7 @@ public static class GameDefinitionValidator
         NodeDefinition node,
         int nodeIndex,
         HashSet<string> resourceIds,
+        HashSet<string> stateVarIds,
         List<string> errors
     )
     {
@@ -817,6 +819,42 @@ public static class GameDefinitionValidator
             if (output == null)
             {
                 errors.Add($"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}] is null.");
+                continue;
+            }
+
+            var outputKind = NormalizeId(output.kind);
+            if (string.IsNullOrEmpty(outputKind))
+                outputKind = "resource";
+
+            if (!ContainsIgnoreCase(SupportedNodeOutputKinds, outputKind))
+            {
+                errors.Add(
+                    $"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}].kind '{outputKind}' is unsupported."
+                );
+                continue;
+            }
+
+            if (string.Equals(outputKind, "stateDelta", StringComparison.OrdinalIgnoreCase))
+            {
+                var varId = NormalizeId(output.varId);
+                if (string.IsNullOrEmpty(varId))
+                {
+                    errors.Add($"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}].varId is empty.");
+                }
+                else if (!stateVarIds.Contains(varId))
+                {
+                    errors.Add(
+                        $"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}].varId '{varId}' references missing stateVars.id."
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(NormalizeId(output.resource)))
+                {
+                    errors.Add(
+                        $"nodes[{nodeIndex}] ('{node?.id}') outputs[{i}] kind='stateDelta' must not define resource."
+                    );
+                }
+
                 continue;
             }
 
@@ -1335,11 +1373,14 @@ public static class GameDefinitionValidator
     private static void ValidateFormulaPaths(
         GameDefinition definition,
         HashSet<string> resourceIds,
+        HashSet<string> stateVarIds,
         List<string> errors
     )
     {
         if (definition == null)
             return;
+
+        var computedVarIds = CollectComputedVarIds(definition.computedVars);
 
         if (definition.computedVars != null)
         {
@@ -1354,10 +1395,109 @@ public static class GameDefinitionValidator
                     ValidateFormulaPathAndNormalize(
                         ref computedVar.dependsOn[d],
                         resourceIds,
+                        stateVarIds,
+                        computedVarIds,
                         $"computedVars[{i}].dependsOn[{d}]",
                         errors
                     );
                 }
+
+                ValidateComputedExpressionPaths(
+                    computedVar.expression,
+                    resourceIds,
+                    stateVarIds,
+                    computedVarIds,
+                    $"computedVars[{i}].expression",
+                    errors
+                );
+            }
+        }
+
+        if (definition.nodes != null)
+        {
+            for (int i = 0; i < definition.nodes.Count; i++)
+            {
+                var node = definition.nodes[i];
+                if (node?.outputs != null)
+                {
+                    for (int o = 0; o < node.outputs.Count; o++)
+                    {
+                        var output = node.outputs[o];
+                        if (output == null)
+                            continue;
+
+                        ValidateFormulaPathAndNormalize(
+                            ref output.amountPerCycleFromVar,
+                            resourceIds,
+                            stateVarIds,
+                            computedVarIds,
+                            $"nodes[{i}].outputs[{o}].amountPerCycleFromVar",
+                            errors
+                        );
+                        ValidateFormulaPathAndNormalize(
+                            ref output.amountPerCycleFromState,
+                            resourceIds,
+                            stateVarIds,
+                            computedVarIds,
+                            $"nodes[{i}].outputs[{o}].amountPerCycleFromState",
+                            errors
+                        );
+                    }
+                }
+
+                if (node?.inputs == null)
+                    continue;
+
+                for (int n = 0; n < node.inputs.Count; n++)
+                {
+                    var input = node.inputs[n];
+                    if (input == null)
+                        continue;
+
+                    ValidateFormulaPathAndNormalize(
+                        ref input.amountPerCycleFromVar,
+                        resourceIds,
+                        stateVarIds,
+                        computedVarIds,
+                        $"nodes[{i}].inputs[{n}].amountPerCycleFromVar",
+                        errors
+                    );
+                    ValidateFormulaPathAndNormalize(
+                        ref input.amountPerCycleFromState,
+                        resourceIds,
+                        stateVarIds,
+                        computedVarIds,
+                        $"nodes[{i}].inputs[{n}].amountPerCycleFromState",
+                        errors
+                    );
+                }
+            }
+        }
+
+        if (definition.nodeInputs != null)
+        {
+            for (int i = 0; i < definition.nodeInputs.Count; i++)
+            {
+                var input = definition.nodeInputs[i];
+                if (input == null)
+                    continue;
+
+                ValidateFormulaPathAndNormalize(
+                    ref input.amountPerCycleFromVar,
+                    resourceIds,
+                    stateVarIds,
+                    computedVarIds,
+                    $"nodeInputs[{i}].amountPerCycleFromVar",
+                    errors
+                );
+                ValidateFormulaPathAndNormalize(
+                    ref input.amountPerCycleFromState,
+                    resourceIds,
+                    stateVarIds,
+                    computedVarIds,
+                    $"nodeInputs[{i}].amountPerCycleFromState",
+                    errors
+                );
             }
         }
 
@@ -1366,6 +1506,8 @@ public static class GameDefinitionValidator
             ValidateFormulaPathAndNormalize(
                 ref definition.prestige.formula.basedOn,
                 resourceIds,
+                stateVarIds,
+                computedVarIds,
                 "prestige.formula.basedOn",
                 errors
             );
@@ -1384,15 +1526,65 @@ public static class GameDefinitionValidator
             ValidateFormulaPathAndNormalize(
                 ref metaUpgrade.computed.basedOn,
                 resourceIds,
+                stateVarIds,
+                computedVarIds,
                 $"prestige.metaUpgrades[{i}].computed.basedOn",
                 errors
             );
         }
     }
 
+    private static void ValidateComputedExpressionPaths(
+        ComputedExpressionDefinition expression,
+        HashSet<string> resourceIds,
+        HashSet<string> stateVarIds,
+        HashSet<string> computedVarIds,
+        string fieldPath,
+        List<string> errors
+    )
+    {
+        if (expression?.args == null)
+            return;
+
+        for (int i = 0; i < expression.args.Count; i++)
+        {
+            var arg = expression.args[i];
+            if (arg == null)
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(arg.PathValue))
+            {
+                var path = arg.PathValue;
+                ValidateFormulaPathAndNormalize(
+                    ref path,
+                    resourceIds,
+                    stateVarIds,
+                    computedVarIds,
+                    $"{fieldPath}.args[{i}]",
+                    errors
+                );
+                arg.PathValue = path;
+            }
+
+            if (arg.ExpressionValue != null)
+            {
+                ValidateComputedExpressionPaths(
+                    arg.ExpressionValue,
+                    resourceIds,
+                    stateVarIds,
+                    computedVarIds,
+                    $"{fieldPath}.args[{i}]",
+                    errors
+                );
+            }
+        }
+    }
+
     private static void ValidateFormulaPathAndNormalize(
         ref string path,
         HashSet<string> resourceIds,
+        HashSet<string> stateVarIds,
+        HashSet<string> computedVarIds,
         string fieldPath,
         List<string> errors
     )
@@ -1414,10 +1606,57 @@ public static class GameDefinitionValidator
             path = parsed.CanonicalPath;
         }
 
-        if (string.IsNullOrEmpty(parsed.ParameterId) || resourceIds.Contains(parsed.ParameterId))
+        var baseName = NormalizeId(parsed.CanonicalBaseName);
+        var parameterId = NormalizeId(parsed.ParameterId);
+        if (string.IsNullOrEmpty(parameterId))
             return;
 
-        errors.Add($"{fieldPath} resource '{parsed.ParameterId}' references missing resources.id.");
+        if (string.Equals(baseName, "resource", StringComparison.Ordinal))
+        {
+            if (!resourceIds.Contains(parameterId))
+                errors.Add($"{fieldPath} resource '{parameterId}' references missing resources.id.");
+
+            return;
+        }
+
+        if (string.Equals(baseName, "stateQuantity", StringComparison.Ordinal))
+        {
+            if (!stateVarIds.Contains(parameterId))
+            {
+                errors.Add(
+                    $"{fieldPath} stateQuantity '{parameterId}' references missing stateVars.id."
+                );
+            }
+
+            return;
+        }
+
+        if (
+            string.Equals(baseName, "var", StringComparison.Ordinal)
+            && computedVarIds != null
+            && !computedVarIds.Contains(parameterId)
+        )
+        {
+            errors.Add($"{fieldPath} var '{parameterId}' references missing computedVars.id.");
+        }
+    }
+
+    private static HashSet<string> CollectComputedVarIds(
+        IReadOnlyList<ComputedVarDefinition> computedVars
+    )
+    {
+        var computedVarIds = new HashSet<string>(StringComparer.Ordinal);
+        if (computedVars == null)
+            return computedVarIds;
+
+        for (int i = 0; i < computedVars.Count; i++)
+        {
+            var computedVarId = NormalizeId(computedVars[i]?.id);
+            if (!string.IsNullOrEmpty(computedVarId))
+                computedVarIds.Add(computedVarId);
+        }
+
+        return computedVarIds;
     }
 
     private static string NormalizeId(string id)

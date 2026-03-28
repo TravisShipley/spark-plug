@@ -253,7 +253,6 @@ public sealed class SaveService : IDisposable
             return false;
 
         EnsureDataInitialized();
-        RefreshZoneStateStorage();
         zoneState = Data.ZoneStates?.Find(
             zone => zone != null && string.Equals(NormalizeId(zone.ZoneId), id, StringComparison.Ordinal)
         );
@@ -281,7 +280,6 @@ public sealed class SaveService : IDisposable
             return;
 
         EnsureDataInitialized();
-        RefreshZoneStateStorage();
 
         var zoneState = EnsureZoneStateEntry(normalizedZoneId);
         zoneState.StateVars ??= new Dictionary<string, double>(StringComparer.Ordinal);
@@ -300,6 +298,24 @@ public sealed class SaveService : IDisposable
             RequestSave();
     }
 
+    public bool AddZoneStateVar(string zoneId, string varId, double delta, bool requestSave = true)
+    {
+        var normalizedZoneId = NormalizeId(zoneId);
+        var normalizedVarId = NormalizeId(varId);
+        if (string.IsNullOrEmpty(normalizedZoneId) || string.IsNullOrEmpty(normalizedVarId))
+            return false;
+
+        if (double.IsNaN(delta) || double.IsInfinity(delta) || Math.Abs(delta) < 0.0000001d)
+            return false;
+
+        EnsureDataInitialized();
+        var zoneState = EnsureZoneStateEntry(normalizedZoneId);
+        zoneState.StateVars ??= new Dictionary<string, double>(StringComparer.Ordinal);
+        zoneState.StateVars.TryGetValue(normalizedVarId, out var current);
+        SetZoneStateVar(normalizedZoneId, normalizedVarId, current + delta, requestSave);
+        return true;
+    }
+
     public double GetZoneStateCapacity(string zoneId, string varId)
     {
         var normalizedZoneId = NormalizeId(zoneId);
@@ -313,6 +329,23 @@ public sealed class SaveService : IDisposable
         return zoneState.StateCapacities.TryGetValue(normalizedVarId, out var capacity)
             ? capacity
             : 0d;
+    }
+
+    public bool ClampZoneStateVars(string zoneId, bool requestSave = true)
+    {
+        var normalizedZoneId = NormalizeId(zoneId);
+        if (string.IsNullOrEmpty(normalizedZoneId))
+            return false;
+
+        EnsureDataInitialized();
+        if (!TryGetZoneState(normalizedZoneId, out var zoneState) || zoneState == null)
+            return false;
+
+        var changed = ClampZoneStateVars(zoneState);
+        if (changed && requestSave)
+            RequestSave();
+
+        return changed;
     }
 
     public void SetNodeInstanceState(
@@ -972,6 +1005,7 @@ public sealed class SaveService : IDisposable
         }
 
         var seenNodes = new HashSet<string>(StringComparer.Ordinal);
+        var nodeAutomationDefaults = BuildNodeAutomationDefaults(definition);
         if (definition.nodeInstances != null)
         {
             for (int i = 0; i < definition.nodeInstances.Count; i++)
@@ -983,6 +1017,11 @@ public sealed class SaveService : IDisposable
 
                 var enabled = nodeInstance?.initialState?.enabled ?? false;
                 var owned = enabled;
+                var nodeId = NormalizeId(nodeInstance?.nodeId);
+                var automated =
+                    owned
+                    && nodeAutomationDefaults.TryGetValue(nodeId, out var defaultAutomated)
+                    && defaultAutomated;
                 var level = Math.Max(0, nodeInstance?.initialState?.level ?? 0);
 
                 if (owned && level < 1)
@@ -997,8 +1036,8 @@ public sealed class SaveService : IDisposable
                         IsOwned = owned,
                         IsEnabled = enabled || owned,
                         Level = level,
-                        IsAutomationPurchased = false,
-                        IsAutomated = false,
+                        IsAutomationPurchased = automated,
+                        IsAutomated = automated,
                         HasRuntimeSnapshot = true,
                         WasRunning = owned,
                         HasPendingPayout = false,
@@ -1014,6 +1053,7 @@ public sealed class SaveService : IDisposable
 
         SeedZoneStateVars(definition, data);
         RebuildZoneStateCapacities(definition, data);
+        ClampAllZoneStateVars(data);
         SortFactLists(data);
         data.EnsureInitialized();
         return data;
@@ -1491,6 +1531,8 @@ public sealed class SaveService : IDisposable
             changed = true;
 
         RebuildZoneStateCapacities(definition, merged);
+        if (ClampAllZoneStateVars(merged))
+            changed = true;
 
         SortFactLists(merged);
         merged.EnsureInitialized();
@@ -1628,6 +1670,7 @@ public sealed class SaveService : IDisposable
         EnsureDataInitialized();
         SeedZoneStateVars(currentDefinition, Data);
         RebuildZoneStateCapacities(currentDefinition, Data);
+        ClampAllZoneStateVars(Data);
     }
 
     private void RebuildZoneStateCapacities()
@@ -1636,6 +1679,7 @@ public sealed class SaveService : IDisposable
             return;
 
         RebuildZoneStateCapacities(currentDefinition, Data);
+        ClampAllZoneStateVars(Data);
     }
 
     private void EnsureDataInitialized()
@@ -1712,6 +1756,46 @@ public sealed class SaveService : IDisposable
     private static double SanitizeFinite(double value)
     {
         return double.IsNaN(value) || double.IsInfinity(value) ? 0d : value;
+    }
+
+    private static bool ClampAllZoneStateVars(GameData data)
+    {
+        if (data?.ZoneStates == null)
+            return false;
+
+        var changed = false;
+        for (int i = 0; i < data.ZoneStates.Count; i++)
+            changed |= ClampZoneStateVars(data.ZoneStates[i]);
+
+        return changed;
+    }
+
+    private static bool ClampZoneStateVars(GameData.ZoneStateData zoneState)
+    {
+        if (zoneState?.StateVars == null)
+            return false;
+
+        zoneState.StateCapacities ??= new Dictionary<string, double>(StringComparer.Ordinal);
+        var changed = false;
+        var keys = new List<string>(zoneState.StateVars.Keys);
+        for (int i = 0; i < keys.Count; i++)
+        {
+            var varId = NormalizeId(keys[i]);
+            if (string.IsNullOrEmpty(varId))
+                continue;
+
+            var current = zoneState.StateVars[varId];
+            var capacity = zoneState.StateCapacities.TryGetValue(varId, out var resolvedCapacity)
+                ? SanitizeNonNegative(resolvedCapacity)
+                : 0d;
+            if (current <= capacity)
+                continue;
+
+            zoneState.StateVars[varId] = capacity;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static string NormalizeId(string id)
@@ -1920,6 +2004,32 @@ public sealed class SaveService : IDisposable
         }
 
         return defaults;
+    }
+
+    private static Dictionary<string, bool> BuildNodeAutomationDefaults(GameDefinition definition)
+    {
+        var defaults = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (definition?.nodes == null)
+            return defaults;
+
+        for (int i = 0; i < definition.nodes.Count; i++)
+        {
+            var node = definition.nodes[i];
+            var nodeId = NormalizeId(node?.id);
+            if (string.IsNullOrEmpty(nodeId) || defaults.ContainsKey(nodeId))
+                continue;
+
+            defaults[nodeId] = IsAutomationEnabledByDefault(node?.automation?.policy);
+        }
+
+        return defaults;
+    }
+
+    private static bool IsAutomationEnabledByDefault(string policy)
+    {
+        var normalizedPolicy = NormalizeId(policy);
+        return string.Equals(normalizedPolicy, "autoRepeat", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedPolicy, "alwaysOn", StringComparison.OrdinalIgnoreCase);
     }
 
     private static List<string> CollectDefinitionZoneIds(GameDefinition definition)
