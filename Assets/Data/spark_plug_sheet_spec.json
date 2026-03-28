@@ -1,13 +1,13 @@
 {
   "sheetSpec": {
-    "version": "0.2",
+    "version": "0.3",
     "notes": "Spreadsheet contract used to ensure the authored content definition stays aligned with the authoritative schema. Does not validate row values.",
     "settings": {
       "headerRowIndex": 1,
       "freezeHeaderRow": true,
       "allowExtraColumns": true,
       "newColumnsPolicy": "append",
-      "reservedSheets": ["__Index", "__Enums", "__EnumDropdowns", "Manifest"]
+      "reservedSheets": ["__Index", "Manifest", "Dropdowns"]
     },
 
     "tables": [
