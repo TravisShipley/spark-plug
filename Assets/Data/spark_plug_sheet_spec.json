@@ -160,6 +160,9 @@
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
+        "columnRenames": [
+          { "from": "expression.args_json", "to": "expression.args" }
+        ],
         "columns": [
           { "name": "id", "required": true, "type": "varId" },
           { "name": "zoneId", "required": false, "type": "zoneId" },
@@ -170,8 +173,13 @@
             "type": "enum",
             "enumRef": "enums.varValueType"
           },
-          { "name": "expression.type", "required": true, "type": "enum" },
-          { "name": "expression.args", "required": true, "type": "json" },
+          {
+            "name": "expression.type",
+            "required": true,
+            "type": "enum",
+            "enumRef": "enums.expressionOp"
+          },
+          { "name": "expression.args_json", "required": true, "type": "json" },
           { "name": "tags", "required": false, "type": "stringList" }
         ]
       },
@@ -201,12 +209,12 @@
         "name": "Zones",
         "outputKey": "zones",
         "emit": "list",
-        "columnRenames": [
-          { "from": "localResources_json", "to": "localResources" }
-        ],
         "required": true,
         "kind": "entity",
         "primaryKey": "id",
+        "columnRenames": [
+          { "from": "localResources_json", "to": "localResources" }
+        ],
         "columns": [
           { "name": "id", "required": true, "type": "zoneId" },
           { "name": "displayName", "required": true, "type": "string" },
@@ -278,7 +286,7 @@
           {
             "name": "enabledRequirements_json",
             "required": false,
-            "type": "numberString"
+            "type": "json"
           },
           { "name": "tags", "required": false, "type": "stringList" }
         ]
@@ -947,7 +955,18 @@
       "varValueType": ["numberString", "bigNumberString"],
       "stateVarKind": ["quantity", "counter", "timer"],
       "linkMode": ["push", "pull"],
-      "scalingOperation": ["add", "multiply", "set"]
+      "scalingOperation": ["add", "multiply", "set"],
+      "expressionOp": [
+        "constant",
+        "add",
+        "multiply",
+        "power",
+        "log10",
+        "min",
+        "max",
+        "clamp",
+        "if"
+      ]
     }
   }
 }
