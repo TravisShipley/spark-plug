@@ -950,7 +950,8 @@
         "ad.rewarded",
         "session.tick",
         "prestige.reset",
-        "upgrade.purchased"
+        "upgrade.purchased",
+        "milestone.fired"
       ],
       "varValueType": ["numberString", "bigNumberString"],
       "stateVarKind": ["quantity", "counter", "timer"],

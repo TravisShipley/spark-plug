@@ -73,6 +73,7 @@
       "id": "var.clipPrice",
       "displayName": "string?",
       "zoneId": "zone.main",
+      "valueType": "numberString|bigNumberString",
       "base": "numberString",
       "min": null,
       "max": null,
@@ -81,7 +82,11 @@
         "type": "constant|add|multiply|power|log10|min|max|clamp|if",
         "args": []
       },
-      "dependsOn": ["resource[resourceId]", "stateQuantity[varId]", "var[varId]"]
+      "dependsOn": [
+        "resource[resourceId]",
+        "stateQuantity[varId]",
+        "var[varId]"
+      ]
     }
   ],
 

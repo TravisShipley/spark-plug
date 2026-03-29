@@ -12,6 +12,7 @@ public sealed class GeneratorDefinition
     public double BaseCycleDurationSeconds = 2.0;
     public string OutputResourceId = "currencySoft";
     public List<NodeOutputDefinition> Outputs = new();
+    public bool AutomationEnabledByDefault;
 
     public double BaseLevelCost = 10.0;
     public string LevelCostResourceId = "currencySoft";
