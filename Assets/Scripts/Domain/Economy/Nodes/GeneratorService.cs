@@ -221,7 +221,10 @@ public class GeneratorService : IDisposable
                 model.CycleElapsedSeconds -= interval;
                 zoneStateChanged |= ApplyCycleStateDeltaOutputs();
                 QueueCompletedCyclePayout();
-                CollectInternal(requestSave: false, publishCycleCompleted: true);
+                if (model.HasPendingPayout && model.PendingPayout > 0d)
+                    CollectInternal(requestSave: false, publishCycleCompleted: true);
+                else
+                    cycleCompleted.OnNext(Unit.Default);
             }
         }
         else
@@ -233,6 +236,8 @@ public class GeneratorService : IDisposable
                 zoneStateChanged |= ApplyCycleStateDeltaOutputs();
                 QueueCompletedCyclePayout();
                 isRunning.Value = false;
+                if (!model.HasPendingPayout || model.PendingPayout <= 0d)
+                    cycleCompleted.OnNext(Unit.Default);
                 PersistRuntimeState(requestSave: true);
             }
         }
@@ -253,11 +258,25 @@ public class GeneratorService : IDisposable
         if (!model.HasPendingPayout || model.PendingPayout <= 0)
             return;
 
+        var outputResourceId = NormalizeId(definition.OutputResourceId);
+        if (string.IsNullOrEmpty(outputResourceId))
+        {
+            model.PendingPayout = 0;
+            model.HasPendingPayout = false;
+            RefreshCanCollectState();
+            PersistRuntimeState(requestSave);
+
+            if (publishCycleCompleted)
+                cycleCompleted.OnNext(Unit.Default);
+
+            return;
+        }
+
         var amount = model.PendingPayout;
         model.PendingPayout = 0;
         model.HasPendingPayout = false;
 
-        wallet.AddRaw(definition.OutputResourceId, amount);
+        wallet.AddRaw(outputResourceId, amount);
         RefreshCanCollectState();
         PersistRuntimeState(requestSave);
 
@@ -331,6 +350,7 @@ public class GeneratorService : IDisposable
         {
             model.IsOwned = true;
             isOwned.Value = true;
+            isAutomated.Value = IsAutomationActive();
             // Newly owned generators begin running immediately
             isRunning.Value = true;
             PersistRuntimeState(requestSave: true);
@@ -615,7 +635,9 @@ public class GeneratorService : IDisposable
 
     private bool IsAutomationActive()
     {
-        return model.IsAutomated || modifierAutomationEnabled;
+        return (definition.AutomationEnabledByDefault && isOwned.Value)
+            || model.IsAutomated
+            || modifierAutomationEnabled;
     }
 
     private void RefreshFromModifiers()
@@ -632,9 +654,10 @@ public class GeneratorService : IDisposable
             newOutputMult = 1.0;
         outputMultiplier.Value = newOutputMult;
 
-        var newResourceGainMult = modifierService.GetResourceGainMultiplier(
-            definition.OutputResourceId
-        );
+        var outputResourceId = NormalizeId(definition.OutputResourceId);
+        var newResourceGainMult = string.IsNullOrEmpty(outputResourceId)
+            ? 1.0
+            : modifierService.GetResourceGainMultiplier(outputResourceId);
         if (
             double.IsNaN(newResourceGainMult)
             || double.IsInfinity(newResourceGainMult)

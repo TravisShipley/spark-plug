@@ -322,6 +322,9 @@ public class GeneratorListComposer
         definition.BaseOutputPerCycle =
             payout > 0 ? payout : perSecond * definition.BaseCycleDurationSeconds;
         definition.OutputResourceId = (output?.resource ?? string.Empty).Trim();
+        definition.AutomationEnabledByDefault = IsAutomationEnabledByDefault(
+            nodeDef?.automation?.policy
+        );
         definition.LevelCostResourceId = (nodeDef?.leveling?.levelResource ?? string.Empty).Trim();
 
         definition.BaseLevelCost = Math.Max(0.0, nodeDef?.leveling?.priceCurve?.basePrice ?? 0.0);
