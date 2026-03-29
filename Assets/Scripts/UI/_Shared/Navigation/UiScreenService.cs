@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 public sealed class UiScreenService
 {
@@ -28,8 +29,18 @@ public sealed class UiScreenService
 
     public void ShowStore() => uiScreenManager.ShowById("STORE");
 
-    public void ShowAdBoost() =>
+    public bool HasAdBoost => uiScreenManager.AdBoostScreenViewModel != null;
+
+    public void ShowAdBoost()
+    {
+        if (!HasAdBoost)
+        {
+            Debug.LogWarning("UiScreenService: ad boost is unavailable for the current content.");
+            return;
+        }
+
         uiScreenManager.Show("AD_BOOST", uiScreenManager.AdBoostScreenViewModel);
+    }
 
     public void ShowPrestige() =>
         uiScreenManager.Show("PRESTIGE", uiScreenManager.PrestigeScreenViewModel);

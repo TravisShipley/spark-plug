@@ -32,8 +32,8 @@ public sealed class AdBoostButtonView : MonoBehaviour
             actionBinder.enabled = false;
 
         button.Bind(
-            interactable: Observable.Return(true),
-            visible: Observable.Return(true),
+            interactable: Observable.Return(uiScreenService.HasAdBoost),
+            visible: Observable.Return(uiScreenService.HasAdBoost),
             onClick: uiScreenService.ShowAdBoost
         );
 

@@ -354,11 +354,17 @@ public class GameCompositionRoot : MonoBehaviour
         );
         upgradesScreenViewModel = new UpgradesScreenViewModel(upgradeListBuilder);
         managersScreenViewModel = new ManagersScreenViewModel(upgradeListBuilder);
-        adBoostScreenViewModel = new AdBoostScreenViewModel(
-            buffService,
-            gameDefinitionService.BuffCatalog,
-            CloseTopScreen
-        );
+        adBoostScreenViewModel = null;
+        if (
+            gameDefinitionService.BuffCatalog.TryGet(AdBoostScreenViewModel.CanonicalBuffId, out _)
+        )
+        {
+            adBoostScreenViewModel = new AdBoostScreenViewModel(
+                buffService,
+                gameDefinitionService.BuffCatalog,
+                CloseTopScreen
+            );
+        }
         prestigeScreenViewModel = new PrestigeScreenViewModel(prestigeService, CloseTopScreen);
         uiScreenManager.UpgradesScreenViewModel = upgradesScreenViewModel;
         uiScreenManager.ManagersScreenViewModel = managersScreenViewModel;
