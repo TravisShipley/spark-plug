@@ -6,6 +6,7 @@ public sealed class ComputedVarService
 {
     private readonly GameDefinitionService gameDefinitionService;
     private readonly SaveService saveService;
+    private readonly IStateVarService stateVarService;
     private readonly WalletService walletService;
     private readonly Dictionary<string, List<ComputedVarDefinition>> computedVarsById = new(
         StringComparer.Ordinal
@@ -14,12 +15,15 @@ public sealed class ComputedVarService
     public ComputedVarService(
         GameDefinitionService gameDefinitionService,
         SaveService saveService,
+        IStateVarService stateVarService,
         WalletService walletService
     )
     {
         this.gameDefinitionService =
             gameDefinitionService ?? throw new ArgumentNullException(nameof(gameDefinitionService));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
+        this.stateVarService =
+            stateVarService ?? throw new ArgumentNullException(nameof(stateVarService));
         this.walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
 
         var computedVars = this.gameDefinitionService.Definition?.computedVars;
@@ -176,7 +180,7 @@ public sealed class ComputedVarService
                 case "lifetimeEarnings":
                     return saveService.GetLifetimeEarnings(parameterId);
                 case "stateQuantity":
-                    return saveService.GetZoneStateVar(zoneId, parameterId);
+                    return stateVarService.GetQuantity(zoneId, parameterId);
                 case "var":
                     if (
                         TryResolveDefinition(parameterId, zoneId, out var referenced)

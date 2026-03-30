@@ -7,6 +7,7 @@ public readonly struct UiBindingsContext
     public readonly BuyModeService BuyModeService;
     public readonly UiScreenService UiScreenService;
     public readonly UiServiceRegistry UiServices;
+    public readonly IStateVarService StateVarService;
 
     public UiBindingsContext(
         UiScreenService uiScreenService,
@@ -15,7 +16,8 @@ public readonly struct UiBindingsContext
         BuyModeService buyModeService,
         TimeWarpService timeWarpService,
         WalletService walletService,
-        WalletViewModel walletViewModel
+        WalletViewModel walletViewModel,
+        IStateVarService stateVarService
     )
     {
         UiScreenService = uiScreenService;
@@ -25,5 +27,6 @@ public readonly struct UiBindingsContext
         TimeWarpService = timeWarpService;
         WalletService = walletService;
         WalletViewModel = walletViewModel;
+        StateVarService = stateVarService;
     }
 }

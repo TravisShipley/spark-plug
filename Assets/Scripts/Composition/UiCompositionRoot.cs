@@ -42,8 +42,12 @@ public sealed class UiCompositionRoot : MonoBehaviour
     [SerializeField]
     private BuyModeButtonView[] buyModeButtons;
 
+    [SerializeField]
+    private LlamaHudView llamaHudView;
+
     private bool hasBound;
     private BuyModeViewModel buyModeViewModel;
+    private LlamaHudViewModel llamaHudViewModel;
     private TestPanelViewModel testPanelViewModel;
     private TopBarViewModel topBarViewModel;
 
@@ -58,6 +62,7 @@ public sealed class UiCompositionRoot : MonoBehaviour
         BindWalletHud(context);
         BindTopBar(context);
         BindBottomBar(context);
+        BindLlamaHud(context);
         BindTestPanel();
         BindAdBoostButtons(context);
         BindBuyModeButtons(context);
@@ -151,6 +156,24 @@ public sealed class UiCompositionRoot : MonoBehaviour
         bottomBarView.Bind(bottomBarVm);
     }
 
+    private void BindLlamaHud(in UiBindingsContext context)
+    {
+        if (llamaHudView == null)
+            llamaHudView = GetComponentInChildren<LlamaHudView>(true);
+
+        if (llamaHudView == null)
+            return;
+
+        if (context.StateVarService == null)
+        {
+            Debug.LogError("UiCompositionRoot: StateVarService is null in UiBindingsContext.", this);
+            return;
+        }
+
+        llamaHudViewModel ??= new LlamaHudViewModel(context.StateVarService);
+        llamaHudView.Initialize(llamaHudViewModel);
+    }
+
     private void BindTestPanel()
     {
         if (testPanel == null)
@@ -208,5 +231,6 @@ public sealed class UiCompositionRoot : MonoBehaviour
         topBarViewModel?.Dispose();
         testPanelViewModel?.Dispose();
         buyModeViewModel?.Dispose();
+        llamaHudViewModel?.Dispose();
     }
 }

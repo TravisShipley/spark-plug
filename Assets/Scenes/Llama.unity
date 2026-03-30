@@ -484,6 +484,7 @@ MonoBehaviour:
   - {fileID: 6065628833239432593}
   buyModeButtons:
   - {fileID: 2037662465}
+  llamaHudView: {fileID: 6065628833239432597}
 --- !u!1 &681466048
 GameObject:
   m_ObjectHideFlags: 0
@@ -2506,6 +2507,31 @@ PrefabInstance:
       propertyPath: m_SizeDelta.x
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6038005665394262711, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6038005665394262711, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6038005665394262711, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6038005665394262711, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6038005665394262711, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6224775914191492142, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_Enabled
@@ -2857,6 +2883,31 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7475956438927993633, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7535220372278263478, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7535220372278263478, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7535220372278263478, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7535220372278263478, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7535220372278263478, guid: 602b3793041444a11842ad222eb83510,
         type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
@@ -3286,6 +3337,11 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.x
       value: 24.99997
       objectReference: {fileID: 0}
+    - target: {fileID: 9179106121025431094, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      propertyPath: m_text
+      value: Llamas. 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 8888359209536957445, guid: 602b3793041444a11842ad222eb83510, type: 3}
@@ -3295,6 +3351,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 9937546}
+    - targetCorrespondingSourceObject: {fileID: 2865780920985717352, guid: 602b3793041444a11842ad222eb83510,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6065628833239432597}
   m_SourcePrefab: {fileID: 100100000, guid: 602b3793041444a11842ad222eb83510, type: 3}
 --- !u!225 &6065628833239432591 stripped
 CanvasGroup:
@@ -3326,12 +3386,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0963807cc3b4f2f93b18e8f42e6f90c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AdBoostButtonView
+--- !u!114 &6065628833239432594 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9179106121025431094, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!223 &6065628833239432595 stripped
 Canvas:
   m_CorrespondingSourceObject: {fileID: 7584166579324823389, guid: 602b3793041444a11842ad222eb83510,
     type: 3}
   m_PrefabInstance: {fileID: 6065628833239432590}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &6065628833239432596 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2865780920985717352, guid: 602b3793041444a11842ad222eb83510,
+    type: 3}
+  m_PrefabInstance: {fileID: 6065628833239432590}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6065628833239432597
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6065628833239432596}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6a31ac7287944f8b449af8d12ce3faa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LlamaHudView
+  llamaText: {fileID: 6065628833239432594}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

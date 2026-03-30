@@ -12,6 +12,7 @@ public class GeneratorService : IDisposable
     private readonly TickService tickService;
     private readonly ModifierService modifierService;
     private readonly ComputedVarService computedVarService;
+    private readonly IStateVarService stateVarService;
     private readonly SaveService saveService;
     private readonly GameEventStream gameEventStream;
 
@@ -89,6 +90,7 @@ public class GeneratorService : IDisposable
         TickService tickService,
         ModifierService modifierService,
         ComputedVarService computedVarService,
+        IStateVarService stateVarService,
         SaveService saveService,
         GameEventStream gameEventStream
     )
@@ -100,6 +102,8 @@ public class GeneratorService : IDisposable
         this.modifierService =
             modifierService ?? throw new ArgumentNullException(nameof(modifierService));
         this.computedVarService = computedVarService;
+        this.stateVarService =
+            stateVarService ?? throw new ArgumentNullException(nameof(stateVarService));
         this.saveService = saveService ?? throw new ArgumentNullException(nameof(saveService));
         this.gameEventStream =
             gameEventStream ?? throw new ArgumentNullException(nameof(gameEventStream));
@@ -206,7 +210,7 @@ public class GeneratorService : IDisposable
         }
 
         var dt = tickService.Interval.TotalSeconds;
-        var zoneStateChanged = ApplyRateStateDeltaOutputs(dt);
+        ApplyRateStateDeltaOutputs(dt);
         // Authoritative effective duration (Option A: base / speedMultiplier)
         var interval = cycleDurationSeconds.Value;
         lastIntervalSeconds = interval;
@@ -219,7 +223,7 @@ public class GeneratorService : IDisposable
             while (model.CycleElapsedSeconds >= interval)
             {
                 model.CycleElapsedSeconds -= interval;
-                zoneStateChanged |= ApplyCycleStateDeltaOutputs();
+                ApplyCycleStateDeltaOutputs();
                 QueueCompletedCyclePayout();
                 if (model.HasPendingPayout && model.PendingPayout > 0d)
                     CollectInternal(requestSave: false, publishCycleCompleted: true);
@@ -233,7 +237,7 @@ public class GeneratorService : IDisposable
             if (model.CycleElapsedSeconds >= interval)
             {
                 model.CycleElapsedSeconds = 0;
-                zoneStateChanged |= ApplyCycleStateDeltaOutputs();
+                ApplyCycleStateDeltaOutputs();
                 QueueCompletedCyclePayout();
                 isRunning.Value = false;
                 if (!model.HasPendingPayout || model.PendingPayout <= 0d)
@@ -242,7 +246,6 @@ public class GeneratorService : IDisposable
             }
         }
 
-        zoneStateChanged |= saveService.ClampZoneStateVars(definition.ZoneId, requestSave: true);
         cycleProgress.Value = model.CycleElapsedSeconds / interval;
         if (isAutomated.Value || model.WasRunning || model.CycleElapsedSeconds > 0d)
             PersistRuntimeState(requestSave: false);
@@ -945,12 +948,8 @@ public class GeneratorService : IDisposable
             if (deltaPerSecond == 0d)
                 continue;
 
-            changed |= saveService.AddZoneStateVar(
-                definition.ZoneId,
-                varId,
-                deltaPerSecond * dt,
-                requestSave: true
-            );
+            stateVarService.AddQuantity(definition.ZoneId, varId, deltaPerSecond * dt);
+            changed = true;
         }
 
         return changed;
@@ -976,12 +975,8 @@ public class GeneratorService : IDisposable
             if (delta == 0d)
                 continue;
 
-            changed |= saveService.AddZoneStateVar(
-                definition.ZoneId,
-                varId,
-                delta,
-                requestSave: true
-            );
+            stateVarService.AddQuantity(definition.ZoneId, varId, delta);
+            changed = true;
         }
 
         return changed;

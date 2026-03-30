@@ -16,4 +16,4 @@ MonoBehaviour:
   outputJsonPath: Assets/Data/Definitions/content_definition_llama.json
   resourcesFallbackOutputPath: 
   addressableKey: content_def_llama
-  rebuildAddressables: 1
+  rebuildAddressables: 0

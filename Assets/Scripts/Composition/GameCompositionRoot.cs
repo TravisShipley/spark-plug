@@ -71,6 +71,7 @@ public class GameCompositionRoot : MonoBehaviour
     private TimeWarpService timeWarpService;
     private GameDefinitionService gameDefinitionService;
     private ComputedVarService computedVarService;
+    private StateVarService stateVarService;
     private TickService tickService;
     private WalletViewModel walletViewModel;
     private SaveService saveService;
@@ -218,6 +219,7 @@ public class GameCompositionRoot : MonoBehaviour
             saveService
         );
         unlockService.LoadUnlockedIds(saveService.Data?.UnlockedNodeInstanceIds);
+        stateVarService.RefreshAll();
 
         BindSceneUi(uiScreenService);
         BindDebugUi();
@@ -240,6 +242,7 @@ public class GameCompositionRoot : MonoBehaviour
             saveService,
             gameDefinitionService,
             computedVarService,
+            stateVarService,
             unlockService,
             disposables,
             generatorModels,
@@ -248,6 +251,7 @@ public class GameCompositionRoot : MonoBehaviour
         );
 
         generatorComposer.Compose();
+        stateVarService.RefreshAll();
         upgradeService.ApplyAllPurchased();
 
         milestoneService = new MilestoneService(
@@ -284,6 +288,7 @@ public class GameCompositionRoot : MonoBehaviour
         gameDefinitionService = new GameDefinitionService(runtimeConfig.Definition);
         saveService.Load(gameDefinitionService.Definition, runtimeConfig.ResetSaveOnBoot);
         gameEventStream = new GameEventStream();
+        stateVarService = new StateVarService(gameDefinitionService, saveService);
 
         walletService = new WalletService(
             saveService,
@@ -294,12 +299,14 @@ public class GameCompositionRoot : MonoBehaviour
         computedVarService = new ComputedVarService(
             gameDefinitionService,
             saveService,
+            stateVarService,
             walletService
         );
 
         tickService = new TickService(TickInterval);
 
         uiService.Initialize(walletService);
+        uiService.RegisterStateVarService(stateVarService);
 
         upgradeService = new UpgradeService(
             gameDefinitionService.UpgradeCatalog,
@@ -403,7 +410,8 @@ public class GameCompositionRoot : MonoBehaviour
             buyModeService,
             timeWarpService,
             walletService,
-            walletViewModel
+            walletViewModel,
+            stateVarService
         );
 
         uiRoot.Bind(uiCtx);
@@ -486,6 +494,7 @@ public class GameCompositionRoot : MonoBehaviour
         adBoostScreenViewModel?.Dispose();
         prestigeScreenViewModel?.Dispose();
         walletViewModel?.Dispose();
+        stateVarService?.Dispose();
 
         upgradeService?.Dispose();
         prestigeService?.Dispose();

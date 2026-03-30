@@ -20,6 +20,7 @@ public class GeneratorListComposer
     private readonly SaveService saveService;
     private readonly GameDefinitionService gameDefinitionService;
     private readonly ComputedVarService computedVarService;
+    private readonly StateVarService stateVarService;
     private readonly UnlockService unlockService;
     private readonly CompositeDisposable disposables;
 
@@ -50,6 +51,7 @@ public class GeneratorListComposer
         SaveService saveService,
         GameDefinitionService gameDefinitionService,
         ComputedVarService computedVarService,
+        StateVarService stateVarService,
         UnlockService unlockService,
         CompositeDisposable disposables,
         List<GeneratorModel> generatorModels,
@@ -70,6 +72,7 @@ public class GeneratorListComposer
         this.saveService = saveService;
         this.gameDefinitionService = gameDefinitionService;
         this.computedVarService = computedVarService;
+        this.stateVarService = stateVarService;
         this.unlockService = unlockService;
         this.disposables = disposables;
         this.generatorModels = generatorModels;
@@ -206,6 +209,7 @@ public class GeneratorListComposer
             tickService,
             modifierService,
             computedVarService,
+            stateVarService,
             saveService,
             gameEventStream
         );
@@ -229,7 +233,7 @@ public class GeneratorListComposer
         if (!string.IsNullOrWhiteSpace(nodeTypeId))
             uiService.RegisterGenerator(nodeTypeId.Trim(), service);
 
-        WireGeneratorPersistence(id, service);
+        WireGeneratorPersistence(id, generatorDefinition.ZoneId, service);
     }
 
     private void InstantiateGeneratorView(string instanceId)
@@ -659,7 +663,7 @@ public class GeneratorListComposer
             || string.Equals(normalizedPolicy, "alwaysOn", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void WireGeneratorPersistence(string id, GeneratorService service)
+    private void WireGeneratorPersistence(string id, string zoneId, GeneratorService service)
     {
         Observable
             .CombineLatest(
@@ -678,6 +682,7 @@ public class GeneratorListComposer
                     state.lvl,
                     state.automationPurchased
                 );
+                stateVarService?.RefreshZone(zoneId);
             })
             .AddTo(disposables);
     }
