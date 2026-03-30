@@ -228,7 +228,7 @@ public class GameCompositionRoot : MonoBehaviour
             .TimeWarpCompleted.Subscribe(evt => ShowTimeWarpResults(uiScreenService, evt.result))
             .AddTo(disposables);
 
-        var generatorComposer = new GeneratorListComposer(
+        var generatorComposer = new NodeListComposer(
             generatorUIRootPrefab,
             generatorUIContainer,
             walletService,

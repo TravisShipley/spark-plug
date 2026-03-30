@@ -134,7 +134,7 @@ These types assemble or transform existing data into a convenient shape for a ca
 
 - `*Composer` — wires together multiple objects or creates a set of runtime objects from definitions.
   - Examples:
-    - `GeneratorListComposer`
+    - `NodeListComposer`
     - `UiCompositionRoot` (still a CompositionRoot, but conceptually similar)
 
 - `*Builder` — builds a value or list from existing inputs, typically returning DTOs/ViewModels.

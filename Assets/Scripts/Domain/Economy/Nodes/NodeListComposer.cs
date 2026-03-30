@@ -5,7 +5,7 @@ using UniRx;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-public class GeneratorListComposer
+public class NodeListComposer
 {
     private readonly GameObject generatorUIRootPrefab;
     private readonly Transform generatorUIContainer;
@@ -37,7 +37,7 @@ public class GeneratorListComposer
     private readonly HashSet<string> instantiatedViewIds = new(StringComparer.Ordinal);
     private int generatedViewsBaseSiblingIndex;
 
-    public GeneratorListComposer(
+    public NodeListComposer(
         GameObject generatorUIRootPrefab,
         Transform generatorUIContainer,
         WalletService walletService,
@@ -86,7 +86,7 @@ public class GeneratorListComposer
         if (instances == null || instances.Count == 0)
         {
             Debug.LogError(
-                "GeneratorListComposer: No node instances found in GameDefinitionService."
+                "NodeListComposer: No node instances found in GameDefinitionService."
             );
             return;
         }
@@ -109,7 +109,7 @@ public class GeneratorListComposer
             if (string.IsNullOrEmpty(nodeTypeId))
             {
                 Debug.LogWarning(
-                    $"GeneratorListComposer: Node instance '{instanceId}' is missing nodeId."
+                    $"NodeListComposer: Node instance '{instanceId}' is missing nodeId."
                 );
                 continue;
             }
@@ -117,7 +117,7 @@ public class GeneratorListComposer
             if (!gameDefinitionService.TryGetNode(nodeTypeId, out var nodeDef) || nodeDef == null)
             {
                 Debug.LogWarning(
-                    $"GeneratorListComposer: Node instance '{instanceId}' references missing nodeId '{nodeTypeId}'."
+                    $"NodeListComposer: Node instance '{instanceId}' references missing nodeId '{nodeTypeId}'."
                 );
                 continue;
             }
@@ -259,7 +259,7 @@ public class GeneratorListComposer
         if (generatorView == null)
         {
             Debug.LogError(
-                $"GameCompositionRoot: Generator UI root prefab is missing a GeneratorView (instance '{id}').",
+                $"NodeListComposer: Generator UI root prefab is missing a GeneratorView (instance '{id}').",
                 generatorUI
             );
             return;

@@ -30,12 +30,14 @@ Rules:
 | --- | --- | --- | --- |
 | Wallet balances | `SaveService` | `GameData` | Domain services via `SaveService` |
 | Generator state | `SaveService` | `GameData` | Domain services via `SaveService` |
+| Zone state vars | `StateVarService` (runtime), `SaveService` (persistence) | `StateVarService` + `GameData.ZoneStates` | Domain services via `StateVarService` |
 | Purchased upgrades | `SaveService` | `GameData` | `UpgradeService` via `SaveService` |
 | Save namespace selection | runtime boot config | save key (`sparkplug.{sessionId}.{saveSlotId}`) | boot path only |
 
 Rules:
 
 - Only `SaveService` writes to disk.
+- `StateVarService` may own the runtime mutation API for zone-level facts, but it persists through `SaveService`.
 - Only facts are persisted.
 - Save isolation is determined before runtime boot and remains stable for the session lifetime.
 

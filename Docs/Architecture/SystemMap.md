@@ -28,6 +28,7 @@ Prototype Scene
   -> GameCompositionRoot
       -> GameDefinitionService
       -> SaveService
+      -> StateVarService
       -> Services
       -> ViewModels
       -> Views
@@ -44,7 +45,7 @@ Sheets -> Importer -> Definition JSON -> Session Config -> Runtime Config -> Cat
 ### Player Action
 
 ```text
-View input -> ViewModel command -> Service mutation -> SaveService
+View input -> ViewModel command -> Service mutation -> StateVarService/SaveService
 ```
 
 ### UI Refresh

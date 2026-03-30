@@ -16,7 +16,8 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 | Service | Owns | Writes Facts To |
 | --- | --- | --- |
 | `WalletService` | Currency balances, spend/earn validation | `SaveService` |
-| `GeneratorService` | Generator state, cycle timing, output calculation | `SaveService` |
+| `GeneratorService` | Generator state, cycle timing, output calculation | `SaveService`, `StateVarService` |
+| `StateVarService` | Reactive zone-level state quantities and capacity-aware mutation | `SaveService` |
 | `UpgradeService` | Purchase state/rank and effect application | `SaveService` |
 | `SaveService` | In-memory `GameData`, session-scoped disk persistence scheduling | Disk (`SaveSystem`) |
 | `TickService` | Shared simulation time stream | n/a |
@@ -34,7 +35,15 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 
 - Owns ownership/level/automation/running state and cycle progression.
 - Exposes authoritative timing/output values.
+- Applies node `stateDelta` outputs via `StateVarService`.
 - Does not format UI strings or animation behavior.
+
+### StateVarService
+
+- Owns runtime access to zone-level state quantities such as `stateQuantity[varId]`.
+- Exposes reactive observation for UI/view-model projection.
+- Clamps quantity mutation against resolved zone capacities before persisting via `SaveService`.
+- Does not talk to disk directly.
 
 ### UpgradeService
 
@@ -47,6 +56,7 @@ For constraints and forbidden patterns, use `ArchitectureRules.md`.
 - Owns persistence boundary and disk write scheduling.
 - Only service allowed to touch `SaveSystem`.
 - Persists player facts into a session-scoped save namespace derived from `sessionId` and `saveSlotId`.
+- Remains the disk authority even when another runtime service, such as `StateVarService`, owns the in-memory mutation API for a fact type.
 
 ### TickService
 
