@@ -134,9 +134,10 @@ nodeId,resource,amountPerCycle,amountPerCycleFromVar,amountPerCycleFromState
 
 NodeOutputs
 
-nodeId,resource,mode,basePerSecond,basePayout,amountPerCycle,amountPerCycleFromVar,amountPerCycleFromState,kind,varId
-nodeType.producer.ranch,,rate,3,,,,,stateDelta,llamas
-nodeType.producer.mill,wool,rate,,,,woolPerSecond,,resource
+nodeId,mode,kind,resource,basePerSecond,basePayout,varId,amountPerCycleFromVar,amountPerCycle,amountPerCycleFromState
+nodeType.producer.ranch,rate,stateDelta,,3,,llamas
+nodeType.producer.mill,rate,resource,wool,,,,woolPerSecond
+nodeType.converter.market,rate,resource,currencySoft,1
 
 ---
 
@@ -185,10 +186,9 @@ nodeType.storage.llama,llamas,250
 
 NodeInstances
 
-id,nodeId,zoneId,displayNameOverride,tags,initialState.level,initialState.enabled,displayName
-nodeInstance.producer.ranch,nodeType.producer.ranch,zone.main,,,0,TRUE
-,,,,,0,FALSE
-,,,,,0,FALSE
+id,nodeId,zoneId,initialState.level,initialState.enabled,displayNameOverride,displayName,tags
+nodeInstance.producer.ranch,nodeType.producer.ranch,zone.main,0,TRUE
+nodeInstance.storage.llama,nodeType.storage.llama,zone.main,0,TRUE
 
 ---
 
