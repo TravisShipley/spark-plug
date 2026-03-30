@@ -308,6 +308,7 @@
             "enumRef": "enums.nodeType"
           },
           { "name": "displayName", "required": true, "type": "string" },
+          { "name": "viewId", "required": false, "type": "string" },
           { "name": "zoneId", "required": true, "type": "zoneId" },
           { "name": "tags", "required": false, "type": "stringList" },
 

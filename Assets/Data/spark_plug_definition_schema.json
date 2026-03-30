@@ -113,6 +113,7 @@
       "id": "nodeTypeId",
       "type": "producer|converter|bottleneck|sink",
       "displayName": "string",
+      "viewId": "string?",
       "tags": ["string"],
 
       "zoneId": "zone.main",

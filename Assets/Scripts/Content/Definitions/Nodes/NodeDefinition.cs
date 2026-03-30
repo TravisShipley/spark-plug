@@ -8,6 +8,7 @@ public sealed class NodeDefinition
     public string id;
     public string type;
     public string displayName;
+    public string viewId;
     public string zoneId;
     public string[] tags;
 
