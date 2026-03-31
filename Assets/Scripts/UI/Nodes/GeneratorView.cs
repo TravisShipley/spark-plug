@@ -3,7 +3,7 @@ using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class GeneratorView : MonoBehaviour
+public class GeneratorView : MonoBehaviour, INodeView
 {
     #region properties
     [Header("UI")]

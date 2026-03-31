@@ -2329,6 +2329,7 @@ public static class GoogleSheetImporter
             EmbedSubtableRows(contentDefinition, tableDef, parsed.Rows, sheetSpec);
         }
 
+        NormalizeNodeViewIds(contentDefinition);
         NormalizeNodeOutputs(contentDefinition);
         NormalizeNodePriceCurveTaggedUnion(contentDefinition);
         MirrorManifestIdentityValues(contentDefinition);
@@ -2587,6 +2588,26 @@ public static class GoogleSheetImporter
 
                 RemoveByPath(output, "varId");
             }
+        }
+    }
+
+    private static void NormalizeNodeViewIds(Dictionary<string, object> contentDefinition)
+    {
+        if (
+            !contentDefinition.TryGetValue("nodes", out var nodesObj)
+            || nodesObj is not List<object> nodes
+            || nodes.Count == 0
+        )
+        {
+            return;
+        }
+
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (nodes[i] is not Dictionary<string, object> node)
+                continue;
+
+            NormalizeStringPath(node, "viewId");
         }
     }
 

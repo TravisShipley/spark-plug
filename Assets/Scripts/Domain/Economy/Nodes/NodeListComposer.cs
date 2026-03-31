@@ -8,6 +8,7 @@ using Object = UnityEngine.Object;
 public class NodeListComposer
 {
     private readonly GameObject generatorUIRootPrefab;
+    private readonly NodeViewRegistryAsset nodeViewRegistry;
     private readonly Transform generatorUIContainer;
     private readonly WalletService walletService;
     private readonly WalletViewModel walletViewModel;
@@ -34,11 +35,13 @@ public class NodeListComposer
     private readonly Dictionary<string, GeneratorViewModel> generatorViewModelsById = new(
         StringComparer.Ordinal
     );
+    private readonly Dictionary<string, string> viewIdsByInstanceId = new(StringComparer.Ordinal);
     private readonly HashSet<string> instantiatedViewIds = new(StringComparer.Ordinal);
     private int generatedViewsBaseSiblingIndex;
 
     public NodeListComposer(
         GameObject generatorUIRootPrefab,
+        NodeViewRegistryAsset nodeViewRegistry,
         Transform generatorUIContainer,
         WalletService walletService,
         WalletViewModel walletViewModel,
@@ -60,6 +63,7 @@ public class NodeListComposer
     )
     {
         this.generatorUIRootPrefab = generatorUIRootPrefab;
+        this.nodeViewRegistry = nodeViewRegistry;
         this.generatorUIContainer = generatorUIContainer;
         this.walletService = walletService;
         this.walletViewModel = walletViewModel;
@@ -140,7 +144,7 @@ public class NodeListComposer
             if (unlockService != null && !unlockService.IsUnlocked(instanceId))
                 continue;
 
-            InstantiateGeneratorView(instanceId);
+            InstantiateNodeView(instanceId);
         }
 
         if (unlockService != null)
@@ -159,7 +163,7 @@ public class NodeListComposer
                     if (!string.Equals(zoneId, currentZoneId, StringComparison.Ordinal))
                         return;
 
-                    InstantiateGeneratorView(normalizedId);
+                    InstantiateNodeView(normalizedId);
                 })
                 .AddTo(disposables);
         }
@@ -226,6 +230,7 @@ public class NodeListComposer
         generatorServices.Add(service);
         generatorViewModels.Add(generatorViewModel);
         generatorViewModelsById[id] = generatorViewModel;
+        viewIdsByInstanceId[id] = NormalizeId(nodeDefinition?.viewId);
 
         // Register by instance id (authoritative runtime id).
         uiService.RegisterGenerator(model.Id, service);
@@ -236,7 +241,7 @@ public class NodeListComposer
         WireGeneratorPersistence(id, generatorDefinition.ZoneId, service);
     }
 
-    private void InstantiateGeneratorView(string instanceId)
+    private void InstantiateNodeView(string instanceId)
     {
         var id = (instanceId ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(id))
@@ -251,27 +256,68 @@ public class NodeListComposer
         )
             return;
 
-        var generatorUI = Object.Instantiate(generatorUIRootPrefab, generatorUIContainer);
-        generatorUI.name = $"Generator_{id}";
-        generatorUI.transform.SetSiblingIndex(CalculateSiblingIndex(id));
+        var viewPrefab = ResolveNodeViewPrefab(id, out var resolvedViewId);
+        var nodeUI = Object.Instantiate(viewPrefab, generatorUIContainer);
+        nodeUI.name = $"Node_{id}";
+        nodeUI.transform.SetSiblingIndex(CalculateSiblingIndex(id));
 
-        var generatorView = generatorUI.GetComponent<GeneratorView>();
-        if (generatorView == null)
+        var nodeView = ResolveNodeView(nodeUI);
+        if (nodeView == null)
         {
             Debug.LogError(
-                $"NodeListComposer: Generator UI root prefab is missing a GeneratorView (instance '{id}').",
-                generatorUI
+                $"NodeListComposer: Node view prefab '{viewPrefab.name}' is missing an INodeView implementation (instance '{id}', viewId '{resolvedViewId}').",
+                nodeUI
             );
             return;
         }
 
-        generatorView.Bind(generatorViewModel);
+        nodeView.Bind(generatorViewModel);
 
-        var generatorButtonView = generatorView.GetComponentInChildren<GeneratorButtonView>(true);
+        var generatorButtonView = nodeUI.GetComponentInChildren<GeneratorButtonView>(true);
         if (generatorButtonView != null)
             generatorButtonView.Bind(generatorViewModel);
 
         instantiatedViewIds.Add(id);
+    }
+
+    private GameObject ResolveNodeViewPrefab(string instanceId, out string resolvedViewId)
+    {
+        resolvedViewId = ResolveViewId(instanceId);
+        if (
+            nodeViewRegistry != null
+            && !string.IsNullOrEmpty(resolvedViewId)
+            && nodeViewRegistry.TryGetPrefab(resolvedViewId, out var mappedPrefab)
+            && mappedPrefab != null
+        )
+        {
+            return mappedPrefab;
+        }
+
+        return generatorUIRootPrefab;
+    }
+
+    private string ResolveViewId(string instanceId)
+    {
+        var id = NormalizeId(instanceId);
+        if (string.IsNullOrEmpty(id))
+            return string.Empty;
+
+        return viewIdsByInstanceId.TryGetValue(id, out var viewId) ? viewId : string.Empty;
+    }
+
+    private static INodeView ResolveNodeView(GameObject nodeUI)
+    {
+        if (nodeUI == null)
+            return null;
+
+        var behaviours = nodeUI.GetComponentsInChildren<MonoBehaviour>(true);
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            if (behaviours[i] is INodeView nodeView)
+                return nodeView;
+        }
+
+        return null;
     }
 
     private int CalculateSiblingIndex(string instanceId)
@@ -685,5 +731,10 @@ public class NodeListComposer
                 stateVarService?.RefreshZone(zoneId);
             })
             .AddTo(disposables);
+    }
+
+    private static string NormalizeId(string value)
+    {
+        return (value ?? string.Empty).Trim();
     }
 }

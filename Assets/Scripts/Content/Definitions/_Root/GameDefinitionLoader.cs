@@ -203,6 +203,7 @@ public static class GameDefinitionLoader
                 gd.nodeStateCapacities = new List<NodeStateCapacityDefinition>();
 
             HydrateComputedVarsFromJson(json, gd);
+            NormalizeNodeViewIds(gd);
             NormalizeNodeOutputs(gd);
             NormalizeBuffEffects(gd.buffs);
             NormalizeParameterizedPaths(gd);
@@ -1180,6 +1181,21 @@ public static class GameDefinitionLoader
                     $"nodes[{i}].outputs[{o}].amountPerCycleFromState"
                 );
             }
+        }
+    }
+
+    private static void NormalizeNodeViewIds(GameDefinition definition)
+    {
+        if (definition?.nodes == null)
+            return;
+
+        for (int i = 0; i < definition.nodes.Count; i++)
+        {
+            var node = definition.nodes[i];
+            if (node == null)
+                continue;
+
+            node.viewId = (node.viewId ?? string.Empty).Trim();
         }
     }
 }

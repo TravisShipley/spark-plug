@@ -42,12 +42,15 @@ public class GameCompositionRoot : MonoBehaviour
     [SerializeField]
     private UiScreenManager uiScreenManager;
 
-    [Header("Generator UI")]
+    [Header("Node UI")]
     [SerializeField]
     private GameObject generatorUIRootPrefab;
 
     [SerializeField]
     private Transform generatorUIContainer;
+
+    [SerializeField]
+    private NodeViewRegistryAsset nodeViewRegistry;
 
     [Header("Debug UI")]
     [SerializeField]
@@ -228,8 +231,9 @@ public class GameCompositionRoot : MonoBehaviour
             .TimeWarpCompleted.Subscribe(evt => ShowTimeWarpResults(uiScreenService, evt.result))
             .AddTo(disposables);
 
-        var generatorComposer = new NodeListComposer(
+        var nodeComposer = new NodeListComposer(
             generatorUIRootPrefab,
+            nodeViewRegistry,
             generatorUIContainer,
             walletService,
             walletViewModel,
@@ -250,7 +254,7 @@ public class GameCompositionRoot : MonoBehaviour
             generatorViewModels
         );
 
-        generatorComposer.Compose();
+        nodeComposer.Compose();
         stateVarService.RefreshAll();
         upgradeService.ApplyAllPurchased();
 
