@@ -117,12 +117,12 @@ llamas,Llamas,quantity,0,population
 
 Nodes
 
-id,type,displayName,zoneId,tags,cycle.baseDurationSeconds,leveling.levelResource,leveling.baseLevel,leveling.maxLevel,leveling.priceCurve.type,leveling.priceCurve.basePrice,leveling.priceCurve.growth,leveling.priceCurve.increment,automation.policy,automation.autoCollect,automation.autoRestart
-nodeType.producer.ranch,producer,Llama Ranch,zone.main,ranch,1,currencySoft,0,,exponential,5,1.08,,alwaysOn,TRUE,TRUE
-nodeType.producer.mill,producer,Wool Mill,zone.main,mill,,currencySoft,0,,exponential,25,1.12,,alwaysOn
-nodeType.storage.llama,bottleneck,Llama Pen,zone.main,pen,,currencySoft,0,,exponential,25,1.12,,alwaysOn
-nodeType.bottleneck.shipping,bottleneck,Shipping Depot,zone.main,,,currencySoft,0,,exponential,50,1.13,,alwaysOn
-nodeType.converter.market,converter,Market,zone.main,,,currencySoft,0,,exponential,100,1.15,,alwaysOn
+id,type,viewId,displayName,zoneId,tags,cycle.baseDurationSeconds,leveling.levelResource,leveling.baseLevel,leveling.maxLevel,leveling.priceCurve.type,leveling.priceCurve.basePrice,leveling.priceCurve.growth,leveling.priceCurve.increment,automation.policy,automation.autoCollect,automation.autoRestart
+nodeType.producer.ranch,producer,node.view.ranch,Llama Ranch,zone.main,ranch,1,currencySoft,0,,exponential,5,1.08,,alwaysOn,TRUE,TRUE
+nodeType.producer.mill,producer,,Wool Mill,zone.main,mill,,currencySoft,0,,exponential,25,1.12,,alwaysOn
+nodeType.storage.llama,bottleneck,,Llama Pen,zone.main,pen,,currencySoft,0,,exponential,25,1.12,,alwaysOn
+nodeType.bottleneck.shipping,bottleneck,,Shipping Depot,zone.main,,,currencySoft,0,,exponential,50,1.13,,alwaysOn
+nodeType.converter.market,converter,,Market,zone.main,,,currencySoft,0,,exponential,100,1.15,,alwaysOn
 
 ---
 
