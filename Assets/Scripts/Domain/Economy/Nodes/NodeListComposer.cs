@@ -7,6 +7,12 @@ using Object = UnityEngine.Object;
 
 public class NodeListComposer
 {
+    private const string ManualNurseryViewId = "node.nursery.view";
+    private const double ManualChargedDefaultMaxCharge = 250d;
+    private const double ManualChargedRefillRatePerSecond = 3d;
+    private const double ManualChargedSpawnCost = 1d;
+    private const double ManualChargedSpawnAmount = 1d;
+
     private readonly GameObject generatorUIRootPrefab;
     private readonly NodeViewRegistryAsset nodeViewRegistry;
     private readonly Transform generatorUIContainer;
@@ -89,9 +95,7 @@ public class NodeListComposer
         var instances = gameDefinitionService?.NodeInstances;
         if (instances == null || instances.Count == 0)
         {
-            Debug.LogError(
-                "NodeListComposer: No node instances found in GameDefinitionService."
-            );
+            Debug.LogError("NodeListComposer: No node instances found in GameDefinitionService.");
             return;
         }
 
@@ -192,6 +196,15 @@ public class NodeListComposer
             out double pendingPayout
         );
 
+        if (IsManualChargedNode(nodeDefinition))
+        {
+            isAutomated = false;
+            wasRunning = false;
+            hasPendingPayout = false;
+            cycleElapsedSeconds = 0d;
+            pendingPayout = 0d;
+        }
+
         var model = new GeneratorModel
         {
             Id = id,
@@ -237,6 +250,20 @@ public class NodeListComposer
         // Compatibility path: allow lookups by node type id when there is a 1:1 instance mapping.
         if (!string.IsNullOrWhiteSpace(nodeTypeId))
             uiService.RegisterGenerator(nodeTypeId.Trim(), service);
+
+        var manualChargedNodeService = CreateManualChargedNodeService(
+            nodeDefinition,
+            nodeInstance,
+            service
+        );
+        if (manualChargedNodeService != null)
+        {
+            uiService.RegisterManualChargedNode(model.Id, manualChargedNodeService);
+            if (!string.IsNullOrWhiteSpace(nodeTypeId))
+                uiService.RegisterManualChargedNode(nodeTypeId.Trim(), manualChargedNodeService);
+
+            disposables.Add(manualChargedNodeService);
+        }
 
         WireGeneratorPersistence(id, generatorDefinition.ZoneId, service);
     }
@@ -392,7 +419,78 @@ public class NodeListComposer
             nodeInstance?.zoneId
         );
 
+        if (IsManualChargedNode(nodeDef))
+        {
+            // Temporary prototype override: charged manual nodes use a dedicated runtime path.
+            definition.Outputs.Clear();
+            definition.BaseOutputPerCycle = 0d;
+            definition.OutputResourceId = string.Empty;
+            definition.AutomationEnabledByDefault = false;
+        }
+
         return definition;
+    }
+
+    private ManualChargedNodeService CreateManualChargedNodeService(
+        NodeDefinition nodeDefinition,
+        NodeInstanceDefinition nodeInstance,
+        GeneratorService generatorService
+    )
+    {
+        if (!IsManualChargedNode(nodeDefinition) || generatorService == null)
+            return null;
+
+        var zoneId = NormalizeId(nodeInstance?.zoneId);
+        var stateVarId = ResolvePrimaryStateVarOutputId(nodeDefinition);
+        if (string.IsNullOrEmpty(zoneId) || string.IsNullOrEmpty(stateVarId))
+        {
+            Debug.LogWarning(
+                $"NodeListComposer: Manual charged node '{nodeDefinition?.id}' is missing a stateDelta output target."
+            );
+            return null;
+        }
+
+        return new ManualChargedNodeService(
+            generatorService,
+            stateVarService,
+            zoneId,
+            stateVarId,
+            ManualChargedDefaultMaxCharge,
+            ManualChargedRefillRatePerSecond,
+            ManualChargedSpawnCost,
+            ManualChargedSpawnAmount
+        );
+    }
+
+    private static string ResolvePrimaryStateVarOutputId(NodeDefinition nodeDefinition)
+    {
+        var outputs = nodeDefinition?.outputs;
+        if (outputs == null)
+            return string.Empty;
+
+        for (int i = 0; i < outputs.Count; i++)
+        {
+            var output = outputs[i];
+            if (
+                output != null
+                && string.Equals(
+                    NormalizeId(output.kind),
+                    "stateDelta",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return NormalizeId(output.varId);
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static bool IsManualChargedNode(NodeDefinition nodeDefinition)
+    {
+        var viewId = NormalizeId(nodeDefinition?.viewId);
+        return string.Equals(viewId, ManualNurseryViewId, StringComparison.Ordinal);
     }
 
     private static List<NodeOutputDefinition> CloneOutputs(List<NodeOutputDefinition> outputs)
@@ -418,7 +516,9 @@ public class NodeListComposer
                     basePayout = output.basePayout,
                     amountPerCycle = output.amountPerCycle,
                     amountPerCycleFromVar = (output.amountPerCycleFromVar ?? string.Empty).Trim(),
-                    amountPerCycleFromState = (output.amountPerCycleFromState ?? string.Empty).Trim(),
+                    amountPerCycleFromState = (
+                        output.amountPerCycleFromState ?? string.Empty
+                    ).Trim(),
                 }
             );
         }

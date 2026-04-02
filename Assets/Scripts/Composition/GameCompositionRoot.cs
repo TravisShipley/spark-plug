@@ -309,6 +309,7 @@ public class GameCompositionRoot : MonoBehaviour
 
         tickService = new TickService(TickInterval);
 
+        uiService.Clear();
         uiService.Initialize(walletService);
         uiService.RegisterStateVarService(stateVarService);
 

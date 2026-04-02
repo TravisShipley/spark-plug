@@ -188,7 +188,7 @@
         "name": "StateVars",
         "outputKey": "stateVars",
         "emit": "list",
-        "required": true,
+        "required": false,
         "kind": "entity",
         "primaryKey": "id",
         "columns": [

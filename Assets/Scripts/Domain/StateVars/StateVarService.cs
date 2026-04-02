@@ -60,6 +60,14 @@ public sealed class StateVarService : IStateVarService, IDisposable
         return EnsureProperty(key).Value;
     }
 
+    public double GetCapacity(string zoneId, string varId)
+    {
+        if (!TryCreateKey(zoneId, varId, out var key))
+            return 0d;
+
+        return SanitizeNonNegative(saveService.GetZoneStateCapacity(key.ZoneId, key.VarId));
+    }
+
     public IReadOnlyReactiveProperty<double> ObserveQuantity(string zoneId, string varId)
     {
         if (!TryCreateKey(zoneId, varId, out var key))

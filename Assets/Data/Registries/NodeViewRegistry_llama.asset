@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: NodeViewRegistry_llama
   m_EditorClassIdentifier: Assembly-CSharp::NodeViewRegistryAsset
   entries:
-  - viewId: node.view.ranch
+  - viewId: node.nursery.view
     prefab: {fileID: 5203841696497185053, guid: 5b260030e8de94e9e8957eb4b6fbd549,
       type: 3}

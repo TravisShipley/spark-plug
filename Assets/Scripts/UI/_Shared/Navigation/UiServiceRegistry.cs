@@ -10,6 +10,8 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
         string,
         GeneratorService
     >(System.StringComparer.Ordinal);
+    private readonly Dictionary<string, ManualChargedNodeService> manualChargedNodesById =
+        new(System.StringComparer.Ordinal);
 
     public WalletService Wallet { get; private set; }
     public BuffService BuffService { get; private set; }
@@ -61,6 +63,15 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
         generatorsById[generatorId] = generator;
     }
 
+    public void RegisterManualChargedNode(string nodeId, ManualChargedNodeService service)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId) || service == null)
+            return;
+
+        nodeId = nodeId.Trim();
+        manualChargedNodesById[nodeId] = service;
+    }
+
     public bool TryGetGenerator(string generatorId, out GeneratorService generator)
     {
         generator = null;
@@ -72,9 +83,21 @@ public sealed class UiServiceRegistry : MonoBehaviour, IGeneratorLookup
         return generatorsById.TryGetValue(generatorId, out generator) && generator != null;
     }
 
+    public bool TryGetManualChargedNode(string nodeId, out ManualChargedNodeService service)
+    {
+        service = null;
+
+        if (string.IsNullOrWhiteSpace(nodeId))
+            return false;
+
+        nodeId = nodeId.Trim();
+        return manualChargedNodesById.TryGetValue(nodeId, out service) && service != null;
+    }
+
     public void Clear()
     {
         generatorsById.Clear();
+        manualChargedNodesById.Clear();
     }
 
     private void OnDestroy()
