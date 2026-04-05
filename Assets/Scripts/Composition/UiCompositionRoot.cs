@@ -27,6 +27,9 @@ public sealed class UiCompositionRoot : MonoBehaviour
     private CurrencyView[] currencyViews;
 
     [SerializeField]
+    private ResourceView[] resourceViews;
+
+    [SerializeField]
     private BottomBarView bottomBarView;
 
     [SerializeField]
@@ -132,10 +135,21 @@ public sealed class UiCompositionRoot : MonoBehaviour
 
     private void BindWalletHud(in UiBindingsContext context)
     {
-        if (currencyViews == null || currencyViews.Length == 0)
+        if (currencyViews != null)
+        {
+            foreach (var v in currencyViews)
+            {
+                if (v == null)
+                    continue;
+
+                v.Initialize(context.WalletViewModel);
+            }
+        }
+
+        if (resourceViews == null || resourceViews.Length == 0)
             return;
 
-        foreach (var v in currencyViews)
+        foreach (var v in resourceViews)
         {
             if (v == null)
                 continue;

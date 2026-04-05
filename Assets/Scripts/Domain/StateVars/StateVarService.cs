@@ -38,9 +38,55 @@ public sealed class StateVarService : IStateVarService, IDisposable
         }
     }
 
+    private readonly struct StateVarTransferKey : IEquatable<StateVarTransferKey>
+    {
+        public readonly string ZoneId;
+        public readonly string FromVarId;
+        public readonly string ToVarId;
+
+        public StateVarTransferKey(string zoneId, string fromVarId, string toVarId)
+        {
+            ZoneId = zoneId;
+            FromVarId = fromVarId;
+            ToVarId = toVarId;
+        }
+
+        public bool Equals(StateVarTransferKey other)
+        {
+            return string.Equals(ZoneId, other.ZoneId, StringComparison.Ordinal)
+                && string.Equals(FromVarId, other.FromVarId, StringComparison.Ordinal)
+                && string.Equals(ToVarId, other.ToVarId, StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is StateVarTransferKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hash = ZoneId != null ? ZoneId.GetHashCode() : 0;
+                hash = (hash * 397) ^ (FromVarId != null ? FromVarId.GetHashCode() : 0);
+                hash = (hash * 397) ^ (ToVarId != null ? ToVarId.GetHashCode() : 0);
+                return hash;
+            }
+        }
+    }
+
+    private sealed class StateVarTransferDefinition
+    {
+        public string zoneId;
+        public string fromVarId;
+        public string toVarId;
+        public double ratePerSecond;
+    }
+
     private readonly GameDefinitionService gameDefinitionService;
     private readonly SaveService saveService;
     private readonly Dictionary<StateVarKey, ReactiveProperty<double>> quantities = new();
+    private readonly Dictionary<StateVarTransferKey, StateVarTransferDefinition> transfers = new();
     private readonly CompositeDisposable disposables = new();
 
     public StateVarService(GameDefinitionService gameDefinitionService, SaveService saveService)
@@ -99,6 +145,91 @@ public sealed class StateVarService : IStateVarService, IDisposable
         SetQuantity(key, EnsureProperty(key).Value + delta, requestSave: true);
     }
 
+    // Example:
+    // stateVarService.RegisterTransfer("zone.main", "llamaBuffer", "llamas", 10d);
+    public void RegisterTransfer(string zoneId, string fromVarId, string toVarId, double ratePerSecond)
+    {
+        if (
+            !TryCreateTransferKey(zoneId, fromVarId, toVarId, out var key)
+            || ratePerSecond <= Epsilon
+            || double.IsNaN(ratePerSecond)
+            || double.IsInfinity(ratePerSecond)
+        )
+        {
+            return;
+        }
+
+        transfers[key] = new StateVarTransferDefinition
+        {
+            zoneId = key.ZoneId,
+            fromVarId = key.FromVarId,
+            toVarId = key.ToVarId,
+            ratePerSecond = ratePerSecond,
+        };
+    }
+
+    public void UnregisterTransfer(string zoneId, string fromVarId, string toVarId)
+    {
+        if (!TryCreateTransferKey(zoneId, fromVarId, toVarId, out var key))
+            return;
+
+        transfers.Remove(key);
+    }
+
+    public void TickTransfers(double deltaTimeSeconds)
+    {
+        if (
+            deltaTimeSeconds <= 0d
+            || double.IsNaN(deltaTimeSeconds)
+            || double.IsInfinity(deltaTimeSeconds)
+            || transfers.Count == 0
+        )
+        {
+            return;
+        }
+
+        var anyChanged = false;
+        foreach (var entry in transfers)
+        {
+            var transfer = entry.Value;
+            if (transfer == null)
+                continue;
+
+            var fromCurrent = GetQuantity(transfer.zoneId, transfer.fromVarId);
+            if (fromCurrent <= Epsilon)
+                continue;
+
+            var toCurrent = GetQuantity(transfer.zoneId, transfer.toVarId);
+            var toCapacity = GetCapacity(transfer.zoneId, transfer.toVarId);
+            var freeTo = Math.Max(0d, toCapacity - toCurrent);
+            if (freeTo <= Epsilon)
+                continue;
+
+            var maxThisTick = transfer.ratePerSecond * deltaTimeSeconds;
+            if (maxThisTick <= Epsilon || double.IsNaN(maxThisTick) || double.IsInfinity(maxThisTick))
+                continue;
+
+            var amount = Math.Min(fromCurrent, Math.Min(freeTo, maxThisTick));
+            if (amount <= Epsilon)
+                continue;
+
+            if (
+                !TryCreateKey(transfer.zoneId, transfer.fromVarId, out var fromKey)
+                || !TryCreateKey(transfer.zoneId, transfer.toVarId, out var toKey)
+            )
+            {
+                continue;
+            }
+
+            SetQuantity(fromKey, fromCurrent - amount, requestSave: false);
+            SetQuantity(toKey, toCurrent + amount, requestSave: false);
+            anyChanged = true;
+        }
+
+        if (anyChanged)
+            saveService.RequestSave();
+    }
+
     public void RefreshAll()
     {
         var zones = gameDefinitionService.Zones;
@@ -138,6 +269,7 @@ public sealed class StateVarService : IStateVarService, IDisposable
 
     public void Dispose()
     {
+        transfers.Clear();
         quantities.Clear();
         disposables.Dispose();
     }
@@ -195,6 +327,31 @@ public sealed class StateVarService : IStateVarService, IDisposable
         }
 
         key = new StateVarKey(normalizedZoneId, normalizedVarId);
+        return true;
+    }
+
+    private static bool TryCreateTransferKey(
+        string zoneId,
+        string fromVarId,
+        string toVarId,
+        out StateVarTransferKey key
+    )
+    {
+        var normalizedZoneId = NormalizeId(zoneId);
+        var normalizedFromVarId = NormalizeId(fromVarId);
+        var normalizedToVarId = NormalizeId(toVarId);
+        if (
+            string.IsNullOrEmpty(normalizedZoneId)
+            || string.IsNullOrEmpty(normalizedFromVarId)
+            || string.IsNullOrEmpty(normalizedToVarId)
+            || string.Equals(normalizedFromVarId, normalizedToVarId, StringComparison.Ordinal)
+        )
+        {
+            key = default(StateVarTransferKey);
+            return false;
+        }
+
+        key = new StateVarTransferKey(normalizedZoneId, normalizedFromVarId, normalizedToVarId);
         return true;
     }
 

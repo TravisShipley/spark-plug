@@ -9,12 +9,12 @@ public sealed class ManualChargedNodeService : IDisposable
     private readonly GeneratorService generatorService;
     private readonly IStateVarService stateVarService;
     private readonly string zoneId;
-    private readonly string stateVarId;
-    private readonly double maxCharge;
+    private readonly string bufferVarId;
+    private readonly string outputVarId;
     private readonly double refillRatePerSecond;
     private readonly double spawnCost;
     private readonly double spawnAmount;
-    private readonly ReactiveProperty<double> currentCharge;
+    private readonly IReadOnlyReactiveProperty<double> currentCharge;
     private readonly ReadOnlyReactiveProperty<float> chargeNormalized;
     private readonly CompositeDisposable disposables = new();
 
@@ -22,14 +22,14 @@ public sealed class ManualChargedNodeService : IDisposable
 
     public IReadOnlyReactiveProperty<double> CurrentCharge => currentCharge;
     public IReadOnlyReactiveProperty<float> ChargeNormalized => chargeNormalized;
-    public double MaxCharge => maxCharge;
+    public double MaxCharge => stateVarService.GetCapacity(zoneId, bufferVarId);
 
     public ManualChargedNodeService(
         GeneratorService generatorService,
         IStateVarService stateVarService,
         string zoneId,
-        string stateVarId,
-        double maxCharge,
+        string bufferVarId,
+        string outputVarId,
         double refillRatePerSecond,
         double spawnCost,
         double spawnAmount
@@ -40,8 +40,8 @@ public sealed class ManualChargedNodeService : IDisposable
         this.stateVarService =
             stateVarService ?? throw new ArgumentNullException(nameof(stateVarService));
         this.zoneId = NormalizeId(zoneId);
-        this.stateVarId = NormalizeId(stateVarId);
-        this.maxCharge = Math.Max(1d, SanitizeNonNegative(maxCharge));
+        this.bufferVarId = NormalizeId(bufferVarId);
+        this.outputVarId = NormalizeId(outputVarId);
         this.refillRatePerSecond = SanitizeNonNegative(refillRatePerSecond);
         this.spawnCost = Math.Max(1d, SanitizeNonNegative(spawnCost));
         this.spawnAmount = Math.Max(1d, SanitizeNonNegative(spawnAmount));
@@ -50,16 +50,25 @@ public sealed class ManualChargedNodeService : IDisposable
             throw new InvalidOperationException(
                 "ManualChargedNodeService: zoneId is required."
             );
-        if (string.IsNullOrEmpty(this.stateVarId))
+        if (string.IsNullOrEmpty(this.bufferVarId))
         {
             throw new InvalidOperationException(
-                "ManualChargedNodeService: stateVarId is required."
+                "ManualChargedNodeService: bufferVarId is required."
             );
         }
+        if (string.IsNullOrEmpty(this.outputVarId))
+            throw new InvalidOperationException("ManualChargedNodeService: outputVarId is required.");
 
-        currentCharge = new ReactiveProperty<double>(this.maxCharge).AddTo(disposables);
+        currentCharge = stateVarService.ObserveQuantity(this.zoneId, this.bufferVarId);
         chargeNormalized = currentCharge
-            .Select(value => Mathf.Clamp01((float)(value / this.maxCharge)))
+            .Select(value =>
+            {
+                var maxCharge = MaxCharge;
+                if (maxCharge <= Epsilon)
+                    return 0f;
+
+                return Mathf.Clamp01((float)(value / maxCharge));
+            })
             .DistinctUntilChanged()
             .ToReadOnlyReactiveProperty()
             .AddTo(disposables);
@@ -74,19 +83,20 @@ public sealed class ManualChargedNodeService : IDisposable
         if (!generatorService.IsOwned.Value)
             return false;
 
-        if (currentCharge.Value + Epsilon < spawnCost)
+        var currentBuffer = stateVarService.GetQuantity(zoneId, bufferVarId);
+        if (currentBuffer + Epsilon < spawnCost)
             return false;
 
-        var capacity = stateVarService.GetCapacity(zoneId, stateVarId);
-        if (capacity <= 0d)
+        var outputCapacity = stateVarService.GetCapacity(zoneId, outputVarId);
+        if (outputCapacity <= 0d)
             return false;
 
-        var quantity = stateVarService.GetQuantity(zoneId, stateVarId);
-        if (quantity + spawnAmount > capacity + Epsilon)
+        var outputQuantity = stateVarService.GetQuantity(zoneId, outputVarId);
+        if (outputQuantity + spawnAmount > outputCapacity + Epsilon)
             return false;
 
-        SetCurrentCharge(currentCharge.Value - spawnCost);
-        stateVarService.AddQuantity(zoneId, stateVarId, spawnAmount);
+        stateVarService.AddQuantity(zoneId, bufferVarId, -spawnCost);
+        stateVarService.AddQuantity(zoneId, outputVarId, spawnAmount);
         return true;
     }
 
@@ -109,26 +119,14 @@ public sealed class ManualChargedNodeService : IDisposable
         if (isRefillPaused || !generatorService.IsOwned.Value)
             return;
 
-        if (currentCharge.Value >= maxCharge - Epsilon || refillRatePerSecond <= Epsilon)
+        if (currentCharge.Value >= MaxCharge - Epsilon || refillRatePerSecond <= Epsilon)
             return;
 
         var deltaTime = Time.unscaledDeltaTime;
         if (deltaTime <= 0f)
             return;
 
-        SetCurrentCharge(currentCharge.Value + refillRatePerSecond * deltaTime);
-    }
-
-    private void SetCurrentCharge(double value)
-    {
-        var clamped = SanitizeNonNegative(value);
-        if (clamped > maxCharge)
-            clamped = maxCharge;
-
-        if (Math.Abs(currentCharge.Value - clamped) < Epsilon)
-            return;
-
-        currentCharge.Value = clamped;
+        stateVarService.AddQuantity(zoneId, bufferVarId, refillRatePerSecond * deltaTime);
     }
 
     private static double SanitizeNonNegative(double value)

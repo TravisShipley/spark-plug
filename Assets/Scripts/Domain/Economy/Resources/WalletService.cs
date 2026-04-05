@@ -46,6 +46,11 @@ public class WalletService : IDisposable
         return GetBalancePropertyInternal(resourceId);
     }
 
+    public bool TryGetResourceDefinition(string resourceId, out ResourceDefinition definition)
+    {
+        return resourceCatalog.TryGet(resourceId, out definition);
+    }
+
     public void Add(string resourceId, double amount)
     {
         AddInternal(resourceId, amount, applyResourceGainMultiplier: true);

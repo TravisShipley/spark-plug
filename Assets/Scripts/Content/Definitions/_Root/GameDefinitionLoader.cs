@@ -870,9 +870,23 @@ public static class GameDefinitionLoader
         string context
     )
     {
+        if (expressionElement == null)
+        {
+            throw new InvalidOperationException(
+                $"GameDefinitionLoader: expression object is null at {context}."
+            );
+        }
+
         var definition = new ComputedExpressionDefinition();
         if (expressionElement != null && expressionElement.TryGetValue("type", out var typeElement))
             definition.type = typeElement?.ToString();
+
+        if (string.IsNullOrWhiteSpace(definition.type))
+        {
+            throw new InvalidOperationException(
+                $"GameDefinitionLoader: expression object at {context} is missing required 'type'."
+            );
+        }
 
         if (
             expressionElement != null
@@ -881,7 +895,9 @@ public static class GameDefinitionLoader
         )
         {
             for (int i = 0; i < argsList.Count; i++)
-                definition.args.Add(ParseComputedExpressionArgument(argsList[i], context));
+            {
+                definition.args.Add(ParseComputedExpressionArgument(argsList[i], $"{context}.args[{i}]"));
+            }
         }
 
         return definition;
@@ -927,6 +943,26 @@ public static class GameDefinitionLoader
                 break;
 
             case Dictionary<string, object> expressionObject:
+                if (TryParseRefArgument(expressionObject, out var refPath))
+                {
+                    argument.PathValue = refPath;
+                    break;
+                }
+
+                if (TryParseConstArgument(expressionObject, context, out var constValue))
+                {
+                    argument.IsNumber = true;
+                    argument.NumberValue = constValue;
+                    break;
+                }
+
+                if (!expressionObject.ContainsKey("type"))
+                {
+                    throw new InvalidOperationException(
+                        $"GameDefinitionLoader: unsupported expression arg object at {context}. Expected 'ref', 'const', or nested expression with 'type'."
+                    );
+                }
+
                 argument.ExpressionValue = ParseComputedExpression(expressionObject, context);
                 break;
 
@@ -937,6 +973,73 @@ public static class GameDefinitionLoader
         }
 
         return argument;
+    }
+
+    private static bool TryParseRefArgument(
+        Dictionary<string, object> expressionObject,
+        out string refPath
+    )
+    {
+        refPath = null;
+        if (
+            expressionObject == null
+            || expressionObject.Count != 1
+            || !expressionObject.TryGetValue("ref", out var refElement)
+        )
+        {
+            return false;
+        }
+
+        refPath = refElement?.ToString();
+        return !string.IsNullOrWhiteSpace(refPath);
+    }
+
+    private static bool TryParseConstArgument(
+        Dictionary<string, object> expressionObject,
+        string context,
+        out double value
+    )
+    {
+        value = 0d;
+        if (
+            expressionObject == null
+            || expressionObject.Count != 1
+            || !expressionObject.TryGetValue("const", out var constElement)
+        )
+        {
+            return false;
+        }
+
+        switch (constElement)
+        {
+            case null:
+                throw new InvalidOperationException(
+                    $"GameDefinitionLoader: const expression arg at {context} is null."
+                );
+            case double doubleValue:
+                value = doubleValue;
+                return true;
+            case bool boolValue:
+                value = boolValue ? 1d : 0d;
+                return true;
+            default:
+                if (
+                    double.TryParse(
+                        constElement.ToString(),
+                        NumberStyles.Float | NumberStyles.AllowThousands,
+                        CultureInfo.InvariantCulture,
+                        out var parsedNumber
+                    )
+                )
+                {
+                    value = parsedNumber;
+                    return true;
+                }
+
+                throw new InvalidOperationException(
+                    $"GameDefinitionLoader: const expression arg at {context} must be numeric."
+                );
+        }
     }
 
     private static object ParseJsonLikeValue(string s)

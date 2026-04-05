@@ -10,33 +10,35 @@ Resources,TRUE,6
 Phases,TRUE,7
 Zones,TRUE,8
 ComputedVars,TRUE,9
-Nodes,TRUE,10
-NodeInputs,TRUE,11
-NodeOutputs,TRUE,12
-NodeCapacities,TRUE,13
-NodeOutputScaling,TRUE,14
-NodeCapacityScaling,TRUE,15
-NodePriceCurveTable,TRUE,16
-NodePriceCurveSegments,TRUE,17
-NodeRequirements,TRUE,18
-NodeInstances,TRUE,19
-Links,TRUE,20
-Modifiers,TRUE,21
-Upgrades,TRUE,22
-Milestones,TRUE,23
-Triggers,TRUE,24
-RewardPools,TRUE,25
-Projects,TRUE,26
-UnlockGraph,TRUE,27
-Buffs,TRUE,28
-Prestige,TRUE,29
+StateVars,TRUE,10
+Nodes,TRUE,11
+NodeInputs,TRUE,12
+NodeOutputs,TRUE,13
+NodeCapacities,TRUE,14
+NodeOutputScaling,TRUE,15
+NodeCapacityScaling,TRUE,16
+NodePriceCurveTable,TRUE,17
+NodePriceCurveSegments,TRUE,18
+NodeRequirements,TRUE,19
+NodeStateCapacities,TRUE,20
+NodeInstances,TRUE,21
+Links,TRUE,22
+Modifiers,TRUE,23
+Upgrades,TRUE,24
+Milestones,TRUE,25
+Triggers,TRUE,26
+RewardPools,TRUE,27
+Projects,TRUE,28
+UnlockGraph,TRUE,29
+Buffs,TRUE,30
+Prestige,TRUE,31
 
 ---
 
 Manifest
 
 key,value
-contentId,orange
+contentId,llama
 schemaUrl,https://raw.githubusercontent.com/TravisShipley/spark-plug/refs/heads/main/Assets/Data/spark_plug_sheet_spec.json
 schemaVersion,0.2
 numberFormat.type,mantissaExponent
@@ -67,7 +69,7 @@ buy.x1,"[""buy.x1"",""buy.x10"",""buy.next"",""buy.max""]"
 
 BuyModes
 
-id,displayName,kind,fixedCount
+id,displayName,kind,fixedCount,tags
 buy.x1,x1,fixed,1
 buy.x10,x10,fixed,10
 buy.next,Next,nextMilestone
@@ -81,12 +83,13 @@ id,displayName,kind,format.style,format.symbol,stackLimit
 currencySoft,Cash,softCurrency,currency,$
 currencyHard,Gold,hardCurrency,currency,€
 currencyMeta,Tokens,metaCurrency,suffix,#
+wool,Wool,inventory,plain
 
 ---
 
 Phases
 
-id,displayName,description
+id,displayName,description,tags
 phase.1,Main Run
 
 ---
@@ -100,16 +103,27 @@ zone.main,Main,,phase.1,"[""currencySoft""]",primary
 
 ComputedVars
 
-id,displayName,zoneId,expression.type,expression.args_json
+id,displayName,zoneId,expression.type,expression.args_json,valueType,tags
+woolPerSecond,Wool / sec,,multiply,"[{""ref"":""stateQuantity[llamas]""},{""const"":0.1}]",bigNumberString
+
+---
+
+StateVars
+
+id,displayName,kind,defaultValue,tags
+llamas,Llamas,quantity,0,population
+llamaBuffer,Llama Buffer,quantity,0,buffer
 
 ---
 
 Nodes
 
-id,type,displayName,zoneId,tags,cycle.baseDurationSeconds,leveling.levelResource,leveling.baseLevel,leveling.maxLevel,leveling.priceCurve.type,leveling.priceCurve.basePrice,leveling.priceCurve.growth,leveling.priceCurve.increment,automation.policy,automation.autoCollect,automation.autoRestart
-nodeType.producer.apple,producer,Apples,zone.main,business,1,currencySoft,0,,exponential,5,1.08,,manualCollect,FALSE,FALSE
-nodeType.producer.grape,producer,Grapes,zone.main,business,3,currencySoft,0,,exponential,66,1.12,,manualCollect,FALSE,FALSE
-nodeType.producer.banana,producer,Bananas,zone.main,business,6,currencySoft,0,,exponential,770,1.19,,manualCollect,FALSE,FALSE
+id,type,viewId,displayName,zoneId,tags,cycle.baseDurationSeconds,leveling.levelResource,leveling.baseLevel,leveling.maxLevel,leveling.priceCurve.type,leveling.priceCurve.basePrice,leveling.priceCurve.growth,leveling.priceCurve.increment,automation.policy,automation.autoCollect,automation.autoRestart
+nodeType.producer.nursery,producer,node.nursery.view,Llama Ranch,zone.main,ranch,1,currencySoft,0,,exponential,5,1.08,,manualCollect,TRUE,TRUE
+nodeType.producer.workshop,producer,,Wool Mill,zone.main,mill,,currencySoft,0,,exponential,10,1.12,,alwaysOn
+nodeType.storage.llama,bottleneck,,Llama Pen,zone.main,pen,,currencySoft,0,,exponential,25,1.12,,alwaysOn
+nodeType.bottleneck.shipping,bottleneck,,Shipping Depot,zone.main,,,currencySoft,0,,exponential,50,1.13,,alwaysOn
+nodeType.converter.market,converter,,Market,zone.main,,,currencySoft,0,,exponential,100,1.15,,alwaysOn
 
 ---
 
@@ -121,10 +135,10 @@ nodeId,resource,amountPerCycle,amountPerCycleFromVar,amountPerCycleFromState
 
 NodeOutputs
 
-nodeId,resource,mode,basePerSecond,basePayout,amountPerCycle,amountPerCycleFromVar,amountPerCycleFromState
-nodeType.producer.apple,currencySoft,cycle,,1
-nodeType.producer.grape,currencySoft,cycle,,44
-nodeType.producer.banana,currencySoft,cycle,,512
+nodeId,mode,kind,resource,basePerSecond,basePayout,varId,amountPerCycleFromVar,amountPerCycle,amountPerCycleFromState
+nodeType.producer.nursery,rate,stateDelta,,3,,llamas
+nodeType.producer.workshop,rate,resource,wool,,,,woolPerSecond
+nodeType.converter.market,rate,resource,currencySoft,1
 
 ---
 
@@ -137,9 +151,6 @@ nodeId,resource,capacityMode,baseCapacity,baseCapacityPerSecond
 NodeOutputScaling
 
 nodeId,target,perLevel.type,perLevel.value
-nodeType.producer.apple,outputs[currencySoft].basePayout,multiply,1.05
-nodeType.producer.grape,outputs[currencySoft].basePayout,multiply,1.06
-nodeType.producer.banana,outputs[currencySoft].basePayout,multiply,1.07
 
 ---
 
@@ -164,110 +175,59 @@ nodeId,fromLevel,toLevel,curve.type,curve.basePrice,curve.growth,curve.increment
 NodeRequirements
 
 nodeId,type,args_json
-nodeType.producer.grape,unlock,"{""id"": ""unlock.grape""}"
-nodeType.producer.banana,unlock,"{""id"": ""unlock.banana""}"
+
+---
+
+NodeStateCapacities
+
+nodeId,varId,baseCapacity
+nodeType.storage.llama,llamas,250
+nodeType.producer.nursery,llamaBuffer,50
 
 ---
 
 NodeInstances
 
-id,nodeId,zoneId,displayNameOverride,tags,initialState.level,initialState.enabled
-nodeInstance.producer.apple,nodeType.producer.apple,zone.main,,,0,TRUE
-nodeInstance.producer.grape,nodeType.producer.grape,zone.main,,,0,FALSE
-nodeInstance.producer.banana,nodeType.producer.banana,zone.main,,,0,FALSE
+id,nodeId,zoneId,initialState.level,initialState.enabled,displayNameOverride,displayName,tags
+nodeInstance.producer.nursery,nodeType.producer.nursery,zone.main,0,TRUE
+nodeInstance.storage.llama,nodeType.storage.llama,zone.main,0,TRUE
+nodeInstance.producer.workshop,nodeType.producer.workshop,zone.main,1,TRUE,,,hidden
 
 ---
 
 Links
 
-id,zoneId,from,to,resource,mode,priority,lossFactor,capacityPerSecondFrom,enabledRequirements_json
+id,zoneId,from,to,resource,mode,priority,lossFactor,capacityPerSecondFrom,enabledRequirements_json,tags
 
 ---
 
 Modifiers
 
 id,source,zoneId,scope.kind,scope.zoneId,scope.nodeId,scope.nodeTag,scope.resource,operation,target,value,valueFromState,valueFromVar,conditions_json
-modifier.upgrade.automation.apple.automation,upgrade.automation.apple,zone.main,node,zone.main,nodeType.producer.apple,,,set,automation.policy,autoRepeat
-modifier.upgrade.automation.grape.automation,upgrade.automation.grape,zone.main,node,zone.main,nodeType.producer.grape,,,set,automation.policy,autoRepeat
-modifier.upgrade.automation.banana.automation,upgrade.automation.banana,zone.main,node,zone.main,nodeType.producer.banana,,,set,automation.policy,autoRepeat
-
-modifier.upgrade.node.apple.001.speed,upgrade.node.apple.001,zone.main,node,zone.main,nodeType.producer.apple,,,multiply,nodeSpeedMultiplier,2
-modifier.upgrade.node.grape.001.speed,upgrade.node.grape.001,zone.main,node,zone.main,nodeType.producer.grape,,,multiply,nodeSpeedMultiplier,2
-modifier.upgrade.node.banana.001.speed,upgrade.node.banana.001,zone.main,node,zone.main,nodeType.producer.banana,,,multiply,nodeSpeedMultiplier,2
-modifier.upgrade.node.apple.002.output,upgrade.node.apple.001,zone.main,node,zone.main,nodeType.producer.apple,,,multiply,nodeOutput[currencySoft],1.5
-modifier.upgrade.node.grape.002.output,upgrade.node.grape.002,zone.main,node,zone.main,nodeType.producer.grape,,,multiply,nodeOutput[currencySoft],1.5
-modifier.upgrade.node.banana.002.output,upgrade.node.banana.002,zone.main,node,zone.main,nodeType.producer.banana,,,multiply,nodeOutput[currencySoft],1.5
-
-modifier.milestone.apple.25.speed,milestone.apple.25,zone.main,node,zone.main,nodeType.producer.apple,,,multiply,nodeSpeedMultiplier,2
-modifier.milestone.apple.50.speed,milestone.apple.50,zone.main,node,zone.main,nodeType.producer.apple,,,multiply,nodeSpeedMultiplier,2
-modifier.milestone.apple.100.output,milestone.apple.100,zone.main,node,zone.main,nodeType.producer.apple,,,multiply,nodeOutput[currencySoft],5
-
-modifier.milestone.grape.25.speed,milestone.grape.25,zone.main,node,zone.main,nodeType.producer.grape,,,multiply,nodeSpeedMultiplier,2
-modifier.milestone.grape.50.speed,milestone.grape.50,zone.main,node,zone.main,nodeType.producer.grape,,,multiply,nodeSpeedMultiplier,2
-modifier.milestone.grape.100.output,milestone.grape.100,zone.main,node,zone.main,nodeType.producer.grape,,,multiply,nodeOutput[currencySoft],5
-
-modifier.milestone.banana.25.speed,milestone.banana.25,zone.main,node,zone.main,nodeType.producer.banana,,,multiply,nodeSpeedMultiplier,2
-modifier.milestone.banana.50.speed,milestone.banana.50,zone.main,node,zone.main,nodeType.producer.banana,,,multiply,nodeSpeedMultiplier,2
-modifier.milestone.banana.100.output,milestone.banana.100,zone.main,node,zone.main,nodeType.producer.banana,,,multiply,nodeOutput[currencySoft],5
-
-modifier.buff.adBoost.profit2x.output,buff.adBoost.profit2x,zone.main,global,zone.main,,,,multiply,nodeOutput[currencySoft],2
 
 ---
 
 Upgrades
 
 id,displayName,category,zoneId,cost_json,repeatable,maxRank,rankCostScaling.type,rankCostScaling.basePriceMultiplier,rankCostScaling.growth,effects_json,requirements_json,tags
-upgrade.automation.apple,Lady Gala,automation,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""100""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.automation.apple.automation""}]",[],"[""apple"", ""manager""]"
-upgrade.automation.grape,Grimace,automation,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""2500""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.automation.grape.automation""}]",[],"[""grape"", ""manager""]"
-upgrade.automation.banana,George Michael,automation,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""30000""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.automation.banana.automation""}]",[],"[""banana"", ""manager""]"
-
-upgrade.node.apple.001,Gluten-Free,node,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""10""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.node.apple.001.speed""}]",[],node
-upgrade.node.grape.001,Mostly Seedless,node,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""25""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.node.grape.001.speed""}]",[],node
-upgrade.node.banana.001,Extra Stickers,node,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""600""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.node.banana.001.speed""}]",[],node
-upgrade.node.apple.002,Granny Smiths,node,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""1024""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.node.apple.002.output""}]",[],node
-upgrade.node.grape.002,Perfectly Spherical,node,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""1337""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.node.grape.002.output""}]",[],node
-upgrade.node.banana.002,Super Curvy,node,zone.main,"[{""resource"": ""currencySoft"", ""amount"": ""4096""}]",FALSE,1,,,,"[{""modifierId"": ""modifier.upgrade.node.banana.002.output""}]",[],node
 
 ---
 
 Milestones
 
 id,nodeId,zoneId,atLevel,grantEffects_json
-milestone.apple.25,nodeType.producer.apple,zone.main,25,"[{""modifierId"": ""modifier.milestone.apple.25.speed""}]"
-milestone.apple.50,nodeType.producer.apple,zone.main,50,"[{""modifierId"": ""modifier.milestone.apple.50.speed""}]"
-milestone.apple.100,nodeType.producer.apple,zone.main,100,"[{""modifierId"": ""modifier.milestone.apple.100.output""}]"
-
-milestone.grape.25,nodeType.producer.grape,zone.main,25,"[{""modifierId"": ""modifier.milestone.grape.25.speed""}]"
-milestone.grape.50,nodeType.producer.grape,zone.main,50,"[{""modifierId"": ""modifier.milestone.grape.50.speed""}]"
-milestone.grape.100,nodeType.producer.grape,zone.main,100,"[{""modifierId"": ""modifier.milestone.grape.100.output""}]"
-
-milestone.banana.25,nodeType.producer.banana,zone.main,25,"[{""modifierId"": ""modifier.milestone.banana.25.speed""}]"
-milestone.banana.50,nodeType.producer.banana,zone.main,50,"[{""modifierId"": ""modifier.milestone.banana.50.speed""}]"
-milestone.banana.100,nodeType.producer.banana,zone.main,100,"[{""modifierId"": ""modifier.milestone.banana.100.output""}]"
 
 ---
 
 Triggers
 
 id,zoneId,event,scope_json,actions_json,conditions_json,chance,cooldownSeconds,maxActivationsPerSession
-trigger.milestone.apple.25,zone.main,milestone.fired,"{""kind"":""global""}","[{ ""type"": ""rollRewardPool"", ""rewardPoolId"": ""reward.milestone.apple.25"" }]","[{ ""type"": ""milestoneIdEquals"", ""args"": { ""milestoneId"": ""milestone.apple.25""}}]"
-trigger.milestone.apple.50,zone.main,milestone.fired,"{""kind"":""global""}","[{ ""type"": ""rollRewardPool"", ""rewardPoolId"": ""reward.milestone.apple.50"" }]","[{ ""type"": ""milestoneIdEquals"", ""args"": { ""milestoneId"": ""milestone.apple.50""}}]"
-
-trigger.milestone.grape.25,zone.main,milestone.fired,"{""kind"":""global""}","[{ ""type"": ""rollRewardPool"", ""rewardPoolId"": ""reward.milestone.grape.25"" }]","[{ ""type"": ""milestoneIdEquals"", ""args"": { ""milestoneId"": ""milestone.grape.25""}}]"
-
-trigger.milestone.banana.25,zone.main,milestone.fired,"{""kind"":""global""}","[{ ""type"": ""rollRewardPool"", ""rewardPoolId"": ""reward.milestone.banana.25"" }]","[{ ""type"": ""milestoneIdEquals"", ""args"": { ""milestoneId"": ""milestone.banana.25""}}]"
 
 ---
 
 RewardPools
 
 id,rewards_json
-reward.milestone.apple.25,"[{ ""weight"": 1, ""action"": { ""type"": ""grantResource"", ""resourceId"": ""currencyHard"", ""amount"": 3 }}]"
-reward.milestone.apple.50,"[{ ""weight"": 1, ""action"": { ""type"": ""grantResource"", ""resourceId"": ""currencyHard"", ""amount"": 5 }}]"
-
-reward.milestone.grape.25,"[{ ""weight"": 1, ""action"": { ""type"": ""grantResource"", ""resourceId"": ""currencyHard"", ""amount"": 8 }}]"
-
-reward.milestone.banana.25,"[{ ""weight"": 1, ""action"": { ""type"": ""grantResource"", ""resourceId"": ""currencyHard"", ""amount"": 6 }}]"
 
 ---
 
@@ -286,7 +246,6 @@ id,zoneId,unlocks_json,requirements_json
 Buffs
 
 id,displayName,zoneId,durationSeconds,stacking,effects_json
-buff.adBoost.profit2x,2x Profit (Rewarded Ad),zone.main,30,refresh,"[{""modifierId"": ""modifier.buff.adBoost.profit2x.output"" }]"
 
 ---
 

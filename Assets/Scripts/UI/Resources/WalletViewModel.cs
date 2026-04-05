@@ -24,6 +24,11 @@ public class WalletViewModel
         return walletService.GetBalance(resourceId);
     }
 
+    public bool TryGetResourceDefinition(string resourceId, out ResourceDefinition definition)
+    {
+        return walletService.TryGetResourceDefinition(resourceId, out definition);
+    }
+
     public void Add(string resourceId, double amount)
     {
         walletService.Add(resourceId, amount);

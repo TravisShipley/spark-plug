@@ -8,7 +8,6 @@ using Object = UnityEngine.Object;
 public class NodeListComposer
 {
     private const string ManualNurseryViewId = "node.nursery.view";
-    private const double ManualChargedDefaultMaxCharge = 250d;
     private const double ManualChargedRefillRatePerSecond = 3d;
     private const double ManualChargedSpawnCost = 1d;
     private const double ManualChargedSpawnAmount = 1d;
@@ -441,11 +440,16 @@ public class NodeListComposer
             return null;
 
         var zoneId = NormalizeId(nodeInstance?.zoneId);
-        var stateVarId = ResolvePrimaryStateVarOutputId(nodeDefinition);
-        if (string.IsNullOrEmpty(zoneId) || string.IsNullOrEmpty(stateVarId))
+        var bufferVarId = ResolveBufferStateVarId(nodeDefinition);
+        var outputVarId = ResolvePrimaryStateVarOutputId(nodeDefinition);
+        if (
+            string.IsNullOrEmpty(zoneId)
+            || string.IsNullOrEmpty(bufferVarId)
+            || string.IsNullOrEmpty(outputVarId)
+        )
         {
             Debug.LogWarning(
-                $"NodeListComposer: Manual charged node '{nodeDefinition?.id}' is missing a stateDelta output target."
+                $"NodeListComposer: Manual charged node '{nodeDefinition?.id}' is missing buffer or output state var data."
             );
             return null;
         }
@@ -454,12 +458,40 @@ public class NodeListComposer
             generatorService,
             stateVarService,
             zoneId,
-            stateVarId,
-            ManualChargedDefaultMaxCharge,
+            bufferVarId,
+            outputVarId,
             ManualChargedRefillRatePerSecond,
             ManualChargedSpawnCost,
             ManualChargedSpawnAmount
         );
+    }
+
+    private string ResolveBufferStateVarId(NodeDefinition nodeDefinition)
+    {
+        var nodeId = NormalizeId(nodeDefinition?.id);
+        if (string.IsNullOrEmpty(nodeId))
+            return string.Empty;
+
+        var capacities = gameDefinitionService?.NodeStateCapacities;
+        if (capacities == null || capacities.Count == 0)
+            return string.Empty;
+
+        for (int i = 0; i < capacities.Count; i++)
+        {
+            var capacity = capacities[i];
+            if (capacity == null)
+                continue;
+
+            if (
+                string.Equals(NormalizeId(capacity.nodeId), nodeId, StringComparison.Ordinal)
+                && !string.IsNullOrEmpty(NormalizeId(capacity.varId))
+            )
+            {
+                return NormalizeId(capacity.varId);
+            }
+        }
+
+        return string.Empty;
     }
 
     private static string ResolvePrimaryStateVarOutputId(NodeDefinition nodeDefinition)

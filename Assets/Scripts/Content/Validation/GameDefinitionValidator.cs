@@ -1543,7 +1543,13 @@ public static class GameDefinitionValidator
         List<string> errors
     )
     {
-        if (expression?.args == null)
+        if (expression == null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(expression.type))
+            errors.Add($"{fieldPath}.type is empty.");
+
+        if (expression.args == null)
             return;
 
         for (int i = 0; i < expression.args.Count; i++)
@@ -1552,7 +1558,26 @@ public static class GameDefinitionValidator
             if (arg == null)
                 continue;
 
-            if (!string.IsNullOrWhiteSpace(arg.PathValue))
+            var hasPath = !string.IsNullOrWhiteSpace(arg.PathValue);
+            var hasExpression = arg.ExpressionValue != null;
+            var hasNumber = arg.IsNumber;
+            var shapeCount = (hasPath ? 1 : 0) + (hasExpression ? 1 : 0) + (hasNumber ? 1 : 0);
+            if (shapeCount == 0)
+            {
+                errors.Add(
+                    $"{fieldPath}.args[{i}] is invalid. Expected exactly one of const, ref/path, or nested expression."
+                );
+                continue;
+            }
+
+            if (shapeCount > 1)
+            {
+                errors.Add(
+                    $"{fieldPath}.args[{i}] is invalid. Arg cannot define multiple value shapes."
+                );
+            }
+
+            if (hasPath)
             {
                 var path = arg.PathValue;
                 ValidateFormulaPathAndNormalize(
@@ -1566,7 +1591,7 @@ public static class GameDefinitionValidator
                 arg.PathValue = path;
             }
 
-            if (arg.ExpressionValue != null)
+            if (hasExpression)
             {
                 ValidateComputedExpressionPaths(
                     arg.ExpressionValue,

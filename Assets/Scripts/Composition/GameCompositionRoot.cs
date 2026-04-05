@@ -81,6 +81,7 @@ public class GameCompositionRoot : MonoBehaviour
     private GameEventStream gameEventStream;
 
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
+    private const float WoolLogIntervalSeconds = 2f;
     private readonly List<GeneratorModel> generatorModels = new();
     private readonly List<GeneratorService> generatorServices = new();
     private readonly List<GeneratorViewModel> generatorViewModels = new();
@@ -89,6 +90,7 @@ public class GameCompositionRoot : MonoBehaviour
     private bool bootStarted;
     private GameSessionConfigAsset activeSessionConfigAsset;
     private SparkPlugRuntimeConfig runtimeConfig;
+    private float woolLogTimer;
 
     private void Awake()
     {
@@ -109,6 +111,19 @@ public class GameCompositionRoot : MonoBehaviour
             return;
 
         StartCoroutine(BootstrapLegacyAsync());
+    }
+
+    private void Update()
+    {
+        if (walletService == null)
+            return;
+
+        woolLogTimer += Time.unscaledDeltaTime;
+        if (woolLogTimer < WoolLogIntervalSeconds)
+            return;
+
+        woolLogTimer = 0f;
+        Debug.Log($"GameCompositionRoot: wool={walletService.GetBalance("wool"):0.###}", this);
     }
 
     public void BeginBootstrap(
@@ -308,6 +323,9 @@ public class GameCompositionRoot : MonoBehaviour
         );
 
         tickService = new TickService(TickInterval);
+        tickService
+            .OnTick.Subscribe(_ => stateVarService.TickTransfers(tickService.Interval.TotalSeconds))
+            .AddTo(disposables);
 
         uiService.Clear();
         uiService.Initialize(walletService);
