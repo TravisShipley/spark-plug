@@ -6,7 +6,7 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public sealed class NurseryNodeView : MonoBehaviour, INodeView
+public sealed class SpawnerNodeView : MonoBehaviour, INodeView
 {
     private const float HoldSpawnIntervalSeconds = 0.1f;
 
@@ -46,7 +46,7 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
     private readonly CompositeDisposable disposables = new();
 
     private GeneratorViewModel viewModel;
-    private ManualChargedNodeService nurseryService;
+    private ManualChargedNodeService spawnerService;
     private SpawnButtonPointerRelay spawnButtonRelay;
     private UnityAction levelButtonClickHandler;
     private UnityAction spawnButtonClickHandler;
@@ -67,12 +67,12 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
         var uiServices = UiServiceRegistry.Instance;
         if (
             uiServices == null
-            || !uiServices.TryGetManualChargedNode(vm.Id, out nurseryService)
-            || nurseryService == null
+            || !uiServices.TryGetManualChargedNode(vm.Id, out spawnerService)
+            || spawnerService == null
         )
         {
             Debug.LogError(
-                $"NurseryNodeView: ManualChargedNodeService is not registered for node '{vm.Id}'.",
+                $"SpawnerNodeView: ManualChargedNodeService is not registered for node '{vm.Id}'.",
                 this
             );
             return;
@@ -93,14 +93,14 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
 
     private void Update()
     {
-        if (!isSpawnPressed || nurseryService == null)
+        if (!isSpawnPressed || spawnerService == null)
             return;
 
         holdSpawnElapsedSeconds += Time.unscaledDeltaTime;
         while (holdSpawnElapsedSeconds >= HoldSpawnIntervalSeconds)
         {
             holdSpawnElapsedSeconds -= HoldSpawnIntervalSeconds;
-            if (nurseryService.TrySpawnOnce())
+            if (spawnerService.TrySpawnOnce())
                 spawnRepeatedThisPress = true;
         }
     }
@@ -253,7 +253,7 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
             })
             .AddTo(disposables);
 
-        nurseryService
+        spawnerService
             .ChargeNormalized.DistinctUntilChanged()
             .Subscribe(fill => cooldownFill.fillAmount = Mathf.Clamp01(fill))
             .AddTo(disposables);
@@ -269,7 +269,7 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
             if (!vm.IsOwned.Value)
                 return;
 
-            nurseryService.TrySpawnOnce();
+            spawnerService.TrySpawnOnce();
         };
         spawnButton.onClick.AddListener(spawnButtonClickHandler);
         Disposable
@@ -310,14 +310,14 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
 
     private void BeginSpawnPress()
     {
-        if (viewModel == null || nurseryService == null || !viewModel.IsOwned.Value)
+        if (viewModel == null || spawnerService == null || !viewModel.IsOwned.Value)
             return;
 
         suppressNextSpawnClick = false;
         isSpawnPressed = true;
         spawnRepeatedThisPress = false;
         holdSpawnElapsedSeconds = 0f;
-        nurseryService.SetRefillPaused(true);
+        spawnerService.SetRefillPaused(true);
     }
 
     private void EndSpawnPress(bool cancelTap)
@@ -327,7 +327,7 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
 
         isSpawnPressed = false;
         holdSpawnElapsedSeconds = 0f;
-        nurseryService?.SetRefillPaused(false);
+        spawnerService?.SetRefillPaused(false);
 
         suppressNextSpawnClick = !cancelTap && spawnRepeatedThisPress;
         spawnRepeatedThisPress = false;
@@ -338,7 +338,7 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
         isSpawnPressed = false;
         holdSpawnElapsedSeconds = 0f;
         spawnRepeatedThisPress = false;
-        nurseryService?.SetRefillPaused(false);
+        spawnerService?.SetRefillPaused(false);
 
         if (clearSuppressedClick)
             suppressNextSpawnClick = false;
@@ -399,7 +399,7 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
 
     private bool Fail(string fieldName)
     {
-        Debug.LogError($"NurseryNodeView: Missing required ref '{fieldName}'.", this);
+        Debug.LogError($"SpawnerNodeView: Missing required ref '{fieldName}'.", this);
         return false;
     }
 
@@ -410,9 +410,9 @@ public sealed class NurseryNodeView : MonoBehaviour, INodeView
             IPointerExitHandler,
             ICancelHandler
     {
-        private NurseryNodeView owner;
+        private SpawnerNodeView owner;
 
-        public void SetOwner(NurseryNodeView owner)
+        public void SetOwner(SpawnerNodeView owner)
         {
             this.owner = owner;
         }
