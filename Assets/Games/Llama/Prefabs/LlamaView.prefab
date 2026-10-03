@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6504089090656889999}
   - component: {fileID: 502766563815998043}
   - component: {fileID: -1204737833802572297}
+  - component: {fileID: 6527061128134568301}
   m_Layer: 0
   m_Name: LlamaView
   m_TagString: Untagged
@@ -140,3 +141,17 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &6527061128134568301
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4909772297966767297}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3a561cf43f642829eb7f823754ed8d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LlamaView
+  LlamaLifetimeSeconds: 2
+  DespawnDurationSeconds: 0.2

@@ -4,7 +4,7 @@ using UnityEngine.EventSystems;
 public sealed class LlamaSpawnerView : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField]
-    private GameObject llamaPrefab;
+    private LlamaView llamaPrefab;
 
     [SerializeField]
     private Transform sceneRoot;
@@ -28,5 +28,6 @@ public sealed class LlamaSpawnerView : MonoBehaviour, IPointerClickHandler
 
         var llama = Instantiate(llamaPrefab, sceneRoot, false);
         llama.transform.localPosition = spawnLocalPosition;
+        llama.Despawn();
     }
 }

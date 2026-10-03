@@ -901,7 +901,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 88d6bccb2fb24ba3996da3ef264bf89d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LlamaSpawnerView
-  llamaPrefab: {fileID: 4909772297966767297, guid: d386ca5432a5d4a759b40879d34432f0,
+  llamaPrefab: {fileID: 6527061128134568301, guid: d386ca5432a5d4a759b40879d34432f0,
     type: 3}
   sceneRoot: {fileID: 2100798905}
   spawnLocalPosition: {x: 0, y: 1, z: 0}
