@@ -7,7 +7,7 @@ using Object = UnityEngine.Object;
 
 public class NodeListComposer
 {
-    private const string ManualNurseryViewId = "node.nursery.view";
+    private const string ManualSpawnerViewId = "node.spawner.view";
     private const double ManualChargedRefillRatePerSecond = 3d;
     private const double ManualChargedSpawnCost = 1d;
     private const double ManualChargedSpawnAmount = 1d;
@@ -522,7 +522,7 @@ public class NodeListComposer
     private static bool IsManualChargedNode(NodeDefinition nodeDefinition)
     {
         var viewId = NormalizeId(nodeDefinition?.viewId);
-        return string.Equals(viewId, ManualNurseryViewId, StringComparison.Ordinal);
+        return string.Equals(viewId, ManualSpawnerViewId, StringComparison.Ordinal);
     }
 
     private static List<NodeOutputDefinition> CloneOutputs(List<NodeOutputDefinition> outputs)
