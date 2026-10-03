@@ -22,13 +22,6 @@ using UnityEngine.Serialization;
 
 public sealed class UiCompositionRoot : MonoBehaviour
 {
-    [Header("Scene UI")]
-    [SerializeField]
-    private CurrencyView[] currencyViews;
-
-    [SerializeField]
-    private ResourceView[] resourceViews;
-
     [SerializeField]
     private BottomBarView bottomBarView;
 
@@ -62,7 +55,6 @@ public sealed class UiCompositionRoot : MonoBehaviour
         if (!Validate(context))
             return;
 
-        BindWalletHud(context);
         BindTopBar(context);
         BindBottomBar(context);
         BindLlamaHud(context);
@@ -100,10 +92,10 @@ public sealed class UiCompositionRoot : MonoBehaviour
             return false;
         }
 
-        if (context.WalletViewModel == null)
+        if (context.WalletService == null)
         {
             Debug.LogError(
-                "UiCompositionRoot: WalletViewModel is null in UiBindingsContext.",
+                "UiCompositionRoot: WalletService is null in UiBindingsContext.",
                 this
             );
             return false;
@@ -133,34 +125,9 @@ public sealed class UiCompositionRoot : MonoBehaviour
         return true;
     }
 
-    private void BindWalletHud(in UiBindingsContext context)
-    {
-        if (currencyViews != null)
-        {
-            foreach (var v in currencyViews)
-            {
-                if (v == null)
-                    continue;
-
-                v.Initialize(context.WalletViewModel);
-            }
-        }
-
-        if (resourceViews == null || resourceViews.Length == 0)
-            return;
-
-        foreach (var v in resourceViews)
-        {
-            if (v == null)
-                continue;
-
-            v.Initialize(context.WalletViewModel);
-        }
-    }
-
     private void BindTopBar(in UiBindingsContext context)
     {
-        topBarViewModel ??= new TopBarViewModel(context.TimeWarpService);
+        topBarViewModel ??= new TopBarViewModel(context.TimeWarpService, context.WalletService);
         topBarView.Bind(topBarViewModel);
     }
 
