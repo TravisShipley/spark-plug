@@ -28,6 +28,7 @@ public sealed class LlamaSpawnerView : MonoBehaviour, IPointerClickHandler
 
         var llama = Instantiate(llamaPrefab, sceneRoot, false);
         llama.transform.localPosition = spawnLocalPosition;
+        llama.Launch();
         llama.Despawn();
     }
 }
