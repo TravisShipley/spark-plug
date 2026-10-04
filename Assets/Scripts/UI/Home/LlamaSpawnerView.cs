@@ -9,15 +9,14 @@ public sealed class LlamaSpawnerView : MonoBehaviour, IPointerClickHandler
     [SerializeField]
     private Transform sceneRoot;
 
-    [SerializeField]
-    private Vector3 spawnLocalPosition = new Vector3(0f, 1f, 0f);
+    private Collider spawnerCollider;
 
     private void Awake()
     {
-        if (llamaPrefab != null && sceneRoot != null)
+        if (llamaPrefab != null && sceneRoot != null && TryGetComponent(out spawnerCollider))
             return;
 
-        Debug.LogError("LlamaSpawnerView: llamaPrefab and sceneRoot must be assigned.", this);
+        Debug.LogError("LlamaSpawnerView: llamaPrefab, sceneRoot, and a Collider are required.", this);
         enabled = false;
     }
 
@@ -27,8 +26,8 @@ public sealed class LlamaSpawnerView : MonoBehaviour, IPointerClickHandler
             return;
 
         var llama = Instantiate(llamaPrefab, sceneRoot, false);
-        llama.transform.localPosition = spawnLocalPosition;
-        llama.Launch();
+        llama.transform.position = transform.position;
+        llama.Launch(spawnerCollider);
         llama.Despawn();
     }
 }

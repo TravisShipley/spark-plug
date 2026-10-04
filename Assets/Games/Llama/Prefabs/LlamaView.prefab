@@ -153,5 +153,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d3a561cf43f642829eb7f823754ed8d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LlamaView
-  LlamaLifetimeSeconds: 2
+  MinLaunchHeight: 0.25
+  MaxLaunchHeight: 0.5
+  MinLaunchElevationDegrees: 75
+  MaxLaunchElevationDegrees: 88
+  launchSpinDegreesPerSecond: {x: 45, y: 90}
+  LlamaLifetimeSeconds: 3.3
   DespawnDurationSeconds: 0.2
